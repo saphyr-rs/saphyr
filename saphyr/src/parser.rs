@@ -1127,7 +1127,7 @@ baz: "qux"
         let yaml = &loader.documents()[1];
         assert_eq!(yaml["baz"].as_str(), Some("qux"));
 
-        let mut loader = YamlLoader::default()
+        let mut loader = YamlLoader::default();
         let mut parser = Parser::new(text.chars()).keep_tags(false);
         assert!(parser.load(&mut loader, true).is_err());
     }
