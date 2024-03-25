@@ -1,6 +1,8 @@
 # yaml-rust2
 
-A fully compliant YAML 1.2 implementation written in pure Rust.
+[yaml-rust2](https://github.com/Ethiraric/yaml-rust2) is a fully compliant YAML 1.2
+implementation written in pure Rust.
+
 This work is based on [`yaml-rust`](https://github.com/chyh1990/yaml-rust) with
 fixes towards being compliant to the [YAML test
 suite](https://github.com/yaml/yaml-test-suite/). `yaml-rust`'s parser is
@@ -120,8 +122,21 @@ You can find licences in the [`.licenses`](.licenses) subfolder.
 
 ## Contribution
 
-Fork & PR on Github.
+[Fork this repository](https://github.com/Ethiraric/yaml-rust2/fork) and
+[Create a Pull Request on Github](https://github.com/Ethiraric/yaml-rust2/compare/master...Ethiraric:yaml-rust2:master).
+You may need to click on "compare across forks" and select your fork's branch.
+Make sure that `Ethiraric` is selected as the base repository, not `chyh1990`.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 be dual licensed as above, without any additional terms or conditions.
+
+## Links
+
+* [yaml-rust2 source code repository](https://github.com/Ethiraric/yaml-rust2)
+
+* [yaml-rust2 releases on crates.io](https://crates.io/crates/yaml-rust2)
+
+* [yaml-rust2 documentation on docs.rs](https://docs.rs/yaml-rust2/latest/yaml_rust2/)
+
+* [yaml-test-suite](https://github.com/yaml/yaml-test-suite)
