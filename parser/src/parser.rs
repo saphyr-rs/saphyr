@@ -61,7 +61,7 @@ pub enum Event {
     Scalar(String, TScalarStyle, usize, Option<Tag>),
     /// The start of a YAML sequence (array).
     SequenceStart(
-        /// The anchor ID of the start of the squence.
+        /// The anchor ID of the start of the sequence.
         usize,
         /// An optional tag
         Option<Tag>,

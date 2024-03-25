@@ -76,7 +76,7 @@ impl Marker {
     }
 }
 
-/// An error that occured while scanning.
+/// An error that occurred while scanning.
 #[derive(Clone, PartialEq, Debug, Eq)]
 pub struct ScanError {
     /// The position at which the error happened in the source.
@@ -1912,7 +1912,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             if (self.mark.col as isize) < self.indent {
                 return Err(ScanError::new(
                     start_mark,
-                    "invalid identation in quoted scalar",
+                    "invalid indentation in quoted scalar",
                 ));
             }
 
