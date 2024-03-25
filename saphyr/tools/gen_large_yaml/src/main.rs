@@ -42,7 +42,7 @@ struct Generator {
     /// The RNG state.
     ///
     /// We don't need to be cryptographically secure. [`SmallRng`] also implements the
-    /// [`SeedableRng`] trait, allowing runs to be predictible.
+    /// [`SeedableRng`] trait, allowing runs to be predictable.
     rng: SmallRng,
     /// The stack of indentations.
     indents: Vec<usize>,

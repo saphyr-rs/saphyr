@@ -102,7 +102,7 @@ Switching to `yaml-rust2` should be a very simple process. Change your `Cargo.to
 As for your code, you have one of two solutions:
 
   * Changing your imports from `use yaml_rust::Yaml` to `use yaml_rust2::Yaml` if you import items directly, or change
-    occurences of `yaml_rust` to `yaml_rust2` if you use fully qualified paths.
+    occurrences of `yaml_rust` to `yaml_rust2` if you use fully qualified paths.
   * Alternatively, you can alias `yaml_rust2` with `use yaml_rust2 as yaml_rust`. This would keep your code working if
     you use fully qualified paths.
 
