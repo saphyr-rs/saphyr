@@ -96,7 +96,7 @@ Switching to `yaml-rust2` should be a very simple process. Change your `Cargo.to
 
 ```diff
 -yaml-rust = "0.4.4"
-+yaml-rust2 = "0.6.0"
++yaml-rust2 = "0.8.0"
 ```
 
 As for your code, you have one of two solutions:
