@@ -1,6 +1,6 @@
 # Changelog
 
-## Upcoming
+## v0.8.0
 
 **Breaking Changes**:
 
