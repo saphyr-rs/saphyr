@@ -47,9 +47,13 @@ trees:
             davvid: "git@github.com:davvid/yaml-rust2.git"
             yaml-rust: "git@github.com:chyh1990/yaml-rust.git"
         gitconfig:
+            # Access yaml-rust2 pull requests as yaml-rust2/pull/*
+            remote.yaml-rust2.url: "git@github.com:Ethiraric/yaml-rust2.git"
+            remote.yaml-rust2.fetch:
+                - "+refs/pull/*/head:refs/remotes/yaml-rust2/pull/*"
+            # Access yaml-rust pull requests as yaml-rust/pull/*
             remote.yaml-rust.fetch:
                 - "+refs/heads/*:refs/remotes/yaml-rust/*"
-                # Access yaml-rust pull requests as yaml-rust/pull/*
                 - "+refs/pull/*/head:refs/remotes/yaml-rust/pull/*"
 
     yaml-test-suite:
