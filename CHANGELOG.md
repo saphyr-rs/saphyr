@@ -34,6 +34,9 @@ documents associated with a loader.
 
 **Development**:
 
+- Linguist attributes were added for the `tests/*.rs.inc` files to prevent github from
+classifying them as C++ files.
+
 ## v0.7.0
 
 **Features**:
