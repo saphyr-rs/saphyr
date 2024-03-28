@@ -135,7 +135,7 @@ impl fmt::Display for ScanError {
 /// The contents of a scanner token.
 #[derive(Clone, PartialEq, Debug, Eq)]
 pub enum TokenType {
-    /// The start of the stream. Sent first, before even [`DocumentStart`].
+    /// The start of the stream. Sent first, before even [`TokenType::DocumentStart`].
     StreamStart(TEncoding),
     /// The end of the stream, EOF.
     StreamEnd,
@@ -324,8 +324,8 @@ const BUFFER_LEN: usize = 16;
 /// some of the constructs. It has understanding of indentation and whitespace and is able to
 /// generate error messages for some invalid YAML constructs.
 ///
-/// It is however not a full parser and needs [`parser::Parser`] to fully detect invalid YAML
-/// documents.
+/// It is however not a full parser and needs [`crate::parser::Parser`] to fully detect invalid
+/// YAML documents.
 #[derive(Debug)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Scanner<T> {

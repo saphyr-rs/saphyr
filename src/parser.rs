@@ -267,7 +267,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
     /// Try to load the next event and return it, but do not consuming it from `self`.
     ///
     /// Any subsequent call to [`Parser::peek`] will return the same value, until a call to
-    /// [`Parser::next`] or [`Parser::load`].
+    /// [`Iterator::next`] or [`Parser::load`].
     /// # Errors
     /// Returns `ScanError` when loading the next event fails.
     pub fn peek(&mut self) -> Result<&(Event, Marker), ScanError> {
