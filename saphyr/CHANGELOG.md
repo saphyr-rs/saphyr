@@ -1,5 +1,17 @@
 # Changelog
 
+## Upcoming
+
+**Features**
+
+- ([#19](https://github.com/Ethiraric/yaml-rust2/pull/19)) `Yaml` now
+  implements `IndexMut<usize>` and `IndexMut<&'a str>`. These functions may not
+  return a mutable reference to a `BAD_VALUE`. Instead, `index_mut()` will
+  panic if either:
+  * The index is out of range, as per `IndexMut`'s requirements
+  * The inner `Yaml` variant doesn't match `Yaml::Array` for `usize` or
+    `Yaml::Hash` for `&'a str`
+
 ## v0.8.0
 
 **Breaking Changes**:
