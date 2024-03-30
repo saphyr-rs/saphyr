@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use std::ops::ControlFlow;
 use std::{collections::BTreeMap, convert::TryFrom, mem, ops::Index, ops::IndexMut};
 
+#[cfg(feature = "encoding")]
 use encoding_rs::{Decoder, DecoderResult, Encoding};
 use hashlink::LinkedHashMap;
 
@@ -279,6 +280,7 @@ impl YamlLoader {
 /// # Returns
 /// The function must return [`ControlFlow::Continue`] if decoding may continue or
 /// [`ControlFlow::Break`] if decoding must be aborted. An optional error string may be supplied.
+#[cfg(feature = "encoding")]
 pub type YAMLDecodingTrapFn = fn(
     malformation_length: u8,
     bytes_read_after_malformation: u8,
@@ -287,6 +289,7 @@ pub type YAMLDecodingTrapFn = fn(
 ) -> ControlFlow<Cow<'static, str>>;
 
 /// The behavior [`YamlDecoder`] must have when an decoding error occurs.
+#[cfg(feature = "encoding")]
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum YAMLDecodingTrap {
     /// Ignore the offending bytes, remove them from the output.
@@ -315,11 +318,13 @@ pub enum YAMLDecodingTrap {
 ///     .decode()
 ///     .unwrap();
 /// ```
+#[cfg(feature = "encoding")]
 pub struct YamlDecoder<T: std::io::Read> {
     source: T,
     trap: YAMLDecodingTrap,
 }
 
+#[cfg(feature = "encoding")]
 impl<T: std::io::Read> YamlDecoder<T> {
     /// Create a `YamlDecoder` decoding the given source.
     pub fn read(source: T) -> YamlDecoder<T> {
@@ -358,6 +363,7 @@ impl<T: std::io::Read> YamlDecoder<T> {
 }
 
 /// Perform a loop of [`Decoder::decode_to_string`], reallocating `output` if needed.
+#[cfg(feature = "encoding")]
 fn decode_loop(
     input: &[u8],
     output: &mut String,
@@ -433,6 +439,7 @@ fn decode_loop(
 /// This allows the encoding to be deduced by the pattern of null (#x00) characters.
 //
 /// See spec at <https://yaml.org/spec/1.2/spec.html#id2771184>
+#[cfg(feature = "encoding")]
 fn detect_utf16_endianness(b: &[u8]) -> &'static Encoding {
     if b.len() > 1 && (b[0] != b[1]) {
         if b[0] == 0 {

@@ -12,10 +12,16 @@ description = "A fully YAML 1.2 compliant YAML parser"
 repository = "https://github.com/Ethiraric/yaml-rust2"
 readme = "README.md"
 edition = "2021"
+rust-version = "1.65.0"
+
+[features]
+default = [ "encoding" ]
+debug_prints = []
+encoding = [ "dep:encoding_rs" ]
 
 [dependencies]
 arraydeque = "0.5.1"
-encoding_rs = "0.8.33"
+encoding_rs = { version = "0.8.33", optional = true }
 hashlink = "0.8"
 
 [dev-dependencies]
