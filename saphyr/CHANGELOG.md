@@ -12,6 +12,16 @@
   * The inner `Yaml` variant doesn't match `Yaml::Array` for `usize` or
     `Yaml::Hash` for `&'a str`
 
+- Use cargo features
+  
+  This allows for more fine-grained control over MSRV and to completely remove
+  debug code from the library when it is consumed.
+
+  The `encoding` feature, governing the `YamlDecoder`, has been enabled by
+  default. Users of `@davvid`'s fork of `yaml-rust` or of `yaml-rust2` might
+  already use this. Users of the original `yaml-rust` crate may freely disable
+  this feature (`cargo <...> --no-default-features`) and lower MSRV to 1.65.0.
+
 ## v0.8.0
 
 **Breaking Changes**:
