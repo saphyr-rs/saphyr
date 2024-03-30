@@ -7,17 +7,17 @@
 //!      build, debug helpers will only trigger if that variable is set when running the program.
 
 // If a debug build, use stuff in the debug submodule.
-#[cfg(debug_assertions)]
+#[cfg(feature = "debug_prints")]
 pub use debug::enabled;
 
 // Otherwise, just export dummies for publicly visible functions.
 /// Evaluates to nothing.
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "debug_prints"))]
 macro_rules! debug_print {
     ($($arg:tt)*) => {{}};
 }
 
-#[cfg(debug_assertions)]
+#[cfg(feature = "debug_prints")]
 #[macro_use]
 #[allow(clippy::module_inception)]
 mod debug {
