@@ -36,7 +36,7 @@ impl From<fmt::Error> for EmitError {
 /// The YAML serializer.
 ///
 /// ```
-/// # use yaml_rust2::{YamlLoader, YamlEmitter};
+/// # use saphyr::{YamlLoader, YamlEmitter};
 /// let input_string = "a: b\nc: d";
 /// let yaml = YamlLoader::load_from_str(input_string).unwrap();
 ///
@@ -142,6 +142,8 @@ impl<'a> YamlEmitter<'a> {
     /// In this form, blocks cannot have any properties (such as anchors
     /// or tags), which should be OK, because this emitter doesn't
     /// (currently) emit those anyways.
+    ///
+    /// TODO(ethiraric, 2024/04/02): We can support those now.
     pub fn compact(&mut self, compact: bool) {
         self.compact = compact;
     }
@@ -157,7 +159,7 @@ impl<'a> YamlEmitter<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
+    /// use saphyr::{Yaml, YamlEmitter, YamlLoader};
     ///
     /// let input = r#"{foo: "bar!\nbar!", baz: 42}"#;
     /// let parsed = YamlLoader::load_from_str(input).unwrap();

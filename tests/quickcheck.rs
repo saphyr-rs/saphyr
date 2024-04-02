@@ -1,9 +1,9 @@
-extern crate yaml_rust2;
 #[macro_use]
 extern crate quickcheck;
 
 use quickcheck::TestResult;
-use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
+
+use saphyr::{Yaml, YamlEmitter, YamlLoader};
 
 quickcheck! {
     fn test_check_weird_keys(xs: Vec<String>) -> TestResult {

@@ -1,6 +1,4 @@
-extern crate yaml_rust2;
-
-use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
+use saphyr::{Yaml, YamlEmitter, YamlLoader};
 
 fn roundtrip(original: &Yaml) {
     let mut emitted = String::new();
