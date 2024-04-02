@@ -2,11 +2,7 @@ use std::fs::{self, DirEntry};
 
 use libtest_mimic::{run_tests, Arguments, Outcome, Test};
 
-use yaml_rust2::{
-    parser::{Event, EventReceiver, Parser, Tag},
-    scanner::TScalarStyle,
-    yaml, ScanError, Yaml, YamlLoader,
-};
+use saphyr_parser::{Event, EventReceiver, Parser, ScanError, TScalarStyle, Tag};
 
 type Result<T, E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 
@@ -76,6 +72,8 @@ fn run_yaml_test(test: &Test<YamlTest>) -> Outcome {
 }
 
 fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
+    use yaml_rust2::{yaml, Yaml, YamlLoader};
+
     let file_name = entry.file_name().to_string_lossy().to_string();
     let test_name = file_name
         .strip_suffix(".yaml")
@@ -123,7 +121,15 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
 
 fn parse_to_events(source: &str) -> Result<Vec<String>, ScanError> {
     let mut reporter = EventReporter::new();
-    Parser::new_from_str(source).load(&mut reporter, true)?;
+    for x in Parser::new_from_str(source) {
+        match x? {
+            (Event::StreamEnd, _) => {
+                reporter.on_event(Event::StreamEnd);
+                break;
+            }
+            (x, _) => reporter.on_event(x),
+        }
+    }
     Ok(reporter.events)
 }
 

@@ -69,7 +69,7 @@ Max    : 1.597028s
 # This will be read by this tool.
 # This must output a YAML as described below.
 $> run_bench ../file.yaml 10 --output-yaml
-parser: yaml-rust2
+parser: saphyr
 input: ../file.yaml
 average: 1620303590
 min: 1611632108
@@ -110,7 +110,7 @@ yaml_output_dir = "yaml_output" # The directory in which `run_bench`'s yamls are
 csv_output = "benchmark.csv"  # The CSV output aggregating times for each parser and file
 
 [[parsers]]                   # A parser, can be repeated as many times as there are parsers
-name = "yaml-rust2"           # The name of the parser (used for logging)
+name = "saphyr"               # The name of the parser (used for logging)
 path = "target/release/"      # The path in which the parsers' `run_bench` and `time_parse` are
 
 # If there is another parser, another block can be added

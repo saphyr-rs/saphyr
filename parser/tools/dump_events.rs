@@ -1,7 +1,8 @@
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
-use yaml_rust2::{
+
+use saphyr_parser::{
     parser::{MarkedEventReceiver, Parser},
     scanner::Marker,
     Event,

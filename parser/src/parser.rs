@@ -1,23 +1,20 @@
 //! Home to the YAML Parser.
 //!
 //! The parser takes input from the [`crate::scanner::Scanner`], performs final checks for YAML
-//! compliance, and emits a stream of tokens that can be used by the [`crate::YamlLoader`] to
-//! construct the [`crate::Yaml`] object.
+//! compliance, and emits a stream of YAML events. This stream can for instance be used to create
+//! YAML objects.
 
 use crate::scanner::{Marker, ScanError, Scanner, TScalarStyle, Token, TokenType};
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, PartialEq, Debug, Eq)]
 enum State {
-    /// We await the start of the stream.
     StreamStart,
     ImplicitDocumentStart,
     DocumentStart,
     DocumentContent,
     DocumentEnd,
     BlockNode,
-    // BlockNodeOrIndentlessSequence,
-    // FlowNode,
     BlockSequenceFirstEntry,
     BlockSequenceEntry,
     IndentlessSequenceEntry,
@@ -165,7 +162,7 @@ pub struct Parser<T> {
 ///
 /// # Example
 /// ```
-/// # use yaml_rust2::parser::{Event, EventReceiver, Parser};
+/// # use saphyr_parser::{Event, EventReceiver, Parser};
 /// #
 /// /// Sink of events. Collects them into an array.
 /// struct EventSink {
@@ -1088,10 +1085,17 @@ impl<T: Iterator<Item = char>> Parser<T> {
     }
 }
 
+impl<T: Iterator<Item = char>> Iterator for Parser<T> {
+    type Item = Result<(Event, Marker), ScanError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.next_token())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::{Event, Parser};
-    use crate::YamlLoader;
 
     #[test]
     fn test_peek_eq_parse() {
@@ -1126,18 +1130,29 @@ foo: "bar"
 --- !t!2 &2
 baz: "qux"
 "#;
-        let mut parser = Parser::new_from_str(text).keep_tags(true);
-        let result = YamlLoader::load_from_parser(&mut parser);
-        assert!(result.is_ok());
-        let docs = result.unwrap();
-        assert_eq!(docs.len(), 2);
-        let yaml = &docs[0];
-        assert_eq!(yaml["foo"].as_str(), Some("bar"));
-        let yaml = &docs[1];
-        assert_eq!(yaml["baz"].as_str(), Some("qux"));
+        for x in Parser::new_from_str(text).keep_tags(true) {
+            let x = x.unwrap();
+            match x.0 {
+                Event::StreamEnd => break,
+                Event::MappingStart(_, tag) => {
+                    let tag = tag.unwrap();
+                    assert_eq!(tag.handle, "tag:test,2024:");
+                }
+                _ => (),
+            }
+        }
 
-        let mut parser = Parser::new_from_str(text).keep_tags(false);
-        let result = YamlLoader::load_from_parser(&mut parser);
-        assert!(result.is_err());
+        for x in Parser::new_from_str(text).keep_tags(false) {
+            match x {
+                Err(..) => {
+                    // Test successful
+                    return;
+                }
+                Ok((Event::StreamEnd, _)) => {
+                    panic!("Test failed, did not encounter error")
+                }
+                _ => (),
+            }
+        }
     }
 }

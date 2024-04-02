@@ -1,4 +1,5 @@
 before_commit:
+  cargo fmt --check
   cargo clippy --release --all-targets -- -D warnings
   cargo clippy --all-targets -- -D warnings
   cargo build --release --all-targets

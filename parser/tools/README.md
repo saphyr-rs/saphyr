@@ -1,6 +1,6 @@
-# `yaml-rust2` tools
+# `saphyr-parser` tools
 This directory contains tools that are used to develop the crate.
-Due to dependency management, only some of them are available as binaries from the `yaml-rust2` crate.
+Due to dependency management, only some of them are available as binaries from the `saphyr-parser` crate.
 
 | Tool | Invocation |
 |------|------------|
@@ -14,7 +14,7 @@ Due to dependency management, only some of them are available as binaries from t
 See the [dedicated README file](./bench_compare/README.md).
 
 ## `dump_events`
-This is a debugging helper for the parser. It outputs events emitted by the parser for a given file. This can be paired with the `YAMLRUST2_DEBUG` environment variable to have an in-depth overview of which steps the scanner and the parser are taking.
+This is a debugging helper for the parser. It outputs events emitted by the parser for a given file. This can be paired with the `SAPHYR_DEBUG` environment variable to have an in-depth overview of which steps the scanner and the parser are taking.
 
 ### Example
 Consider the following `input.yaml` YAML file:
@@ -48,7 +48,7 @@ Running `cargo run --bin dump_events -- input.yaml` outputs:
       ↳ StreamEnd
 ```
 
-Running `YAMLRUST2_DEBUG=1 cargo run --bin dump_events -- input.yaml` outputs much more details:
+Running `SAPHYR_DEBUG=1 cargo run --bin dump_events -- input.yaml` outputs much more details:
 <details>
 <summary> Full output </summary>
 
@@ -174,7 +174,7 @@ The generated files are the following:
 
 All generated files are meant to be between 200 and 250 MiB in size.
 
-This tool depends on external dependencies that are not part of `yaml-rust2`'s dependencies or `dev-dependencies` and as such can't be called through `cargo run` directly. A dedicated `cargo gen_large_yaml` alias can be used to generate the benchmark files.
+This tool depends on external dependencies that are not part of `saphyr-parser`'s dependencies or `dev-dependencies` and as such can't be called through `cargo run` directly. A dedicated `cargo gen_large_yaml` alias can be used to generate the benchmark files.
 
 ## `run_bench`
 This is a benchmarking helper that runs the parser on the given file a given number of times and is able to extract simple metrics out of the results. The `--output-yaml` flag can be specified to make the output a YAML file that can be fed into other tools.
@@ -192,7 +192,7 @@ Max: 1.633045284s
 95%: 1.633045284s
 
 $> cargo run --release --bin run_bench -- bench_yaml/big.yaml 10 --output-yaml
-parser: yaml-rust2
+parser: saphyr
 input: bench_yaml/big.yaml
 average: 1649847674
 min: 1648277149
