@@ -1037,16 +1037,13 @@ impl<T: Iterator<Item = char>> Parser<T> {
         if handle == "!!" {
             // "!!" is a shorthand for "tag:yaml.org,2002:". However, that default can be
             // overridden.
-            match self.tags.get("!!") {
-                Some(prefix) => Ok(Tag {
-                    handle: prefix.to_string(),
-                    suffix,
-                }),
-                None => Ok(Tag {
-                    handle: "tag:yaml.org,2002:".to_string(),
-                    suffix,
-                }),
-            }
+            Ok(Tag {
+                handle: self
+                    .tags
+                    .get("!!")
+                    .map_or_else(|| "tag:yaml.org,2002:".to_string(), ToString::to_string),
+                suffix,
+            })
         } else if handle.is_empty() && suffix == "!" {
             // "!" introduces a local tag. Local tags may have their prefix overridden.
             match self.tags.get("") {
