@@ -8,7 +8,7 @@ authors = [
 ]
 documentation = "https://docs.rs/saphyr-parser"
 keywords = [ "yaml", "parser", "deserialization" ]
-categories = [ "encoding", "parser-implementations" ]
+categories = [ "encoding", "parser-implementations", "parsing" ]
 license = "MIT OR Apache-2.0"
 description = "A fully YAML 1.2 compliant YAML parser"
 repository = "https://github.com/saphyr-rs/saphyr-parser"

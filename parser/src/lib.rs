@@ -23,8 +23,6 @@
 //! # Features
 //! **Note:** With all features disabled, this crate's MSRV is `1.65.0`.
 //!
-//! The MSRV for this feature is `1.70.0`.
-//!
 //! #### `debug_prints`
 //! Enables the `debug` module and usage of debug prints in the scanner and the parser. Do not
 //! enable if you are consuming the crate rather than working on it as this can significantly
