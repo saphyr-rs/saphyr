@@ -1,4 +1,4 @@
-use yaml_rust2::{YamlEmitter, YamlLoader};
+use saphyr::{YamlEmitter, YamlLoader};
 
 #[allow(clippy::similar_names)]
 #[test]

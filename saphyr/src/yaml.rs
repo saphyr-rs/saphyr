@@ -10,8 +10,7 @@ use std::{collections::BTreeMap, convert::TryFrom, mem, ops::Index, ops::IndexMu
 use encoding_rs::{Decoder, DecoderResult, Encoding};
 use hashlink::LinkedHashMap;
 
-use crate::parser::{Event, MarkedEventReceiver, Parser, Tag};
-use crate::scanner::{Marker, ScanError, TScalarStyle};
+use saphyr_parser::{Event, MarkedEventReceiver, Marker, Parser, ScanError, TScalarStyle, Tag};
 
 /// A YAML node is stored as this `Yaml` enumeration, which provides an easy way to
 /// access your YAML document.
@@ -19,7 +18,7 @@ use crate::scanner::{Marker, ScanError, TScalarStyle};
 /// # Examples
 ///
 /// ```
-/// use yaml_rust2::Yaml;
+/// use saphyr::Yaml;
 /// let foo = Yaml::from_str("-123"); // convert the string to the appropriate YAML type
 /// assert_eq!(foo.as_i64().unwrap(), -123);
 ///
@@ -306,7 +305,7 @@ pub enum YAMLDecodingTrap {
 /// For example, to read a YAML file while ignoring Unicode decoding errors you can set the
 /// `encoding_trap` to `encoding::DecoderTrap::Ignore`.
 /// ```rust
-/// use yaml_rust2::yaml::{YamlDecoder, YAMLDecodingTrap};
+/// use saphyr::{YamlDecoder, YAMLDecodingTrap};
 ///
 /// let string = b"---
 /// a\xa9: 1
@@ -580,7 +579,7 @@ impl Yaml {
     /// replace it with a given value `other`. Otherwise, return self unchanged.
     ///
     /// ```
-    /// use yaml_rust2::yaml::Yaml;
+    /// use saphyr::Yaml;
     ///
     /// assert_eq!(Yaml::BadValue.or(Yaml::Integer(3)),  Yaml::Integer(3));
     /// assert_eq!(Yaml::Integer(3).or(Yaml::BadValue),  Yaml::Integer(3));
@@ -613,7 +612,7 @@ impl Yaml {
     ///
     /// # Examples
     /// ```
-    /// # use yaml_rust2::yaml::Yaml;
+    /// # use saphyr::Yaml;
     /// assert!(matches!(Yaml::from_str("42"), Yaml::Integer(42)));
     /// assert!(matches!(Yaml::from_str("0x2A"), Yaml::Integer(42)));
     /// assert!(matches!(Yaml::from_str("0o52"), Yaml::Integer(42)));

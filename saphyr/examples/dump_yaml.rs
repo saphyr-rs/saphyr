@@ -1,7 +1,7 @@
+use saphyr::yaml;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
-use yaml_rust2::yaml;
 
 fn print_indent(indent: usize) {
     for _ in 0..indent {

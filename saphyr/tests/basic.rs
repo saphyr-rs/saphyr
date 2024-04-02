@@ -1,8 +1,7 @@
 #![allow(clippy::bool_assert_comparison)]
 #![allow(clippy::float_cmp)]
 
-use std::vec;
-use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
+use saphyr::{Yaml, YamlEmitter, YamlLoader};
 
 #[test]
 fn test_api() {
@@ -45,27 +44,6 @@ fn test_api() {
 }
 
 #[test]
-fn test_fail() {
-    let s = "
-# syntax error
-scalar
-key: [1, 2]]
-key1:a2
-";
-    let Err(error) = YamlLoader::load_from_str(s) else {
-        panic!()
-    };
-    assert_eq!(
-        error.info(),
-        "mapping values are not allowed in this context"
-    );
-    assert_eq!(
-        error.to_string(),
-        "mapping values are not allowed in this context at byte 26 line 4 column 4"
-    );
-}
-
-#[test]
 fn test_coerce() {
     let s = "---
 a: 1
@@ -78,51 +56,6 @@ c: [1, 2]
     assert_eq!(doc["b"].as_f64().unwrap(), 2.2f64);
     assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
     assert!(doc["d"][0].is_badvalue());
-}
-
-#[test]
-fn test_empty_doc() {
-    let s: String = String::new();
-    YamlLoader::load_from_str(&s).unwrap();
-    let s: String = "---".to_owned();
-    assert_eq!(YamlLoader::load_from_str(&s).unwrap()[0], Yaml::Null);
-}
-
-#[test]
-fn test_parser() {
-    let s: String = "
-# comment
-a0 bb: val
-a1:
-    b1: 4
-    b2: d
-a2: 4 # i'm comment
-a3: [1, 2, 3]
-a4:
-    - - a1
-      - a2
-    - 2
-a5: 'single_quoted'
-a6: \"double_quoted\"
-a7: 你好
-"
-    .to_owned();
-    let out = YamlLoader::load_from_str(&s).unwrap();
-    let doc = &out[0];
-    assert_eq!(doc["a7"].as_str().unwrap(), "你好");
-}
-
-#[test]
-fn test_multi_doc() {
-    let s = "
-'a scalar'
----
-'a scalar'
----
-'a scalar'
-";
-    let out = YamlLoader::load_from_str(s).unwrap();
-    assert_eq!(out.len(), 3);
 }
 
 #[test]
@@ -148,15 +81,6 @@ a1: &DEFAULT
     let out = YamlLoader::load_from_str(s).unwrap();
     let doc = &out[0];
     assert_eq!(doc["a1"]["b2"], Yaml::BadValue);
-}
-
-#[test]
-fn test_github_27() {
-    // https://github.com/chyh1990/yaml-rust/issues/27
-    let s = "&a";
-    let out = YamlLoader::load_from_str(s).unwrap();
-    let doc = &out[0];
-    assert_eq!(doc.as_str().unwrap(), "");
 }
 
 #[test]
@@ -221,45 +145,6 @@ fn test_plain_datatype() {
     assert_eq!(doc[24].as_i64().unwrap(), 12345);
     assert!(doc[25][0].as_bool().unwrap());
     assert!(!doc[25][1].as_bool().unwrap());
-}
-
-#[test]
-fn test_bad_hyphen() {
-    // See: https://github.com/chyh1990/yaml-rust/issues/23
-    let s = "{-";
-    assert!(YamlLoader::load_from_str(s).is_err());
-}
-
-#[test]
-fn test_issue_65() {
-    // See: https://github.com/chyh1990/yaml-rust/issues/65
-    let b = "\n\"ll\\\"ll\\\r\n\"ll\\\"ll\\\r\r\r\rU\r\r\rU";
-    assert!(YamlLoader::load_from_str(b).is_err());
-}
-
-#[test]
-fn test_issue_65_mwe() {
-    // A MWE for `test_issue_65`. The error over there is that there is invalid trailing content
-    // after a double quoted string.
-    let b = r#""foo" l"#;
-    assert!(YamlLoader::load_from_str(b).is_err());
-}
-
-#[test]
-fn test_bad_docstart() {
-    assert!(YamlLoader::load_from_str("---This used to cause an infinite loop").is_ok());
-    assert_eq!(
-        YamlLoader::load_from_str("----"),
-        Ok(vec![Yaml::String(String::from("----"))])
-    );
-    assert_eq!(
-        YamlLoader::load_from_str("--- #here goes a comment"),
-        Ok(vec![Yaml::Null])
-    );
-    assert_eq!(
-        YamlLoader::load_from_str("---- #here goes a comment"),
-        Ok(vec![Yaml::String(String::from("----"))])
-    );
 }
 
 #[test]
@@ -347,96 +232,4 @@ fn test_integer_key() {
     let out = YamlLoader::load_from_str(s).unwrap();
     let first = out.into_iter().next().unwrap();
     assert_eq!(first[0]["important"].as_bool().unwrap(), true);
-}
-
-#[test]
-fn test_indentation_equality() {
-    let four_spaces = YamlLoader::load_from_str(
-        r"
-hash:
-    with:
-        indentations
-",
-    )
-    .unwrap()
-    .into_iter()
-    .next()
-    .unwrap();
-
-    let two_spaces = YamlLoader::load_from_str(
-        r"
-hash:
-  with:
-    indentations
-",
-    )
-    .unwrap()
-    .into_iter()
-    .next()
-    .unwrap();
-
-    let one_space = YamlLoader::load_from_str(
-        r"
-hash:
- with:
-  indentations
-",
-    )
-    .unwrap()
-    .into_iter()
-    .next()
-    .unwrap();
-
-    let mixed_spaces = YamlLoader::load_from_str(
-        r"
-hash:
-     with:
-               indentations
-",
-    )
-    .unwrap()
-    .into_iter()
-    .next()
-    .unwrap();
-
-    assert_eq!(four_spaces, two_spaces);
-    assert_eq!(two_spaces, one_space);
-    assert_eq!(four_spaces, mixed_spaces);
-}
-
-#[test]
-fn test_two_space_indentations() {
-    // https://github.com/kbknapp/clap-rs/issues/965
-
-    let s = r"
-subcommands:
-  - server:
-    about: server related commands
-subcommands2:
-  - server:
-      about: server related commands
-subcommands3:
- - server:
-    about: server related commands
-            ";
-
-    let out = YamlLoader::load_from_str(s).unwrap();
-    let doc = &out.into_iter().next().unwrap();
-
-    println!("{doc:#?}");
-    assert_eq!(doc["subcommands"][0]["server"], Yaml::Null);
-    assert!(doc["subcommands2"][0]["server"].as_hash().is_some());
-    assert!(doc["subcommands3"][0]["server"].as_hash().is_some());
-}
-
-#[test]
-fn test_recursion_depth_check_objects() {
-    let s = "{a:".repeat(10_000) + &"}".repeat(10_000);
-    assert!(YamlLoader::load_from_str(&s).is_err());
-}
-
-#[test]
-fn test_recursion_depth_check_arrays() {
-    let s = "[".repeat(10_000) + &"]".repeat(10_000);
-    assert!(YamlLoader::load_from_str(&s).is_err());
 }

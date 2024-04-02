@@ -31,7 +31,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - run: git submodule update --init
       - run: rustup toolchain install ${{ matrix.rust }} --profile minimal --no-self-update
       - uses: Swatinem/rust-cache@v2
       - name: Run build

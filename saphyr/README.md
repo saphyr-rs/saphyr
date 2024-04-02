@@ -1,29 +1,34 @@
-# yaml-rust2
+# saphyr
 
-[yaml-rust2](https://github.com/Ethiraric/yaml-rust2) is a fully compliant YAML 1.2
-implementation written in pure Rust.
+[saphyr](https://github.com/saphyr-rs/saphyr) is a fully compliant YAML 1.2
+library written in pure Rust.
 
 This work is based on [`yaml-rust`](https://github.com/chyh1990/yaml-rust) with
 fixes towards being compliant to the [YAML test
 suite](https://github.com/yaml/yaml-test-suite/). `yaml-rust`'s parser is
 heavily influenced by `libyaml` and `yaml-cpp`.
 
-`yaml-rust2` is a pure Rust YAML 1.2 implementation that benefits from the
+`saphyr` is a pure Rust YAML 1.2 implementation that benefits from the
 memory safety and other benefits from the Rust language.
 
 ## Quick Start
-
-Add the following to the Cargo.toml of your project:
+### Installing
+Add the following to your Cargo.toml:
 
 ```toml
 [dependencies]
-yaml-rust2 = "0.8"
+saphyr = "0.0.1"
+```
+or use `cargo add` to get the latest version automatically:
+```sh
+cargo add saphyr
 ```
 
-Use `yaml_rust2::YamlLoader` to load YAML documents and access them as `Yaml` objects:
+### Example
+Use `saphyr::YamlLoader` to load YAML documents and access them as `Yaml` objects:
 
 ```rust
-use yaml_rust2::{YamlLoader, YamlEmitter};
+use saphyr::{YamlLoader, YamlEmitter};
 
 fn main() {
     let s =
@@ -61,7 +66,7 @@ bar:
 }
 ```
 
-Note that `yaml_rust2::Yaml` implements `Index<&'a str>` and `Index<usize>`:
+Note that `saphyr::Yaml` implements `Index<&'a str>` and `Index<usize>`:
 
 * `Index<usize>` assumes the container is an array
 * `Index<&'a str>` assumes the container is a string to value map
@@ -75,7 +80,6 @@ your objects.
 
 * Pure Rust
 * `Vec`/`HashMap` access API
-* Low-level YAML events emission
 
 ## Security
 
@@ -85,24 +89,10 @@ communicating with the outside world just by parsing a YAML document.
 
 ## Specification Compliance
 
-This implementation is fully compatible with the YAML 1.2 specification. In
-order to help with compliance, `yaml-rust2` tests against (and passes) the [YAML
-test suite](https://github.com/yaml/yaml-test-suite/).
-
-## Upgrading from yaml-rust
-
-You can use `yaml-rust2` as a drop-in replacement for the original `yaml-rust` crate.
-
-```toml
-[dependencies]
-yaml-rust = { version = "#.#", package = "yaml-rust2" }
-```
-
-This `Cargo.toml` declaration allows you to refer to this crate as `yaml_rust` in your code.
-
-```rust
-use yaml_rust::{YamlLoader, YamlEmitter};
-```
+This implementation is fully compatible with the YAML 1.2 specification. The
+parser behind this library
+([`saphyr-parser`](https://github.com/saphyr-rs/saphyr-parser)) tests against
+(and passes) the [YAML test suite](https://github.com/yaml/yaml-test-suite/).
 
 ## License
 
@@ -122,10 +112,9 @@ You can find licences in the [`.licenses`](.licenses) subfolder.
 
 ## Contribution
 
-[Fork this repository](https://github.com/Ethiraric/yaml-rust2/fork) and
-[Create a Pull Request on Github](https://github.com/Ethiraric/yaml-rust2/compare/master...Ethiraric:yaml-rust2:master).
+[Fork this repository](https://github.com/saphyr-rs/saphyr/fork) and
+[Create a Pull Request on Github](https://github.com/saphyr-rs/saphyr/compare/master...saphyr-rs:saphyr:master).
 You may need to click on "compare across forks" and select your fork's branch.
-Make sure that `Ethiraric` is selected as the base repository, not `chyh1990`.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall
@@ -133,10 +122,12 @@ be dual licensed as above, without any additional terms or conditions.
 
 ## Links
 
-* [yaml-rust2 source code repository](https://github.com/Ethiraric/yaml-rust2)
+* [saphyr source code repository](https://github.com/saphyr-rs/saphyr)
 
-* [yaml-rust2 releases on crates.io](https://crates.io/crates/yaml-rust2)
+* [saphyr releases on crates.io](https://crates.io/crates/saphyr)
 
-* [yaml-rust2 documentation on docs.rs](https://docs.rs/yaml-rust2/latest/yaml_rust2/)
+* [saphyr documentation on docs.rs](https://docs.rs/saphyr/latest/saphyr/)
+
+* [saphyr-parser releases on crates.io](https://crates.io/crates/saphyr-parser)
 
 * [yaml-test-suite](https://github.com/yaml/yaml-test-suite)
