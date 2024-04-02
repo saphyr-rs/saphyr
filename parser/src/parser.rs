@@ -101,17 +101,35 @@ impl Event {
 /// A YAML parser.
 #[derive(Debug)]
 pub struct Parser<T> {
+    /// The underlying scanner from which we pull tokens.
     scanner: Scanner<T>,
+    /// The stack of _previous_ states we were in.
+    ///
+    /// States are pushed in the context of subobjects to this stack. The top-most element is the
+    /// state in which to come back to when exiting the current state.
     states: Vec<State>,
+    /// The state in which we currently are.
     state: State,
+    /// The next token from the scanner.
     token: Option<Token>,
+    /// The next YAML event to emit.
     current: Option<(Event, Marker)>,
+    /// Anchors that have been encountered in the YAML document.
     anchors: HashMap<String, usize>,
-    anchor_id: usize,
+    /// Next ID available for an anchor.
+    ///
+    /// Every anchor is given a unique ID. We use an incrementing ID and this is both the ID to
+    /// return for the next anchor and the count of anchor IDs emitted.
+    anchor_id_count: usize,
     /// The tag directives (`%TAG`) the parser has encountered.
     ///
     /// Key is the handle, and value is the prefix.
     tags: HashMap<String, String>,
+    /// Whether we have emitted [`Event::StreamEnd`].
+    ///
+    /// Emitted means that it has been returned from [`Self::next_token`]. If it is stored in
+    /// [`Self::token`], this is set to `false`.
+    stream_end_emitted: bool,
     /// Make tags global across all documents.
     keep_tags: bool,
 }
@@ -227,8 +245,9 @@ impl<T: Iterator<Item = char>> Parser<T> {
 
             anchors: HashMap::new(),
             // valid anchor_id starts from 1
-            anchor_id: 1,
+            anchor_id_count: 1,
             tags: HashMap::new(),
+            stream_end_emitted: false,
             keep_tags: false,
         }
     }
@@ -265,21 +284,46 @@ impl<T: Iterator<Item = char>> Parser<T> {
     ///
     /// Any subsequent call to [`Parser::peek`] will return the same value, until a call to
     /// [`Iterator::next`] or [`Parser::load`].
+    ///
     /// # Errors
     /// Returns `ScanError` when loading the next event fails.
-    pub fn peek(&mut self) -> Result<&(Event, Marker), ScanError> {
+    pub fn peek(&mut self) -> Option<Result<&(Event, Marker), ScanError>> {
         if let Some(ref x) = self.current {
-            Ok(x)
+            Some(Ok(x))
         } else {
-            self.current = Some(self.next_token()?);
-            self.peek()
+            if self.stream_end_emitted {
+                return None;
+            }
+            match self.next_event_impl() {
+                Ok(token) => self.current = Some(token),
+                Err(e) => return Some(Err(e)),
+            }
+            self.current.as_ref().map(Ok)
         }
     }
 
     /// Try to load the next event and return it, consuming it from `self`.
+    ///
     /// # Errors
     /// Returns `ScanError` when loading the next event fails.
-    pub fn next_token(&mut self) -> ParseResult {
+    pub fn next_event(&mut self) -> Option<ParseResult> {
+        if self.stream_end_emitted {
+            return None;
+        }
+
+        let tok = self.next_event_impl();
+        if matches!(tok, Ok((Event::StreamEnd, _))) {
+            self.stream_end_emitted = true;
+        }
+        Some(tok)
+    }
+
+    /// Implementation function for [`Self::next_event`] without the `Option`.
+    ///
+    /// [`Self::next_event`] should conform to the expectations of an [`Iterator`] and return an
+    /// option. This burdens the parser code. This function is used internally when an option is
+    /// undesirable.
+    fn next_event_impl(&mut self) -> ParseResult {
         match self.current.take() {
             None => self.parse(),
             Some(v) => Ok(v),
@@ -320,7 +364,6 @@ impl<T: Iterator<Item = char>> Parser<T> {
     /// Skip the next token from the scanner.
     fn skip(&mut self) {
         self.token = None;
-        //self.peek_token();
     }
     /// Pops the top-most state and make it the current state.
     fn pop_state(&mut self) {
@@ -336,7 +379,6 @@ impl<T: Iterator<Item = char>> Parser<T> {
             return Ok((Event::StreamEnd, self.scanner.mark()));
         }
         let (ev, mark) = self.state_machine()?;
-        // println!("EV {:?}", ev);
         Ok((ev, mark))
     }
 
@@ -358,7 +400,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
         multi: bool,
     ) -> Result<(), ScanError> {
         if !self.scanner.stream_started() {
-            let (ev, mark) = self.next_token()?;
+            let (ev, mark) = self.next_event_impl()?;
             if ev != Event::StreamStart {
                 return Err(ScanError::new(mark, "did not find expected <stream-start>"));
             }
@@ -371,7 +413,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
             return Ok(());
         }
         loop {
-            let (ev, mark) = self.next_token()?;
+            let (ev, mark) = self.next_event_impl()?;
             if ev == Event::StreamEnd {
                 recv.on_event(ev, mark);
                 return Ok(());
@@ -400,11 +442,11 @@ impl<T: Iterator<Item = char>> Parser<T> {
         }
         recv.on_event(first_ev, mark);
 
-        let (ev, mark) = self.next_token()?;
+        let (ev, mark) = self.next_event_impl()?;
         self.load_node(ev, mark, recv)?;
 
         // DOCUMENT-END is expected.
-        let (ev, mark) = self.next_token()?;
+        let (ev, mark) = self.next_event_impl()?;
         assert_eq!(ev, Event::DocumentEnd);
         recv.on_event(ev, mark);
 
@@ -438,17 +480,17 @@ impl<T: Iterator<Item = char>> Parser<T> {
     }
 
     fn load_mapping<R: MarkedEventReceiver>(&mut self, recv: &mut R) -> Result<(), ScanError> {
-        let (mut key_ev, mut key_mark) = self.next_token()?;
+        let (mut key_ev, mut key_mark) = self.next_event_impl()?;
         while key_ev != Event::MappingEnd {
             // key
             self.load_node(key_ev, key_mark, recv)?;
 
             // value
-            let (ev, mark) = self.next_token()?;
+            let (ev, mark) = self.next_event_impl()?;
             self.load_node(ev, mark, recv)?;
 
             // next event
-            let (ev, mark) = self.next_token()?;
+            let (ev, mark) = self.next_event_impl()?;
             key_ev = ev;
             key_mark = mark;
         }
@@ -457,12 +499,12 @@ impl<T: Iterator<Item = char>> Parser<T> {
     }
 
     fn load_sequence<R: MarkedEventReceiver>(&mut self, recv: &mut R) -> Result<(), ScanError> {
-        let (mut ev, mut mark) = self.next_token()?;
+        let (mut ev, mut mark) = self.next_event_impl()?;
         while ev != Event::SequenceEnd {
             self.load_node(ev, mark, recv)?;
 
             // next event
-            let (next_ev, next_mark) = self.next_token()?;
+            let (next_ev, next_mark) = self.next_event_impl()?;
             ev = next_ev;
             mark = next_mark;
         }
@@ -657,8 +699,8 @@ impl<T: Iterator<Item = char>> Parser<T> {
         //     return Err(ScanError::new(*mark,
         //         "while parsing anchor, found duplicated anchor"));
         // }
-        let new_id = self.anchor_id;
-        self.anchor_id += 1;
+        let new_id = self.anchor_id_count;
+        self.anchor_id_count += 1;
         self.anchors.insert(name, new_id);
         new_id
     }
@@ -1086,7 +1128,7 @@ impl<T: Iterator<Item = char>> Iterator for Parser<T> {
     type Item = Result<(Event, Marker), ScanError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.next_token())
+        self.next_event()
     }
 }
 
@@ -1109,12 +1151,14 @@ a4:
 a5: *x
 ";
         let mut p = Parser::new_from_str(s);
-        while {
-            let event_peek = p.peek().unwrap().clone();
-            let event = p.next_token().unwrap();
+        loop {
+            let event_peek = p.peek().unwrap().unwrap().clone();
+            let event = p.next_event().unwrap().unwrap();
             assert_eq!(event, event_peek);
-            event.0 != Event::StreamEnd
-        } {}
+            if event.0 == Event::StreamEnd {
+                break;
+            }
+        }
     }
 
     #[test]
@@ -1129,27 +1173,18 @@ baz: "qux"
 "#;
         for x in Parser::new_from_str(text).keep_tags(true) {
             let x = x.unwrap();
-            match x.0 {
-                Event::StreamEnd => break,
-                Event::MappingStart(_, tag) => {
-                    let tag = tag.unwrap();
-                    assert_eq!(tag.handle, "tag:test,2024:");
-                }
-                _ => (),
+            if let Event::MappingStart(_, tag) = x.0 {
+                let tag = tag.unwrap();
+                assert_eq!(tag.handle, "tag:test,2024:");
             }
         }
 
         for x in Parser::new_from_str(text).keep_tags(false) {
-            match x {
-                Err(..) => {
-                    // Test successful
-                    return;
-                }
-                Ok((Event::StreamEnd, _)) => {
-                    panic!("Test failed, did not encounter error")
-                }
-                _ => (),
+            if x.is_err() {
+                // Test successful
+                return;
             }
         }
+        panic!("Test failed, did not encounter error")
     }
 }

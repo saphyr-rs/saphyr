@@ -122,13 +122,7 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
 fn parse_to_events(source: &str) -> Result<Vec<String>, ScanError> {
     let mut reporter = EventReporter::new();
     for x in Parser::new_from_str(source) {
-        match x? {
-            (Event::StreamEnd, _) => {
-                reporter.on_event(Event::StreamEnd);
-                break;
-            }
-            (x, _) => reporter.on_event(x),
-        }
+        reporter.on_event(x?.0);
     }
     Ok(reporter.events)
 }

@@ -10,12 +10,7 @@ use saphyr_parser::{Event, Parser, ScanError, TScalarStyle};
 fn run_parser(input: &str) -> Result<Vec<Event>, ScanError> {
     let mut events = vec![];
     for x in Parser::new_from_str(input) {
-        let x = x?;
-        let end = x.0 == Event::StreamEnd;
-        events.push(x.0);
-        if end {
-            break;
-        }
+        events.push(x?.0);
     }
     Ok(events)
 }
