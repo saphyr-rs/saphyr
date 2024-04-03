@@ -1,11 +1,8 @@
 #![allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
 
 use std::{env, fs::File, io::prelude::*};
-use yaml_rust2::{
-    parser::{MarkedEventReceiver, Parser},
-    scanner::Marker,
-    Event,
-};
+
+use saphyr_parser::{Event, MarkedEventReceiver, Marker, Parser};
 
 /// A sink which discards any event sent.
 struct NullSink {}

@@ -1,0 +1,19 @@
+[package]
+name = "saphyr-bench"
+version = "0.0.1"
+authors = [ "Ethiraric <ethiraric@gmail.com>" ]
+license = "MIT"
+description = "Utilities to benchmark saphyr"
+readme = "README.md"
+edition = "2021"
+
+[dependencies]
+saphyr-parser = "0.0.1"
+
+[[bin]]
+name = "time_parse"
+path = "tools/time_parse.rs"
+
+[[bin]]
+name = "run_bench"
+path = "tools/run_bench.rs"
