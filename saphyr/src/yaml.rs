@@ -186,6 +186,26 @@ impl From<std::io::Error> for LoadError {
     }
 }
 
+impl std::error::Error for LoadError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(match &self {
+            LoadError::IO(e) => e,
+            LoadError::Scan(e) => e,
+            LoadError::Decode(_) => return None,
+        })
+    }
+}
+
+impl std::fmt::Display for LoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LoadError::IO(e) => e.fmt(f),
+            LoadError::Scan(e) => e.fmt(f),
+            LoadError::Decode(e) => e.fmt(f),
+        }
+    }
+}
+
 impl YamlLoader {
     fn insert_new_node(&mut self, node: (Yaml, usize)) {
         // valid anchor id starts from 1
