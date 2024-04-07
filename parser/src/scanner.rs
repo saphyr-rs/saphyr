@@ -109,17 +109,12 @@ impl ScanError {
 }
 
 impl Error for ScanError {
-    fn description(&self) -> &str {
-        self.info.as_ref()
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
     }
 }
 
 impl fmt::Display for ScanError {
-    // col starts from 0
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
             formatter,
