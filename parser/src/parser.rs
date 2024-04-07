@@ -348,7 +348,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
         let token = self.scanner.next();
         match token {
             None => match self.scanner.get_error() {
-                None => Err(ScanError::new(self.scanner.mark(), "unexpected eof")),
+                None => Err(ScanError::new_str(self.scanner.mark(), "unexpected eof")),
                 Some(e) => Err(e),
             },
             Some(tok) => Ok(tok),
@@ -402,7 +402,10 @@ impl<T: Iterator<Item = char>> Parser<T> {
         if !self.scanner.stream_started() {
             let (ev, mark) = self.next_event_impl()?;
             if ev != Event::StreamStart {
-                return Err(ScanError::new(mark, "did not find expected <stream-start>"));
+                return Err(ScanError::new_str(
+                    mark,
+                    "did not find expected <stream-start>",
+                ));
             }
             recv.on_event(ev, mark);
         }
@@ -435,7 +438,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
         recv: &mut R,
     ) -> Result<(), ScanError> {
         if first_ev != Event::DocumentStart {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 mark,
                 "did not find expected <document-start>",
             ));
@@ -561,7 +564,10 @@ impl<T: Iterator<Item = char>> Parser<T> {
                 self.skip();
                 Ok((Event::StreamStart, mark))
             }
-            Token(mark, _) => Err(ScanError::new(mark, "did not find expected <stream-start>")),
+            Token(mark, _) => Err(ScanError::new_str(
+                mark,
+                "did not find expected <stream-start>",
+            )),
         }
     }
 
@@ -606,17 +612,17 @@ impl<T: Iterator<Item = char>> Parser<T> {
                 Token(mark, TokenType::VersionDirective(_, _)) => {
                     // XXX parsing with warning according to spec
                     //if major != 1 || minor > 2 {
-                    //    return Err(ScanError::new(tok.0,
+                    //    return Err(ScanError::new_str(tok.0,
                     //        "found incompatible YAML document"));
                     //}
                     if version_directive_received {
-                        return Err(ScanError::new(*mark, "duplicate version directive"));
+                        return Err(ScanError::new_str(*mark, "duplicate version directive"));
                     }
                     version_directive_received = true;
                 }
                 Token(mark, TokenType::TagDirective(handle, prefix)) => {
                     if tags.contains_key(handle) {
-                        return Err(ScanError::new(*mark, "the TAG directive must only be given at most once per handle in the same document"));
+                        return Err(ScanError::new_str(*mark, "the TAG directive must only be given at most once per handle in the same document"));
                     }
                     tags.insert(handle.to_string(), prefix.to_string());
                 }
@@ -637,7 +643,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                 self.skip();
                 Ok((Event::DocumentStart, mark))
             }
-            Token(mark, _) => Err(ScanError::new(
+            Token(mark, _) => Err(ScanError::new_str(
                 mark,
                 "did not find expected <document start>",
             )),
@@ -682,7 +688,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
             if let Token(mark, TokenType::VersionDirective(..) | TokenType::TagDirective(..)) =
                 *self.peek_token()?
             {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     mark,
                     "missing explicit document end marker before directive",
                 ));
@@ -696,7 +702,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
     fn register_anchor(&mut self, name: String, _: &Marker) -> usize {
         // anchors can be overridden/reused
         // if self.anchors.contains_key(name) {
-        //     return Err(ScanError::new(*mark,
+        //     return Err(ScanError::new_str(*mark,
         //         "while parsing anchor, found duplicated anchor"));
         // }
         let new_id = self.anchor_id_count;
@@ -714,7 +720,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                 if let Token(mark, TokenType::Alias(name)) = self.fetch_token() {
                     match self.anchors.get(&name) {
                         None => {
-                            return Err(ScanError::new(
+                            return Err(ScanError::new_str(
                                 mark,
                                 "while parsing node, found unknown anchor",
                             ))
@@ -788,7 +794,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                 self.pop_state();
                 Ok((Event::empty_scalar_with_anchor(anchor_id, tag), mark))
             }
-            Token(mark, _) => Err(ScanError::new(
+            Token(mark, _) => Err(ScanError::new_str(
                 mark,
                 "while parsing a node, did not find expected node content",
             )),
@@ -826,7 +832,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                 self.skip();
                 Ok((Event::MappingEnd, mark))
             }
-            Token(mark, _) => Err(ScanError::new(
+            Token(mark, _) => Err(ScanError::new_str(
                 mark,
                 "while parsing a block mapping, did not find expected key",
             )),
@@ -868,7 +874,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                     if !first {
                         match *self.peek_token()? {
                             Token(_, TokenType::FlowEntry) => self.skip(),
-                            Token(mark, _) => return Err(ScanError::new(
+                            Token(mark, _) => return Err(ScanError::new_str(
                                 mark,
                                 "while parsing a flow mapping, did not find expected ',' or '}'",
                             )),
@@ -954,7 +960,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                 self.skip();
             }
             Token(mark, _) if !first => {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     mark,
                     "while parsing a flow sequence, expected ',' or ']'",
                 ));
@@ -1026,7 +1032,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                     self.parse_node(true, false)
                 }
             }
-            Token(mark, _) => Err(ScanError::new(
+            Token(mark, _) => Err(ScanError::new_str(
                 mark,
                 "while parsing a block collection, did not find expected '-' indicator",
             )),
@@ -1112,7 +1118,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                 // If the handle is of the form "!foo!", this cannot be a local handle and we need
                 // to error.
                 if handle.len() >= 2 && handle.starts_with('!') && handle.ends_with('!') {
-                    Err(ScanError::new(mark, "the handle wasn't declared"))
+                    Err(ScanError::new_str(mark, "the handle wasn't declared"))
                 } else {
                     Ok(Tag {
                         handle: handle.to_string(),

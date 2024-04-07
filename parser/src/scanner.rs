@@ -88,7 +88,13 @@ pub struct ScanError {
 impl ScanError {
     /// Create a new error from a location and an error string.
     #[must_use]
-    pub fn new(loc: Marker, info: &str) -> ScanError {
+    pub fn new(loc: Marker, info: String) -> ScanError {
+        ScanError { mark: loc, info }
+    }
+
+    /// Convenience alias for string slices.
+    #[must_use]
+    pub fn new_str(loc: Marker, info: &str) -> ScanError {
         ScanError {
             mark: loc,
             info: info.to_owned(),
@@ -674,7 +680,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             self.fetch_document_indicator(TokenType::DocumentEnd)?;
             self.skip_ws_to_eol(SkipTabs::Yes)?;
             if !is_breakz(self.ch()) {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     self.mark,
                     "invalid content after document end marker",
                 ));
@@ -683,7 +689,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         }
 
         if (self.mark.col as isize) < self.indent {
-            return Err(ScanError::new(self.mark, "invalid indentation"));
+            return Err(ScanError::new_str(self.mark, "invalid indentation"));
         }
 
         let c = self.buffer[0];
@@ -720,7 +726,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             }
             '%' | '@' | '`' => Err(ScanError::new(
                 self.mark,
-                &format!("unexpected character: `{c}'"),
+                format!("unexpected character: `{c}'"),
             )),
             _ => self.fetch_plain_scalar(),
         }
@@ -738,7 +744,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             self.fetch_more_tokens()?;
         }
         let Some(t) = self.tokens.pop_front() else {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 self.mark,
                 "did not find expected next token",
             ));
@@ -798,7 +804,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                     && (sk.mark.line < self.mark.line || sk.mark.index + 1024 < self.mark.index)
             {
                 if sk.required {
-                    return Err(ScanError::new(self.mark, "simple key expect ':'"));
+                    return Err(ScanError::new_str(self.mark, "simple key expect ':'"));
                 }
                 sk.possible = false;
             }
@@ -828,7 +834,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                     self.skip_ws_to_eol(SkipTabs::Yes)?;
                     // If we have content on that line with a tab, return an error.
                     if !is_breakz(self.ch()) {
-                        return Err(ScanError::new(
+                        return Err(ScanError::new_str(
                             self.mark,
                             "tabs disallowed within this context (block indentation)",
                         ));
@@ -884,7 +890,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         }
 
         if need_whitespace {
-            Err(ScanError::new(self.mark(), "expected whitespace"))
+            Err(ScanError::new_str(self.mark(), "expected whitespace"))
         } else {
             Ok(())
         }
@@ -906,7 +912,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                 }
                 // YAML comments must be preceded by whitespace.
                 '#' if !encountered_tab && !has_yaml_ws => {
-                    return Err(ScanError::new(
+                    return Err(ScanError::new_str(
                         self.mark,
                         "comments must be separated from other tokens by whitespace",
                     ));
@@ -944,7 +950,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         // had. If one was required, however, that was an error and we must propagate it.
         for sk in &mut self.simple_keys {
             if sk.required && sk.possible {
-                return Err(ScanError::new(self.mark, "simple key expected"));
+                return Err(ScanError::new_str(self.mark, "simple key expected"));
             }
             sk.possible = false;
         }
@@ -991,7 +997,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                     start_mark,
                     TokenType::TagDirective(String::new(), String::new()),
                 )
-                // return Err(ScanError::new(start_mark,
+                // return Err(ScanError::new_str(start_mark,
                 //     "while scanning a directive, found unknown directive name"))
             }
         };
@@ -999,7 +1005,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         self.skip_ws_to_eol(SkipTabs::Yes)?;
 
         if !is_breakz(self.ch()) {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 start_mark,
                 "while scanning a directive, did not find expected comment or line break",
             ));
@@ -1022,7 +1028,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         let major = self.scan_version_directive_number(mark)?;
 
         if self.ch() != '.' {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 *mark,
                 "while scanning a YAML directive, did not find expected digit or '.' character",
             ));
@@ -1043,14 +1049,14 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         }
 
         if string.is_empty() {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 start_mark,
                 "while scanning a directive, could not find expected directive name",
             ));
         }
 
         if !is_blank_or_breakz(self.ch()) {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 start_mark,
                 "while scanning a directive, found unexpected non-alphabetical character",
             ));
@@ -1064,7 +1070,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         let mut length = 0usize;
         while let Some(digit) = self.look_ch().to_digit(10) {
             if length + 1 > 9 {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     *mark,
                     "while scanning a YAML directive, found extremely long version number",
                 ));
@@ -1075,7 +1081,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         }
 
         if length == 0 {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 *mark,
                 "while scanning a YAML directive, did not find expected version number",
             ));
@@ -1103,7 +1109,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         if is_blank_or_breakz(self.ch()) {
             Ok(Token(*mark, TokenType::TagDirective(handle, prefix)))
         } else {
-            Err(ScanError::new(
+            Err(ScanError::new_str(
                 *mark,
                 "while scanning TAG, did not find expected whitespace or line break",
             ))
@@ -1154,7 +1160,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             // XXX: ex 7.2, an empty scalar can follow a secondary tag
             Ok(Token(start_mark, TokenType::Tag(handle, suffix)))
         } else {
-            Err(ScanError::new(
+            Err(ScanError::new_str(
                 start_mark,
                 "while scanning a tag, did not find expected whitespace or line break",
             ))
@@ -1164,7 +1170,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     fn scan_tag_handle(&mut self, directive: bool, mark: &Marker) -> Result<String, ScanError> {
         let mut string = String::new();
         if self.look_ch() != '!' {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 *mark,
                 "while scanning a tag, did not find expected '!'",
             ));
@@ -1186,7 +1192,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             // It's either the '!' tag or not really a tag handle.  If it's a %TAG
             // directive, it's an error.  If it's a tag token, it must be a part of
             // URI.
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 *mark,
                 "while parsing a tag directive, did not find expected '!'",
             ));
@@ -1208,7 +1214,10 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             self.skip_non_blank();
         } else if !is_tag_char(self.ch()) {
             // Otherwise, check if the first global tag character is valid.
-            return Err(ScanError::new(*start_mark, "invalid global tag character"));
+            return Err(ScanError::new_str(
+                *start_mark,
+                "invalid global tag character",
+            ));
         } else if self.ch() == '%' {
             // If it is valid and an escape sequence, escape it.
             string.push(self.scan_uri_escapes(start_mark)?);
@@ -1249,7 +1258,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         }
 
         if self.ch() != '>' {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 *start_mark,
                 "while scanning a verbatim tag, did not find the expected '>'",
             ));
@@ -1288,7 +1297,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         }
 
         if length == 0 {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 *mark,
                 "while parsing a tag, did not find expected tag URI",
             ));
@@ -1304,7 +1313,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             self.lookahead(3);
 
             if !(self.ch() == '%' && is_hex(self.buffer[1]) && is_hex(self.buffer[2])) {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     *mark,
                     "while parsing a tag, did not find URI escaped octet",
                 ));
@@ -1318,7 +1327,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                     _ if octet & 0xF0 == 0xE0 => 3,
                     _ if octet & 0xF8 == 0xF0 => 4,
                     _ => {
-                        return Err(ScanError::new(
+                        return Err(ScanError::new_str(
                             *mark,
                             "while parsing a tag, found an incorrect leading UTF-8 octet",
                         ));
@@ -1327,7 +1336,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                 code = octet;
             } else {
                 if octet & 0xc0 != 0x80 {
-                    return Err(ScanError::new(
+                    return Err(ScanError::new_str(
                         *mark,
                         "while parsing a tag, found an incorrect trailing UTF-8 octet",
                     ));
@@ -1345,7 +1354,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
         match char::from_u32(code) {
             Some(ch) => Ok(ch),
-            None => Err(ScanError::new(
+            None => Err(ScanError::new_str(
                 *mark,
                 "while parsing a tag, found an invalid UTF-8 codepoint",
             )),
@@ -1374,7 +1383,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         }
 
         if string.is_empty() {
-            return Err(ScanError::new(start_mark, "while scanning an anchor or alias, did not find expected alphabetic or numeric character"));
+            return Err(ScanError::new_str(start_mark, "while scanning an anchor or alias, did not find expected alphabetic or numeric character"));
         }
 
         if alias {
@@ -1452,7 +1461,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         self.flow_level = self
             .flow_level
             .checked_add(1)
-            .ok_or_else(|| ScanError::new(self.mark, "recursion limit exceeded"))?;
+            .ok_or_else(|| ScanError::new_str(self.mark, "recursion limit exceeded"))?;
         Ok(())
     }
 
@@ -1471,14 +1480,14 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     fn fetch_block_entry(&mut self) -> ScanResult {
         if self.flow_level > 0 {
             // - * only allowed in block
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 self.mark,
                 r#""-" is only valid inside a block"#,
             ));
         }
         // Check if we are allowed to start a new entry.
         if !self.simple_key_allowed {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 self.mark,
                 "block sequence entries are not allowed in this context",
             ));
@@ -1487,7 +1496,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         // ???, fixes test G9HC.
         if let Some(Token(mark, TokenType::Anchor(..) | TokenType::Tag(..))) = self.tokens.back() {
             if self.mark.col == 0 && mark.col == 0 && self.indent > -1 {
-                return Err(ScanError::new(*mark, "invalid indentation for anchor"));
+                return Err(ScanError::new_str(*mark, "invalid indentation for anchor"));
             }
         }
 
@@ -1500,7 +1509,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         let found_tabs = self.skip_ws_to_eol(SkipTabs::Yes)?.found_tabs();
         self.lookahead(2);
         if found_tabs && self.buffer[0] == '-' && is_blank_or_breakz(self.buffer[1]) {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 self.mark,
                 "'-' must be followed by a valid YAML whitespace",
             ));
@@ -1574,7 +1583,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             self.skip_non_blank();
             if is_digit(self.look_ch()) {
                 if self.ch() == '0' {
-                    return Err(ScanError::new(
+                    return Err(ScanError::new_str(
                         start_mark,
                         "while scanning a block scalar, found an indentation indicator equal to 0",
                     ));
@@ -1584,7 +1593,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             }
         } else if is_digit(self.ch()) {
             if self.ch() == '0' {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     start_mark,
                     "while scanning a block scalar, found an indentation indicator equal to 0",
                 ));
@@ -1607,7 +1616,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
         // Check if we are at the end of the line.
         if !is_breakz(self.look_ch()) {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 start_mark,
                 "while scanning a block scalar, did not find expected comment or line break",
             ));
@@ -1619,7 +1628,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         }
 
         if self.look_ch() == '\t' {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 start_mark,
                 "a block scalar content cannot start with a tab",
             ));
@@ -1663,7 +1672,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         }
 
         if self.mark.col < indent && (self.mark.col as isize) > self.indent {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 self.mark,
                 "wrongly indented line in block scalar",
             ));
@@ -1891,21 +1900,21 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                         && (self.buffer[2] == '.')))
                 && is_blank_or_breakz(self.buffer[3])
             {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     start_mark,
                     "while scanning a quoted scalar, found unexpected document indicator",
                 ));
             }
 
             if is_z(self.ch()) {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     start_mark,
                     "while scanning a quoted scalar, found unexpected end of stream",
                 ));
             }
 
             if (self.mark.col as isize) < self.indent {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     start_mark,
                     "invalid indentation in quoted scalar",
                 ));
@@ -1931,7 +1940,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                     // Consume a space or a tab character.
                     if leading_blanks {
                         if self.ch() == '\t' && (self.mark.col as isize) < self.indent {
-                            return Err(ScanError::new(
+                            return Err(ScanError::new_str(
                                 self.mark,
                                 "tab cannot be used as indentation",
                             ));
@@ -1992,7 +2001,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             // Inside a flow context, this is allowed.
             ':' if self.flow_level > 0 => {}
             _ => {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     self.mark,
                     "invalid trailing content after double-quoted scalar",
                 ));
@@ -2094,7 +2103,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             'u' => code_length = 4,
             'U' => code_length = 8,
             _ => {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     *start_mark,
                     "while parsing a quoted scalar, found unknown escape character",
                 ))
@@ -2108,7 +2117,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             let mut value = 0u32;
             for i in 0..code_length {
                 if !is_hex(self.buffer[i]) {
-                    return Err(ScanError::new(
+                    return Err(ScanError::new_str(
                         *start_mark,
                         "while parsing a quoted scalar, did not find expected hexadecimal number",
                     ));
@@ -2117,7 +2126,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             }
 
             let Some(ch) = char::from_u32(value) else {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     *start_mark,
                     "while parsing a quoted scalar, found invalid Unicode character escape code",
                 ));
@@ -2150,7 +2159,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         let start_mark = self.mark;
 
         if self.flow_level > 0 && (start_mark.col as isize) < indent {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 start_mark,
                 "invalid indentation in flow construct",
             ));
@@ -2168,7 +2177,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             }
 
             if self.flow_level > 0 && self.ch() == '-' && is_flow(self.buffer[1]) {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     self.mark,
                     "plain scalar cannot start with '-' followed by ,[]{}",
                 ));
@@ -2232,7 +2241,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                         // empty. Skip to the end of the line.
                         self.skip_ws_to_eol(SkipTabs::Yes)?;
                         if !is_breakz(self.ch()) {
-                            return Err(ScanError::new(
+                            return Err(ScanError::new_str(
                                 start_mark,
                                 "while scanning a plain scalar, found a tab",
                             ));
@@ -2274,7 +2283,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         if self.flow_level == 0 {
             // Check if we are allowed to start a new key (not necessarily simple).
             if !self.simple_key_allowed {
-                return Err(ScanError::new(
+                return Err(ScanError::new_str(
                     self.mark,
                     "mapping keys are not allowed in this context",
                 ));
@@ -2301,7 +2310,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         self.skip_non_blank();
         self.skip_yaml_whitespace()?;
         if self.ch() == '\t' {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 self.mark(),
                 "tabs disallowed in this context",
             ));
@@ -2322,7 +2331,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             && !self.skip_ws_to_eol(SkipTabs::Yes)?.has_valid_yaml_ws()
             && (self.ch() == '-' || is_alpha(self.ch()))
         {
-            return Err(ScanError::new(
+            return Err(ScanError::new_str(
                 self.mark,
                 "':' must be followed by a valid YAML whitespace",
             ));
@@ -2334,7 +2343,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             self.insert_token(sk.token_number - self.tokens_parsed, tok);
             if self.implicit_flow_mapping {
                 if sk.mark.line < start_mark.line {
-                    return Err(ScanError::new(
+                    return Err(ScanError::new_str(
                         start_mark,
                         "illegal placement of ':' indicator",
                     ));
@@ -2364,7 +2373,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             // The ':' indicator follows a complex key.
             if self.flow_level == 0 {
                 if !self.simple_key_allowed {
-                    return Err(ScanError::new(
+                    return Err(ScanError::new_str(
                         start_mark,
                         "mapping values are not allowed in this context",
                     ));
@@ -2489,7 +2498,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     fn remove_simple_key(&mut self) -> ScanResult {
         let last = self.simple_keys.last_mut().unwrap();
         if last.possible && last.required {
-            return Err(ScanError::new(self.mark, "simple key expected"));
+            return Err(ScanError::new_str(self.mark, "simple key expected"));
         }
 
         last.possible = false;
