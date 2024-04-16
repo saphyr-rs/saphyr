@@ -182,6 +182,27 @@ fn test_issue_65_mwe() {
 }
 
 #[test]
+fn test_comment_after_tag() {
+    // https://github.com/Ethiraric/yaml-rust2/issues/21#issuecomment-2053513507
+    let s = "
+%YAML 1.2
+# This is a comment
+--- #-------
+foobar";
+
+    assert_eq!(
+        run_parser(s).unwrap(),
+        [
+            Event::StreamStart,
+            Event::DocumentStart,
+            Event::Scalar("foobar".to_string(), TScalarStyle::Plain, 0, None),
+            Event::DocumentEnd,
+            Event::StreamEnd,
+        ]
+    );
+}
+
+#[test]
 fn test_bad_docstart() {
     assert!(run_parser("---This used to cause an infinite loop").is_ok());
     assert_eq!(
