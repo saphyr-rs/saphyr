@@ -1,3 +1,5 @@
+use crate::char_traits::is_blank_or_breakz;
+
 /// Interface for a source of characters.
 ///
 /// Hiding the input's implementation behind this trait allows mostly:
@@ -104,7 +106,7 @@ pub trait Input {
 
     /// Return whether the next 2 characters in the input source match the given characters.
     ///
-    /// This function assumes that the next 2 characters in the input has already been fetched
+    /// This function assumes that the next 2 characters in the input have already been fetched
     /// through [`Input::lookahead`].
     #[inline]
     #[must_use]
@@ -115,12 +117,46 @@ pub trait Input {
 
     /// Return whether the next 3 characters in the input source match the given characters.
     ///
-    /// This function assumes that the next 3 characters in the input has already been fetched
+    /// This function assumes that the next 3 characters in the input have already been fetched
     /// through [`Input::lookahead`].
     #[inline]
     #[must_use]
     fn next_3_are(&self, c1: char, c2: char, c3: char) -> bool {
         assert!(self.buflen() >= 3);
         self.peek() == c1 && self.peek_nth(1) == c2 && self.peek_nth(2) == c3
+    }
+
+    /// Check whether the next characters correspond to a document indicator.
+    ///
+    /// This function assumes that the next 4 characters in the input has already been fetched
+    /// through [`Input::lookahead`].
+    #[inline]
+    #[must_use]
+    fn next_is_document_indicator(&self) -> bool {
+        assert!(self.buflen() >= 4);
+        is_blank_or_breakz(self.peek_nth(3))
+            && (self.next_3_are('.', '.', '.') || self.next_3_are('-', '-', '-'))
+    }
+
+    /// Check whether the next characters correspond to a start of document.
+    ///
+    /// This function assumes that the next 4 characters in the input has already been fetched
+    /// through [`Input::lookahead`].
+    #[inline]
+    #[must_use]
+    fn next_is_document_start(&self) -> bool {
+        assert!(self.buflen() >= 4);
+        self.next_3_are('-', '-', '-') && is_blank_or_breakz(self.peek_nth(3))
+    }
+
+    /// Check whether the next characters correspond to an end of document.
+    ///
+    /// This function assumes that the next 4 characters in the input has already been fetched
+    /// through [`Input::lookahead`].
+    #[inline]
+    #[must_use]
+    fn next_is_document_end(&self) -> bool {
+        assert!(self.buflen() >= 4);
+        self.next_3_are('.', '.', '.') && is_blank_or_breakz(self.peek_nth(3))
     }
 }

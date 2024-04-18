@@ -575,32 +575,6 @@ impl<T: Input> Scanner<T> {
         s.push('\n');
     }
 
-    /// Check whether the next characters correspond to a start of document.
-    ///
-    /// [`Self::lookahead`] must have been called before calling this function.
-    fn next_is_document_start(&self) -> bool {
-        assert!(self.input.buflen() >= 4);
-        self.input.next_3_are('-', '-', '-') && is_blank_or_breakz(self.input.peek_nth(3))
-    }
-
-    /// Check whether the next characters correspond to an end of document.
-    ///
-    /// [`Self::lookahead`] must have been called before calling this function.
-    fn next_is_document_end(&self) -> bool {
-        assert!(self.input.buflen() >= 4);
-        self.input.next_3_are('.', '.', '.') && is_blank_or_breakz(self.input.peek_nth(3))
-    }
-
-    /// Check whether the next characters correspond to a document indicator.
-    ///
-    /// [`Self::lookahead`] must have been called before calling this function.
-    #[inline]
-    fn next_is_document_indicator(&self) -> bool {
-        assert!(self.input.buflen() >= 4);
-        is_blank_or_breakz(self.input.peek_nth(3))
-            && (self.input.next_3_are('.', '.', '.') || self.input.next_3_are('-', '-', '-'))
-    }
-
     /// Insert a token at the given position.
     fn insert_token(&mut self, pos: usize, tok: Token) {
         let old_len = self.tokens.len();
@@ -650,9 +624,9 @@ impl<T: Input> Scanner<T> {
         if self.mark.col == 0 {
             if self.input.next_char_is('%') {
                 return self.fetch_directive();
-            } else if self.next_is_document_start() {
+            } else if self.input.next_is_document_start() {
                 return self.fetch_document_indicator(TokenType::DocumentStart);
-            } else if self.next_is_document_end() {
+            } else if self.input.next_is_document_end() {
                 self.fetch_document_indicator(TokenType::DocumentEnd)?;
                 self.skip_ws_to_eol(SkipTabs::Yes)?;
                 if !is_breakz(self.input.peek()) {
@@ -1667,7 +1641,7 @@ impl<T: Input> Scanner<T> {
         while self.mark.col == indent && !is_z(self.input.peek()) {
             if indent == 0 {
                 self.input.lookahead(4);
-                if self.next_is_document_end() {
+                if self.input.next_is_document_end() {
                     break;
                 }
             }
@@ -1885,7 +1859,7 @@ impl<T: Input> Scanner<T> {
             /* Check for a document indicator. */
             self.input.lookahead(4);
 
-            if self.mark.col == 0 && self.next_is_document_indicator() {
+            if self.mark.col == 0 && self.input.next_is_document_indicator() {
                 return Err(ScanError::new_str(
                     start_mark,
                     "while scanning a quoted scalar, found unexpected document indicator",
@@ -2159,7 +2133,7 @@ impl<T: Input> Scanner<T> {
 
         loop {
             self.input.lookahead(4);
-            if self.next_is_document_indicator() || self.input.peek() == '#' {
+            if self.input.next_is_document_indicator() || self.input.peek() == '#' {
                 break;
             }
 
