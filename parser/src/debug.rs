@@ -33,7 +33,6 @@ mod debug {
     }
 
     /// Return whether debugging features are enabled in this execution.
-    #[cfg(debug_assertions)]
     pub fn enabled() -> bool {
         static ENABLED: OnceLock<bool> = OnceLock::new();
         *ENABLED.get_or_init(|| std::env::var("SAPHYR_DEBUG").is_ok())
