@@ -11,11 +11,12 @@
 
 use std::{char, collections::VecDeque, error::Error, fmt};
 
-use arraydeque::ArrayDeque;
-
-use crate::char_traits::{
-    as_hex, is_alpha, is_anchor_char, is_blank, is_blank_or_breakz, is_break, is_breakz, is_digit,
-    is_flow, is_hex, is_tag_char, is_uri_char, is_z,
+use crate::{
+    char_traits::{
+        as_hex, is_alpha, is_anchor_char, is_blank, is_blank_or_breakz, is_break, is_breakz,
+        is_digit, is_flow, is_hex, is_tag_char, is_uri_char, is_z,
+    },
+    input::Input,
 };
 
 /// The encoding of the input. Currently, only UTF-8 is supported.
@@ -343,18 +344,6 @@ enum ImplicitMappingState {
     Inside,
 }
 
-/// The size of the [`Scanner`] buffer.
-///
-/// The buffer is statically allocated to avoid conditions for reallocations each time we
-/// consume/push a character. As of now, almost all lookaheads are 4 characters maximum, except:
-///   - Escape sequences parsing: some escape codes are 8 characters
-///   - Scanning indent in scalars: this looks ahead `indent + 2` characters
-///
-/// This constant must be set to at least 8. When scanning indent in scalars, the lookahead is done
-/// in a single call if and only if the indent is `BUFFER_LEN - 2` or less. If the indent is higher
-/// than that, the code will fall back to a loop of lookaheads.
-const BUFFER_LEN: usize = 16;
-
 /// The YAML scanner.
 ///
 /// This corresponds to the low-level interface when reading YAML. The scanner emits token as they
@@ -367,8 +356,10 @@ const BUFFER_LEN: usize = 16;
 #[derive(Debug)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Scanner<T> {
-    /// The reader, providing with characters.
-    rdr: T,
+    /// The input source.
+    ///
+    /// This must implement [`Input`].
+    input: T,
     /// The position of the cursor within the reader.
     mark: Marker,
     /// Buffer for tokens to be returned.
@@ -378,8 +369,6 @@ pub struct Scanner<T> {
     /// follows. In this case, the token stays in the `VecDeque` but cannot be returned from
     /// [`Self::next`] until we have more context.
     tokens: VecDeque<Token>,
-    /// Buffer for the next characters to consume.
-    buffer: ArrayDeque<char, BUFFER_LEN>,
     /// The last error that happened.
     error: Option<ScanError>,
 
@@ -435,7 +424,7 @@ pub struct Scanner<T> {
     implicit_flow_mapping_states: Vec<ImplicitMappingState>,
 }
 
-impl<T: Iterator<Item = char>> Iterator for Scanner<T> {
+impl<T: Input> Iterator for Scanner<T> {
     type Item = Token;
     fn next(&mut self) -> Option<Token> {
         if self.error.is_some() {
@@ -462,12 +451,11 @@ impl<T: Iterator<Item = char>> Iterator for Scanner<T> {
 /// A convenience alias for scanner functions that may fail without returning a value.
 pub type ScanResult = Result<(), ScanError>;
 
-impl<T: Iterator<Item = char>> Scanner<T> {
+impl<T: Input> Scanner<T> {
     /// Creates the YAML tokenizer.
-    pub fn new(rdr: T) -> Scanner<T> {
+    pub fn new(input: T) -> Scanner<T> {
         Scanner {
-            rdr,
-            buffer: ArrayDeque::new(),
+            input,
             mark: Marker::new(0, 1, 0),
             tokens: VecDeque::new(),
             error: None,
@@ -497,25 +485,10 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         self.error.clone()
     }
 
-    /// Fill `self.buffer` with at least `count` characters.
-    ///
-    /// The characters that are extracted this way are not consumed but only placed in the buffer.
-    #[inline]
-    fn lookahead(&mut self, count: usize) {
-        if self.buffer.len() >= count {
-            return;
-        }
-        for _ in 0..(count - self.buffer.len()) {
-            self.buffer
-                .push_back(self.rdr.next().unwrap_or('\0'))
-                .unwrap();
-        }
-    }
-
     /// Consume the next character. It is assumed the next character is a blank.
     #[inline]
     fn skip_blank(&mut self) {
-        self.buffer.pop_front();
+        self.input.skip();
 
         self.mark.index += 1;
         self.mark.col += 1;
@@ -524,7 +497,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     /// Consume the next character. It is assumed the next character is not a blank.
     #[inline]
     fn skip_non_blank(&mut self) {
-        self.buffer.pop_front();
+        self.input.skip();
 
         self.mark.index += 1;
         self.mark.col += 1;
@@ -533,18 +506,18 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
     /// Consume the next characters. It is assumed none of the next characters are blanks.
     #[inline]
-    fn skip_n_non_blank(&mut self, n: usize) {
-        self.buffer.drain(0..n);
+    fn skip_n_non_blank(&mut self, count: usize) {
+        self.input.skip_n(count);
 
-        self.mark.index += n;
-        self.mark.col += n;
+        self.mark.index += count;
+        self.mark.col += count;
         self.leading_whitespace = false;
     }
 
     /// Consume the next character. It is assumed the next character is a newline.
     #[inline]
     fn skip_nl(&mut self) {
-        self.buffer.pop_front();
+        self.input.skip();
 
         self.mark.index += 1;
         self.mark.col = 0;
@@ -555,12 +528,12 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     /// Consume a linebreak (either CR, LF or CRLF), if any. Do nothing if there's none.
     #[inline]
     fn skip_linebreak(&mut self) {
-        if self.buffer[0] == '\r' && self.buffer[1] == '\n' {
+        if self.input.next_is("\r\n") {
             // While technically not a blank, this does not matter as `self.leading_whitespace`
             // will be reset by `skip_nl`.
             self.skip_blank();
             self.skip_nl();
-        } else if is_break(self.buffer[0]) {
+        } else if is_break(self.input.peek()) {
             self.skip_nl();
         }
     }
@@ -570,32 +543,16 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     /// The character is not consumed.
     #[inline]
     fn ch(&self) -> char {
-        self.buffer[0]
-    }
-
-    /// Look for the next character and return it.
-    ///
-    /// The character is not consumed.
-    /// Equivalent to calling [`Self::lookahead`] and [`Self::ch`].
-    #[inline]
-    fn look_ch(&mut self) -> char {
-        self.lookahead(1);
-        self.ch()
+        self.input.peek()
     }
 
     /// Read a character from the input stream, returning it directly.
     ///
-    /// The buffer is bypassed and `self.mark` needs to be updated manually.
+    /// The buffer (if any) is bypassed and `self.mark` needs to be updated manually.
     #[inline]
     #[must_use]
     fn raw_read_ch(&mut self) -> char {
-        self.rdr.next().unwrap_or('\0')
-    }
-
-    /// Return whether the next character is `c`.
-    #[inline]
-    fn ch_is(&self, c: char) -> bool {
-        self.buffer[0] == c
+        self.input.raw_read_ch()
     }
 
     /// Return whether the [`TokenType::StreamStart`] event has been emitted.
@@ -624,8 +581,8 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     // If the next characters do not correspond to a line break.
     #[inline]
     fn read_break(&mut self, s: &mut String) {
-        let c = self.buffer[0];
-        let nc = self.buffer[1];
+        let c = self.input.peek();
+        let nc = self.input.peek_nth(1);
         debug_assert!(is_break(c));
         if c == '\r' && nc == '\n' {
             self.skip_blank();
@@ -635,15 +592,20 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         s.push('\n');
     }
 
+    /// Check whether the next characters correspond to a start of document.
+    ///
+    /// [`Self::lookahead`] must have been called before calling this function.
+    fn next_is_document_start(&self) -> bool {
+        assert!(self.input.buflen() >= 4);
+        self.input.next_is("---") && is_blank_or_breakz(self.input.peek_nth(3))
+    }
+
     /// Check whether the next characters correspond to an end of document.
     ///
     /// [`Self::lookahead`] must have been called before calling this function.
     fn next_is_document_end(&self) -> bool {
-        assert!(self.buffer.len() >= 4);
-        self.buffer[0] == '.'
-            && self.buffer[1] == '.'
-            && self.buffer[2] == '.'
-            && is_blank_or_breakz(self.buffer[3])
+        assert!(self.input.buflen() >= 4);
+        self.input.next_is("...") && is_blank_or_breakz(self.input.peek_nth(3))
     }
 
     /// Check whether the next characters correspond to a document indicator.
@@ -651,11 +613,9 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     /// [`Self::lookahead`] must have been called before calling this function.
     #[inline]
     fn next_is_document_indicator(&self) -> bool {
-        assert!(self.buffer.len() >= 4);
-        self.mark.col == 0
-            && (((self.buffer[0] == '-') && (self.buffer[1] == '-') && (self.buffer[2] == '-'))
-                || ((self.buffer[0] == '.') && (self.buffer[1] == '.') && (self.buffer[2] == '.')))
-            && is_blank_or_breakz(self.buffer[3])
+        assert!(self.input.buflen() >= 4);
+        is_blank_or_breakz(self.input.peek_nth(3))
+            && (self.input.next_is("...") || self.input.next_is("---"))
     }
 
     /// Insert a token at the given position.
@@ -674,11 +634,11 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     }
 
     /// Fetch the next token in the stream.
+    ///
     /// # Errors
     /// Returns `ScanError` when the scanner does not find the next expected token.
     pub fn fetch_next_token(&mut self) -> ScanResult {
-        self.lookahead(1);
-        // eprintln!("--> fetch_next_token Cur {:?} {:?}", self.mark, self.ch());
+        self.input.lookahead(1);
 
         if !self.stream_start_produced {
             self.fetch_stream_start();
@@ -697,51 +657,37 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         let mark = self.mark;
         self.unroll_indent(mark.col as isize);
 
-        self.lookahead(4);
+        self.input.lookahead(4);
 
         if is_z(self.ch()) {
             self.fetch_stream_end()?;
             return Ok(());
         }
 
-        // Is it a directive?
-        if self.mark.col == 0 && self.ch_is('%') {
-            return self.fetch_directive();
-        }
-
-        if self.mark.col == 0
-            && self.buffer[0] == '-'
-            && self.buffer[1] == '-'
-            && self.buffer[2] == '-'
-            && is_blank_or_breakz(self.buffer[3])
-        {
-            self.fetch_document_indicator(TokenType::DocumentStart)?;
-            return Ok(());
-        }
-
-        if self.mark.col == 0
-            && self.buffer[0] == '.'
-            && self.buffer[1] == '.'
-            && self.buffer[2] == '.'
-            && is_blank_or_breakz(self.buffer[3])
-        {
-            self.fetch_document_indicator(TokenType::DocumentEnd)?;
-            self.skip_ws_to_eol(SkipTabs::Yes)?;
-            if !is_breakz(self.ch()) {
-                return Err(ScanError::new_str(
-                    self.mark,
-                    "invalid content after document end marker",
-                ));
+        if self.mark.col == 0 {
+            if self.input.next_char_is('%') {
+                return self.fetch_directive();
+            } else if self.next_is_document_start() {
+                return self.fetch_document_indicator(TokenType::DocumentStart);
+            } else if self.next_is_document_end() {
+                self.fetch_document_indicator(TokenType::DocumentEnd)?;
+                self.skip_ws_to_eol(SkipTabs::Yes)?;
+                if !is_breakz(self.ch()) {
+                    return Err(ScanError::new_str(
+                        self.mark,
+                        "invalid content after document end marker",
+                    ));
+                }
+                return Ok(());
             }
-            return Ok(());
         }
 
         if (self.mark.col as isize) < self.indent {
             return Err(ScanError::new_str(self.mark, "invalid indentation"));
         }
 
-        let c = self.buffer[0];
-        let nc = self.buffer[1];
+        let c = self.input.peek();
+        let nc = self.input.peek_nth(1);
         match c {
             '[' => self.fetch_flow_collection_start(TokenType::FlowSequenceStart),
             '{' => self.fetch_flow_collection_start(TokenType::FlowMappingStart),
@@ -860,7 +806,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         Ok(())
     }
 
-    /// Skip over all whitespace and comments until the next token.
+    /// Skip over all whitespace (`\t`, ` `, `\n`, `\r`) and comments until the next token.
     ///
     /// # Errors
     /// This function returns an error if a tabulation is encountered where there should not be
@@ -868,7 +814,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     fn skip_to_next_token(&mut self) -> ScanResult {
         loop {
             // TODO(chenyh) BOM
-            match self.look_ch() {
+            match self.input.look_ch() {
                 // Tabs may not be used as indentation.
                 // "Indentation" only exists as long as a block is started, but does not exist
                 // inside of flow-style constructs. Tabs are allowed as part of leading
@@ -890,14 +836,14 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                 }
                 '\t' | ' ' => self.skip_blank(),
                 '\n' | '\r' => {
-                    self.lookahead(2);
+                    self.input.lookahead(2);
                     self.skip_linebreak();
                     if self.flow_level == 0 {
                         self.allow_simple_key();
                     }
                 }
                 '#' => {
-                    while !is_breakz(self.look_ch()) {
+                    while !is_breakz(self.input.look_ch()) {
                         self.skip_non_blank();
                     }
                 }
@@ -914,14 +860,14 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     fn skip_yaml_whitespace(&mut self) -> ScanResult {
         let mut need_whitespace = true;
         loop {
-            match self.look_ch() {
+            match self.input.look_ch() {
                 ' ' => {
                     self.skip_blank();
 
                     need_whitespace = false;
                 }
                 '\n' | '\r' => {
-                    self.lookahead(2);
+                    self.input.lookahead(2);
                     self.skip_linebreak();
                     if self.flow_level == 0 {
                         self.allow_simple_key();
@@ -929,7 +875,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                     need_whitespace = false;
                 }
                 '#' => {
-                    while !is_breakz(self.look_ch()) {
+                    while !is_breakz(self.input.look_ch()) {
                         self.skip_non_blank();
                     }
                 }
@@ -949,7 +895,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         let mut encountered_tab = false;
         let mut has_yaml_ws = false;
         loop {
-            match self.look_ch() {
+            match self.input.look_ch() {
                 ' ' => {
                     has_yaml_ws = true;
                     self.skip_blank();
@@ -966,7 +912,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                     ));
                 }
                 '#' => {
-                    while !is_breakz(self.look_ch()) {
+                    while !is_breakz(self.input.look_ch()) {
                         self.skip_non_blank();
                     }
                 }
@@ -1035,7 +981,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             // XXX This should be a warning instead of an error
             _ => {
                 // skip current line
-                while !is_breakz(self.look_ch()) {
+                while !is_breakz(self.input.look_ch()) {
                     self.skip_non_blank();
                 }
                 // XXX return an empty TagDirective token
@@ -1051,7 +997,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         self.skip_ws_to_eol(SkipTabs::Yes)?;
 
         if is_breakz(self.ch()) {
-            self.lookahead(2);
+            self.input.lookahead(2);
             self.skip_linebreak();
             Ok(tok)
         } else {
@@ -1063,7 +1009,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     }
 
     fn scan_version_directive_value(&mut self, mark: &Marker) -> Result<Token, ScanError> {
-        while is_blank(self.look_ch()) {
+        while is_blank(self.input.look_ch()) {
             self.skip_blank();
         }
 
@@ -1085,7 +1031,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     fn scan_directive_name(&mut self) -> Result<String, ScanError> {
         let start_mark = self.mark;
         let mut string = String::new();
-        while is_alpha(self.look_ch()) {
+        while is_alpha(self.input.look_ch()) {
             string.push(self.ch());
             self.skip_non_blank();
         }
@@ -1110,7 +1056,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     fn scan_version_directive_number(&mut self, mark: &Marker) -> Result<u32, ScanError> {
         let mut val = 0u32;
         let mut length = 0usize;
-        while let Some(digit) = self.look_ch().to_digit(10) {
+        while let Some(digit) = self.input.look_ch().to_digit(10) {
             if length + 1 > 9 {
                 return Err(ScanError::new_str(
                     *mark,
@@ -1134,19 +1080,19 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
     fn scan_tag_directive_value(&mut self, mark: &Marker) -> Result<Token, ScanError> {
         /* Eat whitespaces. */
-        while is_blank(self.look_ch()) {
+        while is_blank(self.input.look_ch()) {
             self.skip_blank();
         }
         let handle = self.scan_tag_handle(true, mark)?;
 
         /* Eat whitespaces. */
-        while is_blank(self.look_ch()) {
+        while is_blank(self.input.look_ch()) {
             self.skip_blank();
         }
 
         let prefix = self.scan_tag_prefix(mark)?;
 
-        self.lookahead(1);
+        self.input.lookahead(1);
 
         if is_blank_or_breakz(self.ch()) {
             Ok(Token(*mark, TokenType::TagDirective(handle, prefix)))
@@ -1173,9 +1119,9 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         let mut suffix;
 
         // Check if the tag is in the canonical form (verbatim).
-        self.lookahead(2);
+        self.input.lookahead(2);
 
-        if self.buffer[1] == '<' {
+        if self.input.nth_char_is(1, '<') {
             suffix = self.scan_verbatim_tag(&start_mark)?;
         } else {
             // The tag has either the '!suffix' or the '!handle!suffix'
@@ -1198,7 +1144,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             }
         }
 
-        if is_blank_or_breakz(self.look_ch()) || (self.flow_level > 0 && is_flow(self.ch())) {
+        if is_blank_or_breakz(self.input.look_ch()) || (self.flow_level > 0 && is_flow(self.ch())) {
             // XXX: ex 7.2, an empty scalar can follow a secondary tag
             Ok(Token(start_mark, TokenType::Tag(handle, suffix)))
         } else {
@@ -1211,7 +1157,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
     fn scan_tag_handle(&mut self, directive: bool, mark: &Marker) -> Result<String, ScanError> {
         let mut string = String::new();
-        if self.look_ch() != '!' {
+        if self.input.look_ch() != '!' {
             return Err(ScanError::new_str(
                 *mark,
                 "while scanning a tag, did not find expected '!'",
@@ -1221,7 +1167,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         string.push(self.ch());
         self.skip_non_blank();
 
-        while is_alpha(self.look_ch()) {
+        while is_alpha(self.input.look_ch()) {
             string.push(self.ch());
             self.skip_non_blank();
         }
@@ -1250,7 +1196,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     fn scan_tag_prefix(&mut self, start_mark: &Marker) -> Result<String, ScanError> {
         let mut string = String::new();
 
-        if self.look_ch() == '!' {
+        if self.input.look_ch() == '!' {
             // If we have a local tag, insert and skip `!`.
             string.push(self.ch());
             self.skip_non_blank();
@@ -1269,7 +1215,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             self.skip_non_blank();
         }
 
-        while is_uri_char(self.look_ch()) {
+        while is_uri_char(self.input.look_ch()) {
             if self.ch() == '%' {
                 string.push(self.scan_uri_escapes(start_mark)?);
             } else {
@@ -1290,7 +1236,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         self.skip_non_blank();
 
         let mut string = String::new();
-        while is_uri_char(self.look_ch()) {
+        while is_uri_char(self.input.look_ch()) {
             if self.ch() == '%' {
                 string.push(self.scan_uri_escapes(start_mark)?);
             } else {
@@ -1326,7 +1272,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             string.extend(head.chars().skip(1));
         }
 
-        while is_tag_char(self.look_ch()) {
+        while is_tag_char(self.input.look_ch()) {
             // Check if it is a URI-escape sequence.
             if self.ch() == '%' {
                 string.push(self.scan_uri_escapes(mark)?);
@@ -1352,38 +1298,41 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         let mut width = 0usize;
         let mut code = 0u32;
         loop {
-            self.lookahead(3);
+            self.input.lookahead(3);
 
-            if !(self.ch() == '%' && is_hex(self.buffer[1]) && is_hex(self.buffer[2])) {
+            let c = self.input.peek_nth(1);
+            let nc = self.input.peek_nth(2);
+
+            if !(self.ch() == '%' && is_hex(c) && is_hex(nc)) {
                 return Err(ScanError::new_str(
                     *mark,
-                    "while parsing a tag, did not find URI escaped octet",
+                    "while parsing a tag, found an invalid escape sequence",
                 ));
             }
 
-            let octet = (as_hex(self.buffer[1]) << 4) + as_hex(self.buffer[2]);
+            let byte = (as_hex(c) << 4) + as_hex(nc);
             if width == 0 {
-                width = match octet {
-                    _ if octet & 0x80 == 0x00 => 1,
-                    _ if octet & 0xE0 == 0xC0 => 2,
-                    _ if octet & 0xF0 == 0xE0 => 3,
-                    _ if octet & 0xF8 == 0xF0 => 4,
+                width = match byte {
+                    _ if byte & 0x80 == 0x00 => 1,
+                    _ if byte & 0xE0 == 0xC0 => 2,
+                    _ if byte & 0xF0 == 0xE0 => 3,
+                    _ if byte & 0xF8 == 0xF0 => 4,
                     _ => {
                         return Err(ScanError::new_str(
                             *mark,
-                            "while parsing a tag, found an incorrect leading UTF-8 octet",
+                            "while parsing a tag, found an incorrect leading UTF-8 byte",
                         ));
                     }
                 };
-                code = octet;
+                code = byte;
             } else {
-                if octet & 0xc0 != 0x80 {
+                if byte & 0xc0 != 0x80 {
                     return Err(ScanError::new_str(
                         *mark,
-                        "while parsing a tag, found an incorrect trailing UTF-8 octet",
+                        "while parsing a tag, found an incorrect trailing UTF-8 byte",
                     ));
                 }
-                code = (code << 8) + octet;
+                code = (code << 8) + byte;
             }
 
             self.skip_n_non_blank(3);
@@ -1419,7 +1368,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         let start_mark = self.mark;
 
         self.skip_non_blank();
-        while is_anchor_char(self.look_ch()) {
+        while is_anchor_char(self.input.look_ch()) {
             string.push(self.ch());
             self.skip_non_blank();
         }
@@ -1556,8 +1505,9 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         // generate BLOCK-SEQUENCE-START if indented
         self.roll_indent(mark.col, None, TokenType::BlockSequenceStart, mark);
         let found_tabs = self.skip_ws_to_eol(SkipTabs::Yes)?.found_tabs();
-        self.lookahead(2);
-        if found_tabs && self.buffer[0] == '-' && is_blank_or_breakz(self.buffer[1]) {
+        self.input.lookahead(2);
+        if found_tabs && self.input.next_char_is('-') && is_blank_or_breakz(self.input.peek_nth(1))
+        {
             return Err(ScanError::new_str(
                 self.mark,
                 "'-' must be followed by a valid YAML whitespace",
@@ -1565,7 +1515,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         }
 
         self.skip_ws_to_eol(SkipTabs::No)?;
-        if is_break(self.look_ch()) || is_flow(self.ch()) {
+        if is_break(self.input.look_ch()) || is_flow(self.ch()) {
             self.roll_one_col_indent();
         }
 
@@ -1623,14 +1573,14 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         self.skip_non_blank();
         self.unroll_non_block_indents();
 
-        if self.look_ch() == '+' || self.ch() == '-' {
+        if self.input.look_ch() == '+' || self.ch() == '-' {
             if self.ch() == '+' {
                 chomping = Chomping::Keep;
             } else {
                 chomping = Chomping::Strip;
             }
             self.skip_non_blank();
-            if is_digit(self.look_ch()) {
+            if is_digit(self.input.look_ch()) {
                 if self.ch() == '0' {
                     return Err(ScanError::new_str(
                         start_mark,
@@ -1650,7 +1600,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
             increment = (self.ch() as usize) - ('0' as usize);
             self.skip_non_blank();
-            self.lookahead(1);
+            self.input.lookahead(1);
             if self.ch() == '+' || self.ch() == '-' {
                 if self.ch() == '+' {
                     chomping = Chomping::Keep;
@@ -1664,7 +1614,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         self.skip_ws_to_eol(SkipTabs::Yes)?;
 
         // Check if we are at the end of the line.
-        if !is_breakz(self.look_ch()) {
+        if !is_breakz(self.input.look_ch()) {
             return Err(ScanError::new_str(
                 start_mark,
                 "while scanning a block scalar, did not find expected comment or line break",
@@ -1672,11 +1622,11 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         }
 
         if is_break(self.ch()) {
-            self.lookahead(2);
+            self.input.lookahead(2);
             self.read_break(&mut chomping_break);
         }
 
-        if self.look_ch() == '\t' {
+        if self.input.look_ch() == '\t' {
             return Err(ScanError::new_str(
                 start_mark,
                 "a block scalar content cannot start with a tab",
@@ -1731,7 +1681,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         let start_mark = self.mark;
         while self.mark.col == indent && !is_z(self.ch()) {
             if indent == 0 {
-                self.lookahead(4);
+                self.input.lookahead(4);
                 if self.next_is_document_end() {
                     break;
                 }
@@ -1761,7 +1711,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                 break;
             }
 
-            self.lookahead(2);
+            self.input.lookahead(2);
             self.read_break(&mut leading_break);
 
             // Eat the following indentation spaces and line breaks.
@@ -1797,7 +1747,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     /// line. This function does not consume the line break character(s) after the line.
     fn scan_block_scalar_content_line(&mut self, string: &mut String, line_buffer: &mut String) {
         // Start by evaluating characters in the buffer.
-        while !self.buffer.is_empty() && !is_breakz(self.ch()) {
+        while !self.input.buf_is_empty() && !is_breakz(self.ch()) {
             string.push(self.ch());
             // We may technically skip non-blank characters. However, the only distinction is
             // to determine what is leading whitespace and what is not. Here, we read the
@@ -1809,7 +1759,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
         // All characters that were in the buffer were consumed. We need to check if more
         // follow.
-        if self.buffer.is_empty() {
+        if self.input.buf_is_empty() {
             // We will read all consecutive non-breakz characters. We push them into a
             // temporary buffer. The main difference with going through `self.buffer` is that
             // characters are appended here as their real size (1B for ascii, or up to 4 bytes for
@@ -1824,7 +1774,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             // Our last character read is stored in `c`. It is either an EOF or a break. In any
             // case, we need to push it back into `self.buffer` so it may be properly read
             // after. We must not insert it in `string`.
-            self.buffer.push_back(c).unwrap();
+            self.input.push_back(c);
 
             // We need to manually update our position; we haven't called a `skip` function.
             self.mark.col += line_buffer.len();
@@ -1842,25 +1792,25 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     fn skip_block_scalar_indent(&mut self, indent: usize, breaks: &mut String) {
         loop {
             // Consume all spaces. Tabs cannot be used as indentation.
-            if indent < BUFFER_LEN - 2 {
-                self.lookahead(BUFFER_LEN);
+            if indent < self.input.bufmaxlen() - 2 {
+                self.input.lookahead(self.input.bufmaxlen());
                 while self.mark.col < indent && self.ch() == ' ' {
                     self.skip_blank();
                 }
             } else {
                 loop {
-                    self.lookahead(BUFFER_LEN);
-                    while !self.buffer.is_empty() && self.mark.col < indent && self.ch() == ' ' {
+                    self.input.lookahead(self.input.bufmaxlen());
+                    while !self.input.buf_is_empty() && self.mark.col < indent && self.ch() == ' ' {
                         self.skip_blank();
                     }
                     // If we reached our indent, we can break. We must also break if we have
                     // reached content or EOF; that is, the buffer is not empty and the next
                     // character is not a space.
-                    if self.mark.col == indent || (!self.buffer.is_empty() && self.ch() != ' ') {
+                    if self.mark.col == indent || (!self.input.buf_is_empty() && self.ch() != ' ') {
                         break;
                     }
                 }
-                self.lookahead(2);
+                self.input.lookahead(2);
             }
 
             // If our current line is empty, skip over the break and continue looping.
@@ -1881,7 +1831,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         let mut max_indent = 0;
         loop {
             // Consume all spaces. Tabs cannot be used as indentation.
-            while self.look_ch() == ' ' {
+            while self.input.look_ch() == ' ' {
                 self.skip_blank();
             }
 
@@ -1891,7 +1841,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
             if is_break(self.ch()) {
                 // If our current line is empty, skip over the break and continue looping.
-                self.lookahead(2);
+                self.input.lookahead(2);
                 self.read_break(breaks);
             } else {
                 // Otherwise, we have a content line. Return control.
@@ -1943,15 +1893,9 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
         loop {
             /* Check for a document indicator. */
-            self.lookahead(4);
+            self.input.lookahead(4);
 
-            if self.mark.col == 0
-                && (((self.buffer[0] == '-') && (self.buffer[1] == '-') && (self.buffer[2] == '-'))
-                    || ((self.buffer[0] == '.')
-                        && (self.buffer[1] == '.')
-                        && (self.buffer[2] == '.')))
-                && is_blank_or_breakz(self.buffer[3])
-            {
+            if self.mark.col == 0 && self.next_is_document_indicator() {
                 return Err(ScanError::new_str(
                     start_mark,
                     "while scanning a quoted scalar, found unexpected document indicator",
@@ -1980,7 +1924,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                 &start_mark,
             )?;
 
-            match self.look_ch() {
+            match self.input.look_ch() {
                 '\'' if single => break,
                 '"' if !single => break,
                 _ => {}
@@ -2003,7 +1947,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                         self.skip_blank();
                     }
                 } else {
-                    self.lookahead(2);
+                    self.input.lookahead(2);
                     // Check if it is a first line break.
                     if leading_blanks {
                         self.read_break(&mut trailing_breaks);
@@ -2013,7 +1957,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                         leading_blanks = true;
                     }
                 }
-                self.lookahead(1);
+                self.input.lookahead(1);
             }
 
             // Join the whitespaces or fold line breaks.
@@ -2083,11 +2027,11 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         leading_blanks: &mut bool,
         start_mark: &Marker,
     ) -> Result<(), ScanError> {
-        self.lookahead(2);
+        self.input.lookahead(2);
         while !is_blank_or_breakz(self.ch()) {
             match self.ch() {
                 // Check for an escaped single quote.
-                '\'' if self.buffer[1] == '\'' && single => {
+                '\'' if self.input.peek_nth(1) == '\'' && single => {
                     string.push('\'');
                     self.skip_n_non_blank(2);
                 }
@@ -2095,8 +2039,8 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                 '\'' if single => break,
                 '"' if !single => break,
                 // Check for an escaped line break.
-                '\\' if !single && is_break(self.buffer[1]) => {
-                    self.lookahead(3);
+                '\\' if !single && is_break(self.input.peek_nth(1)) => {
+                    self.input.lookahead(3);
                     self.skip_non_blank();
                     self.skip_linebreak();
                     *leading_blanks = true;
@@ -2111,7 +2055,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                     self.skip_non_blank();
                 }
             }
-            self.lookahead(2);
+            self.input.lookahead(2);
         }
         Ok(())
     }
@@ -2129,7 +2073,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         let mut code_length = 0usize;
         let mut ret = '\0';
 
-        match self.buffer[1] {
+        match self.input.peek_nth(1) {
             '0' => ret = '\0',
             'a' => ret = '\x07',
             'b' => ret = '\x08',
@@ -2165,16 +2109,17 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
         // Consume an arbitrary escape code.
         if code_length > 0 {
-            self.lookahead(code_length);
+            self.input.lookahead(code_length);
             let mut value = 0u32;
             for i in 0..code_length {
-                if !is_hex(self.buffer[i]) {
+                let c = self.input.peek_nth(i);
+                if !is_hex(c) {
                     return Err(ScanError::new_str(
                         *start_mark,
                         "while parsing a quoted scalar, did not find expected hexadecimal number",
                     ));
                 }
-                value = (value << 4) + as_hex(self.buffer[i]);
+                value = (value << 4) + as_hex(c);
             }
 
             let Some(ch) = char::from_u32(value) else {
@@ -2223,12 +2168,12 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         let mut whitespaces = String::with_capacity(32);
 
         loop {
-            self.lookahead(4);
+            self.input.lookahead(4);
             if self.next_is_document_indicator() || self.ch() == '#' {
                 break;
             }
 
-            if self.flow_level > 0 && self.ch() == '-' && is_flow(self.buffer[1]) {
+            if self.flow_level > 0 && self.ch() == '-' && is_flow(self.input.peek_nth(1)) {
                 return Err(ScanError::new_str(
                     self.mark,
                     "plain scalar cannot start with '-' followed by ,[]{}",
@@ -2260,7 +2205,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                 // We can unroll the first iteration of the loop.
                 string.push(self.ch());
                 self.skip_non_blank();
-                self.lookahead(2);
+                self.input.lookahead(2);
 
                 // Add content non-blank characters to the scalar.
                 while !is_blank_or_breakz(self.ch()) {
@@ -2270,7 +2215,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
                     string.push(self.ch());
                     self.skip_non_blank();
-                    self.lookahead(2);
+                    self.input.lookahead(2);
                 }
             }
 
@@ -2283,7 +2228,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             }
 
             // Process blank characters.
-            while is_blank(self.look_ch()) || is_break(self.ch()) {
+            while is_blank(self.input.look_ch()) || is_break(self.ch()) {
                 if is_blank(self.ch()) {
                     if !self.leading_whitespace {
                         whitespaces.push(self.ch());
@@ -2302,7 +2247,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                         self.skip_blank();
                     }
                 } else {
-                    self.lookahead(2);
+                    self.input.lookahead(2);
                     // Check if it is a first line break
                     if self.leading_whitespace {
                         self.read_break(&mut trailing_breaks);
@@ -2379,7 +2324,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     /// [`self.flow_level`]: Self::flow_level
     /// [`fetch_value`]: Self::fetch_value
     fn fetch_flow_value(&mut self) -> ScanResult {
-        let nc = self.buffer[1];
+        let nc = self.input.peek_nth(1);
 
         // If we encounter a ':' inside a flow collection and it is not immediately
         // followed by a blank or breakz:
@@ -2413,7 +2358,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
         // Skip over ':'.
         self.skip_non_blank();
-        if self.look_ch() == '\t'
+        if self.input.look_ch() == '\t'
             && !self.skip_ws_to_eol(SkipTabs::Yes)?.has_valid_yaml_ws()
             && (self.ch() == '-' || is_alpha(self.ch()))
         {
@@ -2600,8 +2545,8 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     fn next_can_be_plain_scalar(&self) -> bool {
         match self.ch() {
             // indicators can end a plain scalar, see 7.3.3. Plain Style
-            ':' if is_blank_or_breakz(self.buffer[1])
-                || (self.flow_level > 0 && is_flow(self.buffer[1])) =>
+            ':' if is_blank_or_breakz(self.input.peek_nth(1))
+                || (self.flow_level > 0 && is_flow(self.input.peek_nth(1))) =>
             {
                 false
             }

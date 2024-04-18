@@ -4,7 +4,11 @@
 //! compliance, and emits a stream of YAML events. This stream can for instance be used to create
 //! YAML objects.
 
-use crate::scanner::{Marker, ScanError, Scanner, TScalarStyle, Token, TokenType};
+use crate::{
+    input::Input,
+    scanner::{Marker, ScanError, Scanner, TScalarStyle, Token, TokenType},
+    BufferedInput,
+};
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, PartialEq, Debug, Eq)]
@@ -100,7 +104,7 @@ impl Event {
 
 /// A YAML parser.
 #[derive(Debug)]
-pub struct Parser<T> {
+pub struct Parser<T: Input> {
     /// The underlying scanner from which we pull tokens.
     scanner: Scanner<T>,
     /// The stack of _previous_ states we were in.
@@ -225,15 +229,15 @@ impl<R: EventReceiver> MarkedEventReceiver for R {
 /// A convenience alias for a `Result` of a parser event.
 pub type ParseResult = Result<(Event, Marker), ScanError>;
 
-impl<'a> Parser<core::str::Chars<'a>> {
+impl<'a> Parser<BufferedInput<std::str::Chars<'a>>> {
     /// Create a new instance of a parser from a &str.
     #[must_use]
     pub fn new_from_str(value: &'a str) -> Self {
-        Parser::new(value.chars())
+        Parser::new(BufferedInput::new(value.chars()))
     }
 }
 
-impl<T: Iterator<Item = char>> Parser<T> {
+impl<T: Input> Parser<T> {
     /// Create a new instance of a parser from the given input of characters.
     pub fn new(src: T) -> Parser<T> {
         Parser {
@@ -1130,7 +1134,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
     }
 }
 
-impl<T: Iterator<Item = char>> Iterator for Parser<T> {
+impl<T: Input> Iterator for Parser<T> {
     type Item = Result<(Event, Marker), ScanError>;
 
     fn next(&mut self) -> Option<Self::Item> {

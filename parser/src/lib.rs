@@ -32,11 +32,14 @@
 
 #![warn(missing_docs, clippy::pedantic)]
 
-pub(crate) mod char_traits;
+mod buffered_input;
+mod char_traits;
 #[macro_use]
-pub(crate) mod debug;
-pub mod parser;
-pub mod scanner;
+mod debug;
+mod input;
+mod parser;
+mod scanner;
 
+pub use crate::buffered_input::BufferedInput;
 pub use crate::parser::{Event, EventReceiver, MarkedEventReceiver, Parser, Tag};
 pub use crate::scanner::{Marker, ScanError, TScalarStyle};

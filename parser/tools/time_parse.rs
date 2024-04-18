@@ -1,11 +1,8 @@
-use saphyr_parser::{
-    parser::{MarkedEventReceiver, Parser},
-    scanner::Marker,
-    Event,
-};
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+
+use saphyr_parser::{Event, MarkedEventReceiver, Marker, Parser};
 
 /// A sink which discards any event sent.
 struct NullSink {}

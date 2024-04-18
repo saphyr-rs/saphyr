@@ -231,7 +231,7 @@ a: |-
 
 #[test]
 fn test_bad_docstart() {
-    assert!(run_parser("---This used to cause an infinite loop").is_ok());
+    run_parser("---This used to cause an infinite loop").unwrap();
     assert_eq!(
         run_parser("----").unwrap(),
         [

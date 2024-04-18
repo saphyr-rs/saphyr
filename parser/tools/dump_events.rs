@@ -2,11 +2,7 @@ use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 
-use saphyr_parser::{
-    parser::{MarkedEventReceiver, Parser},
-    scanner::Marker,
-    Event,
-};
+use saphyr_parser::{Event, MarkedEventReceiver, Marker, Parser};
 
 #[derive(Debug)]
 struct EventSink {
