@@ -2169,17 +2169,24 @@ impl<T: Input> Scanner<T> {
                 // We can unroll the first iteration of the loop.
                 string.push(self.input.peek());
                 self.skip_non_blank();
-                self.input.lookahead(2);
+                string.reserve(self.input.bufmaxlen());
 
                 // Add content non-blank characters to the scalar.
-                while !is_blank_or_breakz(self.input.peek()) {
-                    if !self.next_can_be_plain_scalar() {
-                        break;
+                let mut end = false;
+                while !end {
+                    // Fill the buffer once and process all characters in the buffer until the next
+                    // fetch. Note that `next_can_be_plain_scalar` needs 2 lookahead characters,
+                    // hence the `for` loop looping `self.input.bufmaxlen() - 1` times.
+                    self.input.lookahead(self.input.bufmaxlen());
+                    for _ in 0..self.input.bufmaxlen() - 1 {
+                        if is_blank_or_breakz(self.input.peek()) || !self.next_can_be_plain_scalar()
+                        {
+                            end = true;
+                            break;
+                        }
+                        string.push(self.input.peek());
+                        self.skip_non_blank();
                     }
-
-                    string.push(self.input.peek());
-                    self.skip_non_blank();
-                    self.input.lookahead(2);
                 }
             }
 
