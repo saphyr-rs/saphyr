@@ -102,10 +102,25 @@ pub trait Input {
         self.peek_nth(n) == c
     }
 
-    /// Return whether the next characters in the input source match the given pattern.
+    /// Return whether the next 2 characters in the input source match the given characters.
     ///
-    /// This function assumes that the next `pat.len()` characters in the input has already been
-    /// fetched through [`Input::lookahead`].
+    /// This function assumes that the next 2 characters in the input has already been fetched
+    /// through [`Input::lookahead`].
+    #[inline]
     #[must_use]
-    fn next_is(&self, pat: &str) -> bool;
+    fn next_2_are(&self, c1: char, c2: char) -> bool {
+        assert!(self.buflen() >= 2);
+        self.peek() == c1 && self.peek_nth(1) == c2
+    }
+
+    /// Return whether the next 3 characters in the input source match the given characters.
+    ///
+    /// This function assumes that the next 3 characters in the input has already been fetched
+    /// through [`Input::lookahead`].
+    #[inline]
+    #[must_use]
+    fn next_3_are(&self, c1: char, c2: char, c3: char) -> bool {
+        assert!(self.buflen() >= 3);
+        self.peek() == c1 && self.peek_nth(1) == c2 && self.peek_nth(2) == c3
+    }
 }

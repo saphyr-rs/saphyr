@@ -90,10 +90,4 @@ impl<T: Iterator<Item = char>> Input for BufferedInput<T> {
     fn peek_nth(&self, n: usize) -> char {
         self.buffer[n]
     }
-
-    #[inline]
-    fn next_is(&self, pat: &str) -> bool {
-        assert!(self.buffer.len() >= pat.len());
-        self.buffer.iter().zip(pat.chars()).all(|(a, b)| *a == b)
-    }
 }

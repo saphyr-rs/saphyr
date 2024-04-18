@@ -528,7 +528,7 @@ impl<T: Input> Scanner<T> {
     /// Consume a linebreak (either CR, LF or CRLF), if any. Do nothing if there's none.
     #[inline]
     fn skip_linebreak(&mut self) {
-        if self.input.next_is("\r\n") {
+        if self.input.next_2_are('\r', '\n') {
             // While technically not a blank, this does not matter as `self.leading_whitespace`
             // will be reset by `skip_nl`.
             self.skip_blank();
@@ -597,7 +597,7 @@ impl<T: Input> Scanner<T> {
     /// [`Self::lookahead`] must have been called before calling this function.
     fn next_is_document_start(&self) -> bool {
         assert!(self.input.buflen() >= 4);
-        self.input.next_is("---") && is_blank_or_breakz(self.input.peek_nth(3))
+        self.input.next_3_are('-', '-', '-') && is_blank_or_breakz(self.input.peek_nth(3))
     }
 
     /// Check whether the next characters correspond to an end of document.
@@ -605,7 +605,7 @@ impl<T: Input> Scanner<T> {
     /// [`Self::lookahead`] must have been called before calling this function.
     fn next_is_document_end(&self) -> bool {
         assert!(self.input.buflen() >= 4);
-        self.input.next_is("...") && is_blank_or_breakz(self.input.peek_nth(3))
+        self.input.next_3_are('.', '.', '.') && is_blank_or_breakz(self.input.peek_nth(3))
     }
 
     /// Check whether the next characters correspond to a document indicator.
@@ -615,7 +615,7 @@ impl<T: Input> Scanner<T> {
     fn next_is_document_indicator(&self) -> bool {
         assert!(self.input.buflen() >= 4);
         is_blank_or_breakz(self.input.peek_nth(3))
-            && (self.input.next_is("...") || self.input.next_is("---"))
+            && (self.input.next_3_are('.', '.', '.') || self.input.next_3_are('-', '-', '-'))
     }
 
     /// Insert a token at the given position.
