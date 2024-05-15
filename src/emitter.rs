@@ -212,9 +212,9 @@ impl<'a> YamlEmitter<'a> {
 
     fn emit_node(&mut self, node: &Yaml) -> EmitResult {
         match *node {
-            Yaml::Array(ref v) => self.emit_array(v),
-            Yaml::Hash(ref h) => self.emit_hash(h),
-            Yaml::String(ref v) => {
+            Yaml::Array(ref v, _) => self.emit_array(v),
+            Yaml::Hash(ref h, _) => self.emit_hash(h),
+            Yaml::String(ref v, _) => {
                 if self.multiline_strings
                     && v.contains('\n')
                     && char_traits::is_valid_literal_block_scalar(v)
@@ -235,7 +235,7 @@ impl<'a> YamlEmitter<'a> {
                 }
                 Ok(())
             }
-            Yaml::Boolean(v) => {
+            Yaml::Boolean(v, _) => {
                 if v {
                     self.writer.write_str("true")?;
                 } else {
@@ -243,11 +243,11 @@ impl<'a> YamlEmitter<'a> {
                 }
                 Ok(())
             }
-            Yaml::Integer(v) => {
+            Yaml::Integer(v, _) => {
                 write!(self.writer, "{v}")?;
                 Ok(())
             }
-            Yaml::Real(ref v) => {
+            Yaml::Real(ref v, _) => {
                 write!(self.writer, "{v}")?;
                 Ok(())
             }
@@ -284,7 +284,7 @@ impl<'a> YamlEmitter<'a> {
         } else {
             self.level += 1;
             for (cnt, (k, v)) in h.iter().enumerate() {
-                let complex_key = matches!(*k, Yaml::Hash(_) | Yaml::Array(_));
+                let complex_key = matches!(*k, Yaml::Hash(_, _) | Yaml::Array(_, _));
                 if cnt > 0 {
                     writeln!(self.writer)?;
                     self.write_indent()?;
@@ -313,7 +313,7 @@ impl<'a> YamlEmitter<'a> {
     /// and short enough to respect the compact flag.
     fn emit_val(&mut self, inline: bool, val: &Yaml) -> EmitResult {
         match *val {
-            Yaml::Array(ref v) => {
+            Yaml::Array(ref v, _) => {
                 if (inline && self.compact) || v.is_empty() {
                     write!(self.writer, " ")?;
                 } else {
@@ -324,7 +324,7 @@ impl<'a> YamlEmitter<'a> {
                 }
                 self.emit_array(v)
             }
-            Yaml::Hash(ref h) => {
+            Yaml::Hash(ref h, _) => {
                 if (inline && self.compact) || h.is_empty() {
                     write!(self.writer, " ")?;
                 } else {

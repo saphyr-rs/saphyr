@@ -207,15 +207,15 @@ c: ~
     let first = out.into_iter().next().unwrap();
     let mut iter = first.into_hash().unwrap().into_iter();
     assert_eq!(
-        Some((Yaml::String("b".to_owned()), Yaml::Null)),
+        Some((Yaml::String("b".to_owned(), None), Yaml::Null)),
         iter.next()
     );
     assert_eq!(
-        Some((Yaml::String("a".to_owned()), Yaml::Null)),
+        Some((Yaml::String("a".to_owned(), None), Yaml::Null)),
         iter.next()
     );
     assert_eq!(
-        Some((Yaml::String("c".to_owned()), Yaml::Null)),
+        Some((Yaml::String("c".to_owned(), None), Yaml::Null)),
         iter.next()
     );
     assert_eq!(None, iter.next());
