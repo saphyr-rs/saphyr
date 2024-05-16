@@ -33,14 +33,14 @@ impl From<Marker> for Location {
 }
 
 impl Location {
-    fn end(self, m: Marker) -> Location {
+    fn end_on(self, end: (usize, usize)) -> Location {
         match self {
             Location::Proper(_) => panic!("this already ended!"),
-            Location::Partial { start } => Location::Proper(Inner {
-                start,
-                end: (m.line(), m.col()),
-            }),
+            Location::Partial { start } => Location::Proper(Inner { start, end }),
         }
+    }
+    fn end(self, m: Marker) -> Location {
+        self.end_on((m.line(), m.col()))
     }
 }
 
@@ -87,6 +87,7 @@ pub enum Yaml {
     BadValue,
 }
 
+// We need to ignore the location for now
 impl PartialEq for Yaml {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -832,10 +833,12 @@ c: [1, 2]
 ";
         let out = YamlDecoder::read(s as &[u8]).decode().unwrap();
         let doc = &out[0];
+        dbg!(&doc);
         assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
         assert!((doc["b"].as_f64().unwrap() - 2.2f64).abs() <= f64::EPSILON);
         assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
         assert!(doc["d"][0].is_badvalue());
+        assert!(false);
     }
 
     #[test]
