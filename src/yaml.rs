@@ -42,6 +42,23 @@ impl Location {
     fn end(self, m: Marker) -> Location {
         self.end_on((m.line(), m.col()))
     }
+
+    fn n_characters_after(self, arg: usize) -> Location {
+        match self {
+            Location::Proper(_) => panic!("this already ended!"),
+            Location::Partial { start: (row, col) } => Location::Proper(Inner {
+                start: (row, col),
+                end: (row, col + arg),
+            }),
+        }
+    }
+
+    fn extend_to(&mut self, m: Marker) {
+        match self {
+            Location::Proper(Inner { end, .. }) => *end = (m.line(), m.col()),
+            Location::Partial { .. } => *self = self.clone().end(m),
+        };
+    }
 }
 
 /// A YAML node is stored as this `Yaml` enumeration, which provides an easy way to
@@ -153,8 +170,9 @@ impl MarkedEventReceiver for YamlLoader {
                     .push((Yaml::Array(Vec::new(), Some(m.into())), aid));
             }
             Event::SequenceEnd => {
+                dbg!(&m);
                 let node = self.doc_stack.pop().unwrap();
-                self.insert_new_node(node);
+                self.insert_new_node(node, m);
             }
             Event::MappingStart(aid, _) => {
                 self.doc_stack
@@ -164,7 +182,7 @@ impl MarkedEventReceiver for YamlLoader {
             Event::MappingEnd => {
                 self.key_stack.pop().unwrap();
                 let node = self.doc_stack.pop().unwrap();
-                self.insert_new_node(node);
+                self.insert_new_node(node, m);
             }
             Event::Scalar(v, style, aid, tag) => {
                 let node = if style != TScalarStyle::Plain {
@@ -180,7 +198,13 @@ impl MarkedEventReceiver for YamlLoader {
                                 // "true" or "false"
                                 match v.parse::<bool>() {
                                     Err(_) => Yaml::BadValue,
-                                    Ok(v) => Yaml::Boolean(v, Some(m.into())),
+                                    Ok(v) => {
+                                        let length = if v { 4 } else { 5 };
+                                        Yaml::Boolean(
+                                            v,
+                                            Some(Location::from(m).n_characters_after(length)),
+                                        )
+                                    }
                                 }
                             }
                             "int" => match v.parse::<i64>() {
@@ -202,17 +226,17 @@ impl MarkedEventReceiver for YamlLoader {
                     }
                 } else {
                     // Datatype is not specified, or unrecognized
-                    Yaml::from_str(&v)
+                    Yaml::from_str(&v, m)
                 };
 
-                self.insert_new_node((node, aid));
+                self.insert_new_node((node, aid), m);
             }
             Event::Alias(id) => {
                 let n = match self.anchor_map.get(&id) {
                     Some(v) => v.clone(),
                     None => Yaml::BadValue,
                 };
-                self.insert_new_node((n, 0));
+                self.insert_new_node((n, 0), m);
             }
         }
         // println!("DOC {:?}", self.doc_stack);
@@ -257,13 +281,15 @@ impl std::fmt::Display for LoadError {
 }
 
 impl YamlLoader {
-    fn insert_new_node(&mut self, node: (Yaml, usize)) {
+    fn insert_new_node(&mut self, mut node: (Yaml, usize), end: Marker) {
+        node.0.foo_end(end);
         // valid anchor id starts from 1
         if node.1 > 0 {
             self.anchor_map.insert(node.1, node.0.clone());
         }
         if self.doc_stack.is_empty() {
-            self.doc_stack.push(node);
+            let n = node.0.end(end);
+            self.doc_stack.push((n, node.1));
         } else {
             let parent = self.doc_stack.last_mut().unwrap();
             match *parent {
@@ -273,7 +299,7 @@ impl YamlLoader {
                     // current node is a key
                     if cur_key.is_badvalue() {
                         *cur_key = node.0;
-                    // current node is a value
+                        // current node is a value
                     } else {
                         let mut newkey = Yaml::BadValue;
                         mem::swap(&mut newkey, cur_key);
@@ -589,6 +615,41 @@ pub fn $name(self) -> Option<$t> {
 );
 
 impl Yaml {
+    fn foo_end(&mut self, m: Marker) {
+        match self {
+            Yaml::Real(r, mx) => {
+                if let Some(x) = mx {
+                    x.extend_to(m)
+                }
+            }
+            Yaml::Integer(i, mx) => {
+                if let Some(x) = mx {
+                    x.extend_to(m)
+                }
+            }
+            Yaml::String(s, mx) => {
+                if let Some(x) = mx {
+                    x.extend_to(m)
+                }
+            }
+            Yaml::Boolean(b, mx) => {
+                if let Some(x) = mx {
+                    x.extend_to(m)
+                }
+            }
+            Yaml::Array(ar, mx) => {
+                if let Some(x) = mx {
+                    x.extend_to(m)
+                }
+            }
+            Yaml::Hash(h, mx) => {
+                if let Some(x) = mx {
+                    x.extend_to(m)
+                }
+            }
+            other => {}
+        }
+    }
     fn end(self, m: Marker) -> Yaml {
         match self {
             Yaml::Real(r, mx) => Yaml::Real(r, mx.map(|p| p.end(m))),
@@ -705,31 +766,32 @@ impl Yaml {
     /// assert!(matches!(Yaml::from_str("foo"), Yaml::String(_)));
     /// ```
     #[must_use]
-    pub fn from_str(v: &str) -> Yaml {
+    pub fn from_str(v: &str, m: Marker) -> Yaml {
+        let location = Location::from(m);
         if let Some(number) = v.strip_prefix("0x") {
             if let Ok(i) = i64::from_str_radix(number, 16) {
-                return Yaml::Integer(i, None);
+                return Yaml::Integer(i, Some(location.n_characters_after(v.len())));
             }
         } else if let Some(number) = v.strip_prefix("0o") {
             if let Ok(i) = i64::from_str_radix(number, 8) {
-                return Yaml::Integer(i, None);
+                return Yaml::Integer(i, Some(location.n_characters_after(v.len())));
             }
         } else if let Some(number) = v.strip_prefix('+') {
             if let Ok(i) = number.parse::<i64>() {
-                return Yaml::Integer(i, None);
+                return Yaml::Integer(i, Some(location.n_characters_after(v.len())));
             }
         }
         match v {
             "~" | "null" => Yaml::Null,
-            "true" => Yaml::Boolean(true, None),
-            "false" => Yaml::Boolean(false, None),
+            "true" => Yaml::Boolean(true, Some(location.n_characters_after(4))),
+            "false" => Yaml::Boolean(false, Some(location.n_characters_after(5))),
             _ => {
                 if let Ok(integer) = v.parse::<i64>() {
-                    Yaml::Integer(integer, None)
+                    Yaml::Integer(integer, Some(location.n_characters_after(v.len())))
                 } else if parse_f64(v).is_some() {
-                    Yaml::Real(v.to_owned(), None)
+                    Yaml::Real(v.to_owned(), Some(location.n_characters_after(v.len())))
                 } else {
-                    Yaml::String(v.to_owned(), None)
+                    Yaml::String(v.to_owned(), Some(location.n_characters_after(v.len())))
                 }
             }
         }
@@ -737,6 +799,7 @@ impl Yaml {
 }
 
 static BAD_VALUE: Yaml = Yaml::BadValue;
+
 impl<'a> Index<&'a str> for Yaml {
     type Output = Yaml;
 
