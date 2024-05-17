@@ -18,6 +18,12 @@ pub struct Inner {
     end: (usize, usize),
 }
 
+impl From<Inner> for Location {
+    fn from(value: Inner) -> Self {
+        Location::Proper(value)
+    }
+}
+
 #[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
 pub enum Location {
     Partial { start: (usize, usize) },
@@ -33,16 +39,6 @@ impl From<Marker> for Location {
 }
 
 impl Location {
-    fn end_on(self, end: (usize, usize)) -> Location {
-        match self {
-            Location::Proper(_) => panic!("this already ended!"),
-            Location::Partial { start } => Location::Proper(Inner { start, end }),
-        }
-    }
-    fn end(self, m: Marker) -> Location {
-        self.end_on((m.line(), m.col()))
-    }
-
     fn n_characters_after(self, arg: usize) -> Location {
         match self {
             Location::Proper(_) => panic!("this already ended!"),
@@ -56,8 +52,30 @@ impl Location {
     fn extend_to(&mut self, m: Marker) {
         match self {
             Location::Proper(Inner { end, .. }) => *end = (m.line(), m.col()),
-            Location::Partial { .. } => *self = self.clone().end(m),
+            Location::Partial { start } => {
+                *self = Location::Proper(Inner {
+                    start: *start,
+                    end: (m.line(), m.col()),
+                });
+            }
         };
+    }
+
+    fn for_str_starting_at(m: Marker, v: &str) -> Location {
+        let lines_in_string = v.lines().count();
+        let last_width = v.lines().last().unwrap_or(v).len();
+
+        let last_column = m.col() + last_width;
+        let last_row = m.line() + lines_in_string - 1; // if there is a single line, we shouldn't be adding 1 so we substract it again
+        match Location::from(m) {
+            Location::Partial { start } => Location::Proper(Inner {
+                start,
+                end: (last_row, last_column),
+            }),
+            Location::Proper(_) => {
+                unreachable!("If we just convert this, it can't really have an end!")
+            }
+        }
     }
 }
 
@@ -77,7 +95,7 @@ impl Location {
 ///     assert!(v.as_i64().is_some());
 /// }
 /// ```
-#[derive(Clone, PartialOrd, Debug, Eq, Ord, Hash)]
+#[derive(Clone, PartialOrd, Debug, Eq, Ord)]
 pub enum Yaml {
     /// Float types are stored as String and parsed on demand.
     /// Note that `f64` does NOT implement Eq trait and can NOT be stored in `BTreeMap`.
@@ -104,13 +122,27 @@ pub enum Yaml {
     BadValue,
 }
 
+impl std::hash::Hash for Yaml {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Yaml::Integer(a, _) => a.hash(state),
+            Yaml::String(a, _) | Yaml::Real(a, _) => a.hash(state),
+            Yaml::Boolean(a, _) => a.hash(state),
+            Yaml::Array(a, _) => a.hash(state),
+            Yaml::Hash(a, _) => a.hash(state),
+            _other => core::mem::discriminant(self).hash(state),
+        }
+    }
+}
+
 // We need to ignore the location for now
 impl PartialEq for Yaml {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Real(a, _), Self::Real(b, _)) => a == b,
             (Self::Integer(a, _), Self::Integer(b, _)) => a == b,
-            (Self::String(a, _), Self::String(b, _)) => a == b,
+            (Self::String(a, _), Self::String(b, _)) | (Self::Real(a, _), Self::Real(b, _)) => {
+                a == b
+            }
             (Self::Boolean(a, _), Self::Boolean(b, _)) => a == b,
             (Self::Array(a, _), Self::Array(b, _)) => a == b,
             (Self::Hash(a, _), Self::Hash(b, _)) => a == b,
@@ -170,9 +202,10 @@ impl MarkedEventReceiver for YamlLoader {
                     .push((Yaml::Array(Vec::new(), Some(m.into())), aid));
             }
             Event::SequenceEnd => {
-                dbg!(&m);
-                let node = self.doc_stack.pop().unwrap();
-                self.insert_new_node(node, m);
+                let (mut node, alias) = self.doc_stack.pop().unwrap();
+                node.mut_end(m);
+
+                self.insert_new_node((node, alias));
             }
             Event::MappingStart(aid, _) => {
                 self.doc_stack
@@ -181,12 +214,14 @@ impl MarkedEventReceiver for YamlLoader {
             }
             Event::MappingEnd => {
                 self.key_stack.pop().unwrap();
-                let node = self.doc_stack.pop().unwrap();
-                self.insert_new_node(node, m);
+                let (mut node, alias) = self.doc_stack.pop().unwrap();
+                node.mut_end(m);
+                self.insert_new_node((node, alias));
             }
             Event::Scalar(v, style, aid, tag) => {
                 let node = if style != TScalarStyle::Plain {
-                    Yaml::String(v, Some(m.into()))
+                    let location = Location::for_str_starting_at(m, &v);
+                    Yaml::String(v, Some(location))
                 } else if let Some(Tag {
                     ref handle,
                     ref suffix,
@@ -219,24 +254,28 @@ impl MarkedEventReceiver for YamlLoader {
                                 "~" | "null" => Yaml::Null,
                                 _ => Yaml::BadValue,
                             },
-                            _ => Yaml::String(v, Some(m.into())),
+                            _ => {
+                                let location = Location::for_str_starting_at(m, &v);
+                                Yaml::String(v, Some(location))
+                            }
                         }
                     } else {
-                        Yaml::String(v, Some(m.into()))
+                        let location = Location::for_str_starting_at(m, &v);
+                        Yaml::String(v, Some(location))
                     }
                 } else {
                     // Datatype is not specified, or unrecognized
                     Yaml::from_str(&v, m)
                 };
 
-                self.insert_new_node((node, aid), m);
+                self.insert_new_node((node, aid));
             }
             Event::Alias(id) => {
                 let n = match self.anchor_map.get(&id) {
                     Some(v) => v.clone(),
                     None => Yaml::BadValue,
                 };
-                self.insert_new_node((n, 0), m);
+                self.insert_new_node((n, 0));
             }
         }
         // println!("DOC {:?}", self.doc_stack);
@@ -281,15 +320,13 @@ impl std::fmt::Display for LoadError {
 }
 
 impl YamlLoader {
-    fn insert_new_node(&mut self, mut node: (Yaml, usize), end: Marker) {
-        node.0.foo_end(end);
+    fn insert_new_node(&mut self, node: (Yaml, usize)) {
         // valid anchor id starts from 1
         if node.1 > 0 {
             self.anchor_map.insert(node.1, node.0.clone());
         }
         if self.doc_stack.is_empty() {
-            let n = node.0.end(end);
-            self.doc_stack.push((n, node.1));
+            self.doc_stack.push(node);
         } else {
             let parent = self.doc_stack.last_mut().unwrap();
             match *parent {
@@ -615,51 +652,29 @@ pub fn $name(self) -> Option<$t> {
 );
 
 impl Yaml {
-    fn foo_end(&mut self, m: Marker) {
+    fn mut_end(&mut self, m: Marker) {
         match self {
-            Yaml::Real(r, mx) => {
-                if let Some(x) = mx {
-                    x.extend_to(m)
-                }
-            }
-            Yaml::Integer(i, mx) => {
-                if let Some(x) = mx {
-                    x.extend_to(m)
-                }
-            }
-            Yaml::String(s, mx) => {
-                if let Some(x) = mx {
-                    x.extend_to(m)
-                }
-            }
-            Yaml::Boolean(b, mx) => {
-                if let Some(x) = mx {
-                    x.extend_to(m)
-                }
-            }
-            Yaml::Array(ar, mx) => {
-                if let Some(x) = mx {
-                    x.extend_to(m)
-                }
-            }
-            Yaml::Hash(h, mx) => {
-                if let Some(x) = mx {
-                    x.extend_to(m)
-                }
-            }
-            other => {}
+            Yaml::Real(_, Some(ref mut x))
+            | Yaml::Integer(_, Some(ref mut x))
+            | Yaml::String(_, Some(ref mut x))
+            | Yaml::Boolean(_, Some(ref mut x))
+            | Yaml::Array(_, Some(ref mut x))
+            | Yaml::Hash(_, Some(ref mut x)) => x.extend_to(m),
+            _other => {}
         }
     }
-    fn end(self, m: Marker) -> Yaml {
+
+    pub fn location(&self) -> Option<&Location> {
         match self {
-            Yaml::Real(r, mx) => Yaml::Real(r, mx.map(|p| p.end(m))),
-            Yaml::Integer(i, mx) => Yaml::Integer(i, mx.map(|p| p.end(m))),
-            Yaml::String(s, mx) => Yaml::String(s, mx.map(|p| p.end(m))),
-            Yaml::Boolean(b, mx) => Yaml::Boolean(b, mx.map(|p| p.end(m))),
-            Yaml::Array(ar, mx) => Yaml::Array(ar, mx.map(|p| p.end(m))),
-            Yaml::Hash(h, mx) => Yaml::Hash(h, mx.map(|p| p.end(m))),
-            other => other,
+            Yaml::Integer(_, m)
+            | Yaml::String(_, m)
+            | Yaml::Boolean(_, m)
+            | Yaml::Real(_, m)
+            | Yaml::Array(_, m)
+            | Yaml::Hash(_, m) => m,
+            Yaml::Alias(_) | Yaml::Null | Yaml::BadValue => &None,
         }
+        .as_ref()
     }
 
     define_as!(as_bool, bool, Boolean);
@@ -781,17 +796,18 @@ impl Yaml {
                 return Yaml::Integer(i, Some(location.n_characters_after(v.len())));
             }
         }
+        let trivial_location = Some(location.clone().n_characters_after(v.len()));
         match v {
             "~" | "null" => Yaml::Null,
-            "true" => Yaml::Boolean(true, Some(location.n_characters_after(4))),
-            "false" => Yaml::Boolean(false, Some(location.n_characters_after(5))),
+            "true" => Yaml::Boolean(true, trivial_location),
+            "false" => Yaml::Boolean(false, trivial_location),
             _ => {
                 if let Ok(integer) = v.parse::<i64>() {
-                    Yaml::Integer(integer, Some(location.n_characters_after(v.len())))
+                    Yaml::Integer(integer, trivial_location)
                 } else if parse_f64(v).is_some() {
-                    Yaml::Real(v.to_owned(), Some(location.n_characters_after(v.len())))
+                    Yaml::Real(v.to_owned(), trivial_location)
                 } else {
-                    Yaml::String(v.to_owned(), Some(location.n_characters_after(v.len())))
+                    Yaml::String(v.to_owned(), Some(Location::for_str_starting_at(m, v)))
                 }
             }
         }
@@ -885,7 +901,52 @@ impl Iterator for YamlIter {
 
 #[cfg(test)]
 mod test {
+    use crate::{
+        yaml::{Inner, Location},
+        YamlLoader,
+    };
+
     use super::{YAMLDecodingTrap, Yaml, YamlDecoder};
+
+    #[test]
+    fn larger_block_of_text() {
+        // I'm struggling to line up these...
+        let s = include_str!("./fixtures/multiline_string.yaml");
+        let doc = YamlLoader::load_from_str(s).unwrap().remove(0);
+        assert_eq!(
+            doc.location().unwrap(),
+            &Location::from(Inner {
+                start: (1, 1),
+                end: (9, 0),
+            }),
+        );
+        let a = &doc["a"];
+        assert_eq!(
+            a.location().unwrap(),
+            &Location::from(Inner {
+                start: (2, 2),
+                end: (4, 9),
+            }),
+        );
+
+        let b = &doc["b"];
+        assert_eq!(
+            b.location().unwrap(),
+            &Location::from(Inner {
+                start: (5, 3),
+                end: (5, 16),
+            }),
+        );
+
+        let e = &doc["c"]["d"]["e"];
+        assert_eq!(
+            e.location().unwrap(),
+            &Location::from(Inner {
+                start: (8, 7),
+                end: (8, 13), // The quotes get removed
+            }),
+        );
+    }
 
     #[test]
     fn test_read_bom() {
@@ -901,7 +962,6 @@ c: [1, 2]
         assert!((doc["b"].as_f64().unwrap() - 2.2f64).abs() <= f64::EPSILON);
         assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
         assert!(doc["d"][0].is_badvalue());
-        assert!(false);
     }
 
     #[test]
