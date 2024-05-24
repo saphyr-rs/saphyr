@@ -265,7 +265,7 @@ impl MarkedEventReceiver for YamlLoader {
                     }
                 } else {
                     // Datatype is not specified, or unrecognized
-                    Yaml::from_str(&v, m)
+                    Yaml::from_str(&v, Some(m))
                 };
 
                 self.insert_new_node((node, aid));
@@ -781,22 +781,22 @@ impl Yaml {
     /// assert!(matches!(Yaml::from_str("foo"), Yaml::String(_)));
     /// ```
     #[must_use]
-    pub fn from_str(v: &str, m: Marker) -> Yaml {
-        let location = Location::from(m);
+    pub fn from_str(v: &str, m: Option<Marker>) -> Yaml {
+        let location = m.map(Location::from);
         if let Some(number) = v.strip_prefix("0x") {
             if let Ok(i) = i64::from_str_radix(number, 16) {
-                return Yaml::Integer(i, Some(location.n_characters_after(v.len())));
+                return Yaml::Integer(i, location.map(|l| l.n_characters_after(v.len())));
             }
         } else if let Some(number) = v.strip_prefix("0o") {
             if let Ok(i) = i64::from_str_radix(number, 8) {
-                return Yaml::Integer(i, Some(location.n_characters_after(v.len())));
+                return Yaml::Integer(i, location.map(|l| l.n_characters_after(v.len())));
             }
         } else if let Some(number) = v.strip_prefix('+') {
             if let Ok(i) = number.parse::<i64>() {
-                return Yaml::Integer(i, Some(location.n_characters_after(v.len())));
+                return Yaml::Integer(i, location.map(|l| l.n_characters_after(v.len())));
             }
         }
-        let trivial_location = Some(location.clone().n_characters_after(v.len()));
+        let trivial_location = location.clone().map(|l| l.n_characters_after(v.len()));
         match v {
             "~" | "null" => Yaml::Null,
             "true" => Yaml::Boolean(true, trivial_location),
@@ -807,7 +807,7 @@ impl Yaml {
                 } else if parse_f64(v).is_some() {
                     Yaml::Real(v.to_owned(), trivial_location)
                 } else {
-                    Yaml::String(v.to_owned(), Some(Location::for_str_starting_at(m, v)))
+                    Yaml::String(v.to_owned(), m.map(|m| Location::for_str_starting_at(m, v)))
                 }
             }
         }
