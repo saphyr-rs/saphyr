@@ -12,7 +12,7 @@ use hashlink::LinkedHashMap;
 
 use saphyr_parser::{Event, MarkedEventReceiver, Marker, Parser, ScanError, TScalarStyle, Tag};
 
-#[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OtherMarker {
     pub line: usize,
     pub column: usize,
@@ -35,7 +35,7 @@ impl From<Marker> for OtherMarker {
     }
 }
 
-#[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Location {
     Start(OtherMarker),
     Ended {
@@ -115,7 +115,7 @@ impl Location {
 ///     assert!(v.as_i64().is_some());
 /// }
 /// ```
-#[derive(Clone, PartialOrd, Debug, Eq, Ord)]
+#[derive(Clone, Debug, Eq)]
 pub enum Yaml {
     /// Float types are stored as String and parsed on demand.
     /// Note that `f64` does NOT implement Eq trait and can NOT be stored in `BTreeMap`.
