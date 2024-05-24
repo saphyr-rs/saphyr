@@ -13,50 +13,65 @@ use hashlink::LinkedHashMap;
 use saphyr_parser::{Event, MarkedEventReceiver, Marker, Parser, ScanError, TScalarStyle, Tag};
 
 #[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
-pub struct Inner {
-    start: (usize, usize),
-    end: (usize, usize),
+pub struct OtherMarker {
+    pub line: usize,
+    pub column: usize,
+    pub idx: usize,
 }
 
-impl From<Inner> for Location {
-    fn from(value: Inner) -> Self {
-        Location::Proper(value)
+impl From<(usize, usize, usize)> for OtherMarker {
+    fn from((line, column, idx): (usize, usize, usize)) -> Self {
+        OtherMarker { line, column, idx }
+    }
+}
+
+impl From<Marker> for OtherMarker {
+    fn from(value: Marker) -> Self {
+        OtherMarker {
+            line: value.line(),
+            column: value.col(),
+            idx: value.index(),
+        }
     }
 }
 
 #[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
 pub enum Location {
-    Partial { start: (usize, usize) },
-    Proper(Inner),
+    Start(OtherMarker),
+    Ended {
+        start: OtherMarker,
+        end: OtherMarker,
+    },
 }
 
 impl From<Marker> for Location {
     fn from(value: Marker) -> Self {
-        Location::Partial {
-            start: (value.line(), value.col()),
-        }
+        Location::Start(value.into())
     }
 }
 
 impl Location {
     fn n_characters_after(self, arg: usize) -> Location {
         match self {
-            Location::Proper(_) => panic!("this already ended!"),
-            Location::Partial { start: (row, col) } => Location::Proper(Inner {
-                start: (row, col),
-                end: (row, col + arg),
-            }),
+            Location::Ended { .. } => panic!("this already ended!"),
+            Location::Start(start) => {
+                let mut end = start.clone();
+                end.idx = start.idx + arg;
+                end.column = start.column + arg;
+                Location::Ended { start, end }
+            }
         }
     }
 
     fn extend_to(&mut self, m: Marker) {
         match self {
-            Location::Proper(Inner { end, .. }) => *end = (m.line(), m.col()),
-            Location::Partial { start } => {
-                *self = Location::Proper(Inner {
-                    start: *start,
-                    end: (m.line(), m.col()),
-                });
+            Location::Ended { end, .. } => *end = m.into(),
+            Location::Start(start) => {
+                let end = m.into();
+                *self = Location::Ended {
+                    start: start.clone(),
+                    end,
+                };
             }
         };
     }
@@ -67,12 +82,17 @@ impl Location {
 
         let last_column = m.col() + last_width;
         let last_row = m.line() + lines_in_string - 1; // if there is a single line, we shouldn't be adding 1 so we substract it again
+        let last_idx = m.index() + v.len();
         match Location::from(m) {
-            Location::Partial { start } => Location::Proper(Inner {
+            Location::Start(start) => Location::Ended {
                 start,
-                end: (last_row, last_column),
-            }),
-            Location::Proper(_) => {
+                end: OtherMarker {
+                    line: last_row,
+                    column: last_column,
+                    idx: last_idx,
+                },
+            },
+            Location::Ended { .. } => {
                 unreachable!("If we just convert this, it can't really have an end!")
             }
         }
@@ -901,10 +921,7 @@ impl Iterator for YamlIter {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        yaml::{Inner, Location},
-        YamlLoader,
-    };
+    use crate::{yaml::Location, YamlLoader};
 
     use super::{YAMLDecodingTrap, Yaml, YamlDecoder};
 
@@ -915,36 +932,36 @@ mod test {
         let doc = YamlLoader::load_from_str(s).unwrap().remove(0);
         assert_eq!(
             doc.location().unwrap(),
-            &Location::from(Inner {
-                start: (1, 1),
-                end: (9, 0),
-            }),
+            &Location::Ended {
+                start: (1, 1, 1).into(),
+                end: (9, 0, 90).into(),
+            },
         );
         let a = &doc["a"];
         assert_eq!(
             a.location().unwrap(),
-            &Location::from(Inner {
-                start: (2, 2),
-                end: (4, 9),
-            }),
+            &Location::Ended {
+                start: (2, 2, 8).into(),
+                end: (4, 9, 43).into(),
+            },
         );
 
         let b = &doc["b"];
         assert_eq!(
             b.location().unwrap(),
-            &Location::from(Inner {
-                start: (5, 3),
-                end: (5, 16),
-            }),
+            &Location::Ended {
+                start: (5, 3, 51).into(),
+                end: (5, 16, 64).into(),
+            },
         );
 
         let e = &doc["c"]["d"]["e"];
         assert_eq!(
             e.location().unwrap(),
-            &Location::from(Inner {
-                start: (8, 7),
-                end: (8, 13), // The quotes get removed
-            }),
+            &Location::Ended {
+                start: (8, 7, 81).into(),
+                end: (8, 13, 87).into(), // The quotes get removed
+            },
         );
     }
 
