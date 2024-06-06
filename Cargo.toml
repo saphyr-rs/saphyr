@@ -29,6 +29,9 @@ hashlink = "0.8"
 [dev-dependencies]
 quickcheck = "1.0"
 
+[lib]
+doctest = false
+
 [profile.release-lto]
 inherits = "release"
 lto = true

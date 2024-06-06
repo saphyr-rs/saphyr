@@ -24,13 +24,13 @@ fn double_roundtrip(original: &str) {
 
 #[test]
 fn test_escape_character() {
-    let y = Yaml::String("\x1b".to_owned());
+    let y = Yaml::String("\x1b".to_owned(), None);
     roundtrip(&y);
 }
 
 #[test]
 fn test_colon_in_string() {
-    let y = Yaml::String("x: %".to_owned());
+    let y = Yaml::String("x: %".to_owned(), None);
     roundtrip(&y);
 }
 
@@ -47,7 +47,7 @@ fn test_numberlike_strings() {
     ];
 
     for doc in &docs {
-        roundtrip(&Yaml::String((*doc).to_string()));
+        roundtrip(&Yaml::String((*doc).to_string(), None));
         double_roundtrip(doc);
     }
 }
@@ -59,7 +59,7 @@ fn test_issue133() {
         .unwrap()
         .pop()
         .unwrap();
-    assert_eq!(doc, Yaml::String("0x123".to_string()));
+    assert_eq!(doc, Yaml::String("0x123".to_string(), None));
 
     let mut out_str = String::new();
     YamlEmitter::new(&mut out_str).dump(&doc).unwrap();
@@ -69,12 +69,12 @@ fn test_issue133() {
 
 #[test]
 fn test_newline() {
-    let y = Yaml::Array(vec![Yaml::String("\n".to_owned())]);
+    let y = Yaml::Array(vec![Yaml::String("\n".to_owned(), None)], None);
     roundtrip(&y);
 }
 
 #[test]
 fn test_crlf() {
-    let y = Yaml::Array(vec![Yaml::String("\r\n".to_owned())]);
+    let y = Yaml::Array(vec![Yaml::String("\r\n".to_owned(), None)], None);
     roundtrip(&y);
 }

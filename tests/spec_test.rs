@@ -5,20 +5,28 @@ fn test_mapvec_legal() {
     // Emitting a `map<map<seq<_>>, _>` should result in legal yaml that
     // we can parse.
 
-    let key = vec![Yaml::Integer(1), Yaml::Integer(2), Yaml::Integer(3)];
+    let key = vec![
+        Yaml::Integer(1, None),
+        Yaml::Integer(2, None),
+        Yaml::Integer(3, None),
+    ];
 
     let mut keyhash = Hash::new();
-    keyhash.insert(Yaml::String("key".into()), Yaml::Array(key));
+    keyhash.insert(Yaml::String("key".into(), None), Yaml::Array(key, None));
 
-    let val = vec![Yaml::Integer(4), Yaml::Integer(5), Yaml::Integer(6)];
+    let val = vec![
+        Yaml::Integer(4, None),
+        Yaml::Integer(5, None),
+        Yaml::Integer(6, None),
+    ];
 
     let mut hash = Hash::new();
-    hash.insert(Yaml::Hash(keyhash), Yaml::Array(val));
+    hash.insert(Yaml::Hash(keyhash, None), Yaml::Array(val, None));
 
     let mut out_str = String::new();
     {
         let mut emitter = YamlEmitter::new(&mut out_str);
-        emitter.dump(&Yaml::Hash(hash)).unwrap();
+        emitter.dump(&Yaml::Hash(hash, None)).unwrap();
     }
 
     // At this point, we are tempted to naively render like this:

@@ -1,0 +1,8 @@
+a: |-
+  this is a long
+  string over 
+  3 lines
+b: just short...
+c:
+  d: 
+    e: "Great!"

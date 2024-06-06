@@ -12,6 +12,93 @@ use hashlink::LinkedHashMap;
 
 use saphyr_parser::{Event, MarkedEventReceiver, Marker, Parser, ScanError, TScalarStyle, Tag};
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OtherMarker {
+    pub line: usize,
+    pub column: usize,
+    pub idx: usize,
+}
+
+impl From<(usize, usize, usize)> for OtherMarker {
+    fn from((line, column, idx): (usize, usize, usize)) -> Self {
+        OtherMarker { line, column, idx }
+    }
+}
+
+impl From<Marker> for OtherMarker {
+    fn from(value: Marker) -> Self {
+        OtherMarker {
+            line: value.line(),
+            column: value.col(),
+            idx: value.index(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Location {
+    Start(OtherMarker),
+    Ended {
+        start: OtherMarker,
+        end: OtherMarker,
+    },
+}
+
+impl From<Marker> for Location {
+    fn from(value: Marker) -> Self {
+        Location::Start(value.into())
+    }
+}
+
+impl Location {
+    fn n_characters_after(self, arg: usize) -> Location {
+        match self {
+            Location::Ended { .. } => panic!("this already ended!"),
+            Location::Start(start) => {
+                let mut end = start.clone();
+                end.idx = start.idx + arg;
+                end.column = start.column + arg;
+                Location::Ended { start, end }
+            }
+        }
+    }
+
+    fn extend_to(&mut self, m: Marker) {
+        match self {
+            Location::Ended { end, .. } => *end = m.into(),
+            Location::Start(start) => {
+                let end = m.into();
+                *self = Location::Ended {
+                    start: start.clone(),
+                    end,
+                };
+            }
+        };
+    }
+
+    fn for_str_starting_at(m: Marker, v: &str) -> Location {
+        let lines_in_string = v.lines().count();
+        let last_width = v.lines().last().unwrap_or(v).len();
+
+        let last_column = m.col() + last_width;
+        let last_row = m.line() + lines_in_string - 1; // if there is a single line, we shouldn't be adding 1 so we substract it again
+        let last_idx = m.index() + v.len();
+        match Location::from(m) {
+            Location::Start(start) => Location::Ended {
+                start,
+                end: OtherMarker {
+                    line: last_row,
+                    column: last_column,
+                    idx: last_idx,
+                },
+            },
+            Location::Ended { .. } => {
+                unreachable!("If we just convert this, it can't really have an end!")
+            }
+        }
+    }
+}
+
 /// A YAML node is stored as this `Yaml` enumeration, which provides an easy way to
 /// access your YAML document.
 ///
@@ -28,23 +115,23 @@ use saphyr_parser::{Event, MarkedEventReceiver, Marker, Parser, ScanError, TScal
 ///     assert!(v.as_i64().is_some());
 /// }
 /// ```
-#[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
+#[derive(Clone, Debug, Eq)]
 pub enum Yaml {
     /// Float types are stored as String and parsed on demand.
     /// Note that `f64` does NOT implement Eq trait and can NOT be stored in `BTreeMap`.
-    Real(String),
+    Real(String, Option<Location>),
     /// YAML int is stored as i64.
-    Integer(i64),
+    Integer(i64, Option<Location>),
     /// YAML scalar.
-    String(String),
+    String(String, Option<Location>),
     /// YAML bool, e.g. `true` or `false`.
-    Boolean(bool),
+    Boolean(bool, Option<Location>),
     /// YAML array, can be accessed as a `Vec`.
-    Array(Array),
+    Array(Array, Option<Location>),
     /// YAML hash, can be accessed as a `LinkedHashMap`.
     ///
     /// Insertion order will match the order of insertion into the map.
-    Hash(Hash),
+    Hash(Hash, Option<Location>),
     /// Alias, not fully supported yet.
     Alias(usize),
     /// YAML null, e.g. `null` or `~`.
@@ -53,6 +140,36 @@ pub enum Yaml {
     /// simplifies error handling in the calling code. Invalid type conversion also
     /// returns `BadValue`.
     BadValue,
+}
+
+impl std::hash::Hash for Yaml {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Yaml::Integer(a, _) => a.hash(state),
+            Yaml::String(a, _) | Yaml::Real(a, _) => a.hash(state),
+            Yaml::Boolean(a, _) => a.hash(state),
+            Yaml::Array(a, _) => a.hash(state),
+            Yaml::Hash(a, _) => a.hash(state),
+            _other => core::mem::discriminant(self).hash(state),
+        }
+    }
+}
+
+// We need to ignore the location for now
+impl PartialEq for Yaml {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Integer(a, _), Self::Integer(b, _)) => a == b,
+            (Self::String(a, _), Self::String(b, _)) | (Self::Real(a, _), Self::Real(b, _)) => {
+                a == b
+            }
+            (Self::Boolean(a, _), Self::Boolean(b, _)) => a == b,
+            (Self::Array(a, _), Self::Array(b, _)) => a == b,
+            (Self::Hash(a, _), Self::Hash(b, _)) => a == b,
+            (Self::Alias(a), Self::Alias(b)) => a == b,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
 }
 
 /// The type contained in the `Yaml::Array` variant. This corresponds to YAML sequences.
@@ -86,7 +203,7 @@ pub struct YamlLoader {
 }
 
 impl MarkedEventReceiver for YamlLoader {
-    fn on_event(&mut self, ev: Event, _: Marker) {
+    fn on_event(&mut self, ev: Event, m: Marker) {
         // println!("EV {:?}", ev);
         match ev {
             Event::DocumentStart | Event::Nothing | Event::StreamStart | Event::StreamEnd => {
@@ -101,24 +218,30 @@ impl MarkedEventReceiver for YamlLoader {
                 }
             }
             Event::SequenceStart(aid, _) => {
-                self.doc_stack.push((Yaml::Array(Vec::new()), aid));
+                self.doc_stack
+                    .push((Yaml::Array(Vec::new(), Some(m.into())), aid));
             }
             Event::SequenceEnd => {
-                let node = self.doc_stack.pop().unwrap();
-                self.insert_new_node(node);
+                let (mut node, alias) = self.doc_stack.pop().unwrap();
+                node.mut_end(m);
+
+                self.insert_new_node((node, alias));
             }
             Event::MappingStart(aid, _) => {
-                self.doc_stack.push((Yaml::Hash(Hash::new()), aid));
+                self.doc_stack
+                    .push((Yaml::Hash(Hash::new(), Some(m.into())), aid));
                 self.key_stack.push(Yaml::BadValue);
             }
             Event::MappingEnd => {
                 self.key_stack.pop().unwrap();
-                let node = self.doc_stack.pop().unwrap();
-                self.insert_new_node(node);
+                let (mut node, alias) = self.doc_stack.pop().unwrap();
+                node.mut_end(m);
+                self.insert_new_node((node, alias));
             }
             Event::Scalar(v, style, aid, tag) => {
                 let node = if style != TScalarStyle::Plain {
-                    Yaml::String(v)
+                    let location = Location::for_str_starting_at(m, &v);
+                    Yaml::String(v, Some(location))
                 } else if let Some(Tag {
                     ref handle,
                     ref suffix,
@@ -130,29 +253,39 @@ impl MarkedEventReceiver for YamlLoader {
                                 // "true" or "false"
                                 match v.parse::<bool>() {
                                     Err(_) => Yaml::BadValue,
-                                    Ok(v) => Yaml::Boolean(v),
+                                    Ok(v) => {
+                                        let length = if v { 4 } else { 5 };
+                                        Yaml::Boolean(
+                                            v,
+                                            Some(Location::from(m).n_characters_after(length)),
+                                        )
+                                    }
                                 }
                             }
                             "int" => match v.parse::<i64>() {
                                 Err(_) => Yaml::BadValue,
-                                Ok(v) => Yaml::Integer(v),
+                                Ok(v) => Yaml::Integer(v, Some(m.into())),
                             },
                             "float" => match parse_f64(&v) {
-                                Some(_) => Yaml::Real(v),
+                                Some(_) => Yaml::Real(v, Some(m.into())),
                                 None => Yaml::BadValue,
                             },
                             "null" => match v.as_ref() {
                                 "~" | "null" => Yaml::Null,
                                 _ => Yaml::BadValue,
                             },
-                            _ => Yaml::String(v),
+                            _ => {
+                                let location = Location::for_str_starting_at(m, &v);
+                                Yaml::String(v, Some(location))
+                            }
                         }
                     } else {
-                        Yaml::String(v)
+                        let location = Location::for_str_starting_at(m, &v);
+                        Yaml::String(v, Some(location))
                     }
                 } else {
                     // Datatype is not specified, or unrecognized
-                    Yaml::from_str(&v)
+                    Yaml::from_str(&v, Some(m))
                 };
 
                 self.insert_new_node((node, aid));
@@ -217,13 +350,13 @@ impl YamlLoader {
         } else {
             let parent = self.doc_stack.last_mut().unwrap();
             match *parent {
-                (Yaml::Array(ref mut v), _) => v.push(node.0),
-                (Yaml::Hash(ref mut h), _) => {
+                (Yaml::Array(ref mut v, _), _) => v.push(node.0),
+                (Yaml::Hash(ref mut h, _), _) => {
                     let cur_key = self.key_stack.last_mut().unwrap();
                     // current node is a key
                     if cur_key.is_badvalue() {
                         *cur_key = node.0;
-                    // current node is a value
+                        // current node is a value
                     } else {
                         let mut newkey = Yaml::BadValue;
                         mem::swap(&mut newkey, cur_key);
@@ -480,7 +613,7 @@ macro_rules! define_as (
 #[must_use]
 pub fn $name(&self) -> Option<$t> {
     match *self {
-        Yaml::$yt(v) => Some(v),
+        Yaml::$yt(v, _) => Some(v),
         _ => None
     }
 }
@@ -497,7 +630,7 @@ macro_rules! define_as_ref (
 #[must_use]
 pub fn $name(&self) -> Option<$t> {
     match *self {
-        Yaml::$yt(ref v) => Some(v),
+        Yaml::$yt(ref v, _) => Some(v),
         _ => None
     }
 }
@@ -514,7 +647,7 @@ macro_rules! define_as_mut_ref (
 #[must_use]
 pub fn $name(&mut self) -> Option<$t> {
     match *self {
-        Yaml::$yt(ref mut v) => Some(v),
+        Yaml::$yt(ref mut v, _) => Some(v),
         _ => None
     }
 }
@@ -531,7 +664,7 @@ macro_rules! define_into (
 #[must_use]
 pub fn $name(self) -> Option<$t> {
     match self {
-        Yaml::$yt(v) => Some(v),
+        Yaml::$yt(v, _) => Some(v),
         _ => None
     }
 }
@@ -539,6 +672,31 @@ pub fn $name(self) -> Option<$t> {
 );
 
 impl Yaml {
+    fn mut_end(&mut self, m: Marker) {
+        match self {
+            Yaml::Real(_, Some(ref mut x))
+            | Yaml::Integer(_, Some(ref mut x))
+            | Yaml::String(_, Some(ref mut x))
+            | Yaml::Boolean(_, Some(ref mut x))
+            | Yaml::Array(_, Some(ref mut x))
+            | Yaml::Hash(_, Some(ref mut x)) => x.extend_to(m),
+            _other => {}
+        }
+    }
+
+    pub fn location(&self) -> Option<&Location> {
+        match self {
+            Yaml::Integer(_, m)
+            | Yaml::String(_, m)
+            | Yaml::Boolean(_, m)
+            | Yaml::Real(_, m)
+            | Yaml::Array(_, m)
+            | Yaml::Hash(_, m) => m,
+            Yaml::Alias(_) | Yaml::Null | Yaml::BadValue => &None,
+        }
+        .as_ref()
+    }
+
     define_as!(as_bool, bool, Boolean);
     define_as!(as_i64, i64, Integer);
 
@@ -570,7 +728,7 @@ impl Yaml {
     /// Return whether `self` is a [`Yaml::Array`] node.
     #[must_use]
     pub fn is_array(&self) -> bool {
-        matches!(*self, Yaml::Array(_))
+        matches!(*self, Yaml::Array(_, _))
     }
 
     /// Return the `f64` value contained in this YAML node.
@@ -579,7 +737,7 @@ impl Yaml {
     /// `None` is returned.
     #[must_use]
     pub fn as_f64(&self) -> Option<f64> {
-        if let Yaml::Real(ref v) = self {
+        if let Yaml::Real(ref v, _) = self {
             parse_f64(v)
         } else {
             None
@@ -643,31 +801,33 @@ impl Yaml {
     /// assert!(matches!(Yaml::from_str("foo"), Yaml::String(_)));
     /// ```
     #[must_use]
-    pub fn from_str(v: &str) -> Yaml {
+    pub fn from_str(v: &str, m: Option<Marker>) -> Yaml {
+        let location = m.map(Location::from);
         if let Some(number) = v.strip_prefix("0x") {
             if let Ok(i) = i64::from_str_radix(number, 16) {
-                return Yaml::Integer(i);
+                return Yaml::Integer(i, location.map(|l| l.n_characters_after(v.len())));
             }
         } else if let Some(number) = v.strip_prefix("0o") {
             if let Ok(i) = i64::from_str_radix(number, 8) {
-                return Yaml::Integer(i);
+                return Yaml::Integer(i, location.map(|l| l.n_characters_after(v.len())));
             }
         } else if let Some(number) = v.strip_prefix('+') {
             if let Ok(i) = number.parse::<i64>() {
-                return Yaml::Integer(i);
+                return Yaml::Integer(i, location.map(|l| l.n_characters_after(v.len())));
             }
         }
+        let trivial_location = location.clone().map(|l| l.n_characters_after(v.len()));
         match v {
             "~" | "null" => Yaml::Null,
-            "true" => Yaml::Boolean(true),
-            "false" => Yaml::Boolean(false),
+            "true" => Yaml::Boolean(true, trivial_location),
+            "false" => Yaml::Boolean(false, trivial_location),
             _ => {
                 if let Ok(integer) = v.parse::<i64>() {
-                    Yaml::Integer(integer)
+                    Yaml::Integer(integer, trivial_location)
                 } else if parse_f64(v).is_some() {
-                    Yaml::Real(v.to_owned())
+                    Yaml::Real(v.to_owned(), trivial_location)
                 } else {
-                    Yaml::String(v.to_owned())
+                    Yaml::String(v.to_owned(), m.map(|m| Location::for_str_starting_at(m, v)))
                 }
             }
         }
@@ -675,11 +835,12 @@ impl Yaml {
 }
 
 static BAD_VALUE: Yaml = Yaml::BadValue;
+
 impl<'a> Index<&'a str> for Yaml {
     type Output = Yaml;
 
     fn index(&self, idx: &'a str) -> &Yaml {
-        let key = Yaml::String(idx.to_owned());
+        let key = Yaml::String(idx.to_owned(), None);
         match self.as_hash() {
             Some(h) => h.get(&key).unwrap_or(&BAD_VALUE),
             None => &BAD_VALUE,
@@ -689,7 +850,7 @@ impl<'a> Index<&'a str> for Yaml {
 
 impl<'a> IndexMut<&'a str> for Yaml {
     fn index_mut(&mut self, idx: &'a str) -> &mut Yaml {
-        let key = Yaml::String(idx.to_owned());
+        let key = Yaml::String(idx.to_owned(), None);
         match self.as_mut_hash() {
             Some(h) => h.get_mut(&key).unwrap(),
             None => panic!("Not a hash type"),
@@ -704,7 +865,7 @@ impl Index<usize> for Yaml {
         if let Some(v) = self.as_vec() {
             v.get(idx).unwrap_or(&BAD_VALUE)
         } else if let Some(v) = self.as_hash() {
-            let key = Yaml::Integer(i64::try_from(idx).unwrap());
+            let key = Yaml::Integer(i64::try_from(idx).unwrap(), None);
             v.get(&key).unwrap_or(&BAD_VALUE)
         } else {
             &BAD_VALUE
@@ -724,9 +885,9 @@ impl IndexMut<usize> for Yaml {
     /// This function also panics if `self` is not a [`Yaml::Array`] nor a [`Yaml::Hash`].
     fn index_mut(&mut self, idx: usize) -> &mut Yaml {
         match self {
-            Yaml::Array(sequence) => sequence.index_mut(idx),
-            Yaml::Hash(mapping) => {
-                let key = Yaml::Integer(i64::try_from(idx).unwrap());
+            Yaml::Array(sequence, _) => sequence.index_mut(idx),
+            Yaml::Hash(mapping, _) => {
+                let key = Yaml::Integer(i64::try_from(idx).unwrap(), None);
                 mapping.get_mut(&key).unwrap()
             }
             _ => panic!("Attempting to index but `self` is not a sequence nor a mapping"),
@@ -760,7 +921,49 @@ impl Iterator for YamlIter {
 
 #[cfg(test)]
 mod test {
+    use crate::{yaml::Location, YamlLoader};
+
     use super::{YAMLDecodingTrap, Yaml, YamlDecoder};
+
+    #[test]
+    fn larger_block_of_text() {
+        // I'm struggling to line up these...
+        let s = include_str!("./fixtures/multiline_string.yaml");
+        let doc = YamlLoader::load_from_str(s).unwrap().remove(0);
+        assert_eq!(
+            doc.location().unwrap(),
+            &Location::Ended {
+                start: (1, 1, 1).into(),
+                end: (9, 0, 90).into(),
+            },
+        );
+        let a = &doc["a"];
+        assert_eq!(
+            a.location().unwrap(),
+            &Location::Ended {
+                start: (2, 2, 8).into(),
+                end: (4, 9, 43).into(),
+            },
+        );
+
+        let b = &doc["b"];
+        assert_eq!(
+            b.location().unwrap(),
+            &Location::Ended {
+                start: (5, 3, 51).into(),
+                end: (5, 16, 64).into(),
+            },
+        );
+
+        let e = &doc["c"]["d"]["e"];
+        assert_eq!(
+            e.location().unwrap(),
+            &Location::Ended {
+                start: (8, 7, 81).into(),
+                end: (8, 13, 87).into(), // The quotes get removed
+            },
+        );
+    }
 
     #[test]
     fn test_read_bom() {
@@ -771,6 +974,7 @@ c: [1, 2]
 ";
         let out = YamlDecoder::read(s as &[u8]).decode().unwrap();
         let doc = &out[0];
+        dbg!(&doc);
         assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
         assert!((doc["b"].as_f64().unwrap() - 2.2f64).abs() <= f64::EPSILON);
         assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
@@ -846,7 +1050,13 @@ c: [1, 2]
 
     #[test]
     fn test_or() {
-        assert_eq!(Yaml::Null.or(Yaml::Integer(3)), Yaml::Integer(3));
-        assert_eq!(Yaml::Integer(3).or(Yaml::Integer(7)), Yaml::Integer(3));
+        assert_eq!(
+            Yaml::Null.or(Yaml::Integer(3, None)),
+            Yaml::Integer(3, None)
+        );
+        assert_eq!(
+            Yaml::Integer(3, None).or(Yaml::Integer(7, None)),
+            Yaml::Integer(3, None)
+        );
     }
 }
