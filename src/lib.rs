@@ -43,15 +43,20 @@
 
 #![warn(missing_docs, clippy::pedantic)]
 
+#[macro_use]
+mod macros;
+
+mod annotated;
 mod char_traits;
 mod emitter;
 mod loader;
 mod yaml;
 
 // Re-export main components.
+pub use crate::annotated::{AnnotatedArray, AnnotatedHash, YamlData};
 pub use crate::emitter::YamlEmitter;
 pub use crate::loader::YamlLoader;
-pub use crate::yaml::{Array, Hash, Yaml};
+pub use crate::yaml::{Array, Hash, Yaml, YamlIter};
 
 #[cfg(feature = "encoding")]
 mod encoding;

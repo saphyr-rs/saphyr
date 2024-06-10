@@ -72,6 +72,8 @@ Note that `saphyr::Yaml` implements `Index<&'a str>` and `Index<usize>`:
 * `Index<&'a str>` assumes the container is a string to value map
 * otherwise, `Yaml::BadValue` is returned
 
+Note that `annotated::YamlData` cannot return `BadValue` and will panic.
+
 If your document does not conform to this convention (e.g. map with complex
 type key), you can use the `Yaml::as_XXX` family API of functions to access
 your objects.
