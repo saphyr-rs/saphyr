@@ -56,108 +56,31 @@ pub type Array = Vec<Yaml>;
 /// The type contained in the `Yaml::Hash` variant. This corresponds to YAML mappings.
 pub type Hash = LinkedHashMap<Yaml, Yaml>;
 
-macro_rules! define_as (
-    ($name:ident, $t:ident, $yt:ident) => (
-/// Get a copy of the inner object in the YAML enum if it is a `$t`.
-///
-/// # Return
-/// If the variant of `self` is `Yaml::$yt`, return `Some($t)` with a copy of the `$t` contained.
-/// Otherwise, return `None`.
-#[must_use]
-pub fn $name(&self) -> Option<$t> {
-    match *self {
-        Yaml::$yt(v) => Some(v),
-        _ => None
-    }
-}
-    );
-);
-
-macro_rules! define_as_ref (
-    ($name:ident, $t:ty, $yt:ident) => (
-/// Get a reference to the inner object in the YAML enum if it is a `$t`.
-///
-/// # Return
-/// If the variant of `self` is `Yaml::$yt`, return `Some(&$t)` with the `$t` contained. Otherwise,
-/// return `None`.
-#[must_use]
-pub fn $name(&self) -> Option<$t> {
-    match *self {
-        Yaml::$yt(ref v) => Some(v),
-        _ => None
-    }
-}
-    );
-);
-
-macro_rules! define_as_mut_ref (
-    ($name:ident, $t:ty, $yt:ident) => (
-/// Get a mutable reference to the inner object in the YAML enum if it is a `$t`.
-///
-/// # Return
-/// If the variant of `self` is `Yaml::$yt`, return `Some(&mut $t)` with the `$t` contained.
-/// Otherwise, return `None`.
-#[must_use]
-pub fn $name(&mut self) -> Option<$t> {
-    match *self {
-        Yaml::$yt(ref mut v) => Some(v),
-        _ => None
-    }
-}
-    );
-);
-
-macro_rules! define_into (
-    ($name:ident, $t:ty, $yt:ident) => (
-/// Get the inner object in the YAML enum if it is a `$t`.
-///
-/// # Return
-/// If the variant of `self` is `Yaml::$yt`, return `Some($t)` with the `$t` contained. Otherwise,
-/// return `None`.
-#[must_use]
-pub fn $name(self) -> Option<$t> {
-    match self {
-        Yaml::$yt(v) => Some(v),
-        _ => None
-    }
-}
-    );
-);
-
 impl Yaml {
     define_as!(as_bool, bool, Boolean);
     define_as!(as_i64, i64, Integer);
 
-    define_as_ref!(as_str, &str, String);
     define_as_ref!(as_hash, &Hash, Hash);
+    define_as_ref!(as_str, &str, String);
     define_as_ref!(as_vec, &Array, Array);
 
     define_as_mut_ref!(as_mut_hash, &mut Hash, Hash);
     define_as_mut_ref!(as_mut_vec, &mut Array, Array);
 
     define_into!(into_bool, bool, Boolean);
+    define_into!(into_hash, Hash, Hash);
     define_into!(into_i64, i64, Integer);
     define_into!(into_string, String, String);
-    define_into!(into_hash, Hash, Hash);
     define_into!(into_vec, Array, Array);
 
-    /// Return whether `self` is a [`Yaml::Null`] node.
-    #[must_use]
-    pub fn is_null(&self) -> bool {
-        matches!(*self, Yaml::Null)
-    }
-
-    /// Return whether `self` is a [`Yaml::BadValue`] node.
-    #[must_use]
-    pub fn is_badvalue(&self) -> bool {
-        matches!(*self, Yaml::BadValue)
-    }
-
-    /// Return whether `self` is a [`Yaml::Array`] node.
-    #[must_use]
-    pub fn is_array(&self) -> bool {
-        matches!(*self, Yaml::Array(_))
-    }
+    define_is!(is_alias, Self::Alias(_));
+    define_is!(is_array, Self::Array(_));
+    define_is!(is_badvalue, Self::BadValue);
+    define_is!(is_boolean, Self::Boolean(_));
+    define_is!(is_integer, Self::Integer(_));
+    define_is!(is_null, Self::Null);
+    define_is!(is_real, Self::Real(_));
+    define_is!(is_string, Self::String(_));
 
     /// Return the `f64` value contained in this YAML node.
     ///
@@ -198,8 +121,9 @@ impl Yaml {
         }
     }
 
-    /// See `or` for behavior. This performs the same operations, but with
-    /// borrowed values for less linear pipelines.
+    /// See [`Self::or`] for behavior.
+    ///
+    /// This performs the same operations, but with borrowed values for less linear pipelines.
     #[must_use]
     pub fn borrowed_or<'a>(&'a self, other: &'a Self) -> &'a Self {
         match self {
@@ -274,6 +198,12 @@ impl<'a> Index<&'a str> for Yaml {
 }
 
 impl<'a> IndexMut<&'a str> for Yaml {
+    /// Perform indexing if `self` is a mapping.
+    ///
+    /// # Panics
+    /// This function panics if the key given does not exist within `self` (as per [`Index`]).
+    ///
+    /// This function also panics if `self` is not a [`Yaml::Hash`].
     fn index_mut(&mut self, idx: &'a str) -> &mut Yaml {
         let key = Yaml::String(idx.to_owned());
         match self.as_mut_hash() {
@@ -302,9 +232,9 @@ impl IndexMut<usize> for Yaml {
     /// Perform indexing if `self` is a sequence or a mapping.
     ///
     /// # Panics
-    /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` i
+    /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
     /// a [`Yaml::Array`], this is when the index is bigger or equal to the length of the
-    /// underlying `Vec`. If `self` is a [`Yaml::Hash`], this is when the mapping sequence does no
+    /// underlying `Vec`. If `self` is a [`Yaml::Hash`], this is when the mapping sequence does not
     /// contain [`Yaml::Integer`]`(idx)` as a key.
     ///
     /// This function also panics if `self` is not a [`Yaml::Array`] nor a [`Yaml::Hash`].
