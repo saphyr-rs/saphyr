@@ -43,16 +43,20 @@
 
 #![warn(missing_docs, clippy::pedantic)]
 
-pub(crate) mod char_traits;
-pub mod emitter;
-pub mod yaml;
+mod char_traits;
+mod emitter;
+mod loader;
+mod yaml;
 
 // Re-export main components.
 pub use crate::emitter::YamlEmitter;
-pub use crate::yaml::{Array, Hash, Yaml, YamlLoader};
+pub use crate::loader::YamlLoader;
+pub use crate::yaml::{Array, Hash, Yaml};
 
 #[cfg(feature = "encoding")]
-pub use crate::yaml::{YAMLDecodingTrap, YAMLDecodingTrapFn, YamlDecoder};
+mod encoding;
+#[cfg(feature = "encoding")]
+pub use crate::encoding::{YAMLDecodingTrap, YAMLDecodingTrapFn, YamlDecoder};
 
 // Re-export `ScanError` as it is used as part of our public API and we want consumers to be able
 // to inspect it (e.g. perform a `match`). They wouldn't be able without it.
