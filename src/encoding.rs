@@ -4,7 +4,7 @@ use std::{borrow::Cow, ops::ControlFlow};
 
 use encoding_rs::{Decoder, DecoderResult, Encoding};
 
-use crate::{loader::LoadError, Yaml, YamlLoader};
+use crate::{loader::LoadError, Yaml};
 
 /// The signature of the function to call when using [`YAMLDecodingTrap::Call`].
 ///
@@ -102,7 +102,7 @@ impl<T: std::io::Read> YamlDecoder<T> {
         // Decode the input buffer.
         decode_loop(&buffer, &mut output, &mut decoder, self.trap)?;
 
-        YamlLoader::load_from_str(&output).map_err(LoadError::Scan)
+        crate::load_from_str(&output).map_err(LoadError::Scan)
     }
 }
 

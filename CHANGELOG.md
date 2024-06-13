@@ -2,7 +2,14 @@
 
 ## Upcoming
 
-**Features**
+**Breaking Changes**:
+- Move `load_from_*` methods out of the `YamlLoader`. Now, `YamlLoader` gained
+  a generic parameter. Moving those functions out of it spares having to
+  manually specify the generic in `YamlLoader::<Yaml>::load_from_str`.
+  Manipulating the `YamlLoader` directly was not common.
+
+
+**Features**:
 
 - ([#19](https://github.com/Ethiraric/yaml-rust2/pull/19)) `Yaml` now
   implements `IndexMut<usize>` and `IndexMut<&'a str>`. These functions may not
