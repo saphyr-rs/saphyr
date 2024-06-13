@@ -5,7 +5,7 @@ extern crate saphyr_parser;
 use saphyr_parser::{Event, EventReceiver, Parser, TScalarStyle};
 
 // These names match the names used in the C++ test suite.
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::enum_variant_names))]
+#[allow(clippy::enum_variant_names)]
 #[derive(Clone, PartialEq, PartialOrd, Debug)]
 enum TestEvent {
     OnDocumentStart,

@@ -54,7 +54,7 @@ pub enum Event {
         /// The anchor ID the alias refers to.
         usize,
     ),
-    /// Value, style, anchor_id, tag
+    /// Value, style, `anchor_id`, tag
     Scalar(String, TScalarStyle, usize, Option<Tag>),
     /// The start of a YAML sequence (array).
     SequenceStart(

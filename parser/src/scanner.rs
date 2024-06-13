@@ -313,6 +313,7 @@ struct Indent {
 /// consume/push a character. As of now, almost all lookaheads are 4 characters maximum, except:
 ///   - Escape sequences parsing: some escape codes are 8 characters
 ///   - Scanning indent in scalars: this looks ahead `indent + 2` characters
+///
 /// This constant must be set to at least 8. When scanning indent in scalars, the lookahead is done
 /// in a single call if and only if the indent is `BUFFER_LEN - 2` or less. If the indent is higher
 /// than that, the code will fall back to a loop of lookaheads.
@@ -1140,12 +1141,12 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                     self.scan_tag_shorthand_suffix(false, is_secondary_handle, "", &start_mark)?;
             } else {
                 suffix = self.scan_tag_shorthand_suffix(false, false, &handle, &start_mark)?;
-                handle = "!".to_owned();
+                "!".clone_into(&mut handle);
                 // A special case: the '!' tag.  Set the handle to '' and the
                 // suffix to '!'.
                 if suffix.is_empty() {
                     handle.clear();
-                    suffix = "!".to_owned();
+                    "!".clone_into(&mut suffix);
                 }
             }
         }
