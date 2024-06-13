@@ -52,7 +52,9 @@ mod loader;
 mod yaml;
 
 // Re-export main components.
-pub use crate::annotated::{AnnotatedArray, AnnotatedHash, YamlData};
+pub use crate::annotated::{
+    marked_yaml::MarkedYaml, AnnotatedArray, AnnotatedHash, AnnotatedYamlIter, YamlData,
+};
 pub use crate::emitter::YamlEmitter;
 pub use crate::loader::{
     load_from_iter, load_from_parser, load_from_str, LoadableYamlNode, YamlLoader,
@@ -67,3 +69,5 @@ pub use crate::encoding::{YAMLDecodingTrap, YAMLDecodingTrapFn, YamlDecoder};
 // Re-export `ScanError` as it is used as part of our public API and we want consumers to be able
 // to inspect it (e.g. perform a `match`). They wouldn't be able without it.
 pub use saphyr_parser::ScanError;
+// Re-export [`Marker`] which is used for annotated YAMLs.
+pub use saphyr_parser::Marker;

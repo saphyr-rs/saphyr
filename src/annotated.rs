@@ -1,12 +1,17 @@
 //! Utilities for extracting YAML with certain metadata.
 
+pub mod marked_yaml;
+
 use std::ops::{Index, IndexMut};
 
 use hashlink::LinkedHashMap;
 
 use crate::loader::parse_f64;
 
-/// A YAML node without annotation. See [`Yaml`], you probably want that.
+/// YAML data for nodes that will contain annotations.
+///
+/// If you want a YAML node without annotations, see [`Yaml`].
+/// If you want a YAML node with annotations, see types using [`YamlData`] such as [`MarkedYaml`]
 ///
 /// Unlike [`Yaml`] which only supports storing data, [`YamlData`] allows storing metadata
 /// alongside the YAML data. It is unlikely one would build it directly; it is mostly intended to
@@ -32,6 +37,7 @@ use crate::loader::parse_f64;
 ///   * Indexing cannot return `BadValue` and will panic instead.
 ///
 /// [`Yaml`]: crate::Yaml
+/// [`MarkedYaml`]: marked_yaml::MarkedYaml
 #[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
 pub enum YamlData<Node>
 where
@@ -93,6 +99,7 @@ where
     define_is!(is_array, Self::Array(_));
     define_is!(is_badvalue, Self::BadValue);
     define_is!(is_boolean, Self::Boolean(_));
+    define_is!(is_hash, Self::Hash(_));
     define_is!(is_integer, Self::Integer(_));
     define_is!(is_null, Self::Null);
     define_is!(is_real, Self::Real(_));

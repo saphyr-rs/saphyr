@@ -29,6 +29,14 @@
   already use this. Users of the original `yaml-rust` crate may freely disable
   this feature (`cargo <...> --no-default-features`) and lower MSRV to 1.65.0.
 
+- Load with metadata
+
+  The `YamlLoader` now supports adding metadata alongside the nodes. For now,
+  the only one supported is the `Marker`, pointing to the position in the input
+  stream of the start of the node.
+
+  This feature is extensible and should allow (later) to add comments.
+
 ## v0.8.0
 
 **Breaking Changes**:
