@@ -50,7 +50,7 @@ pub fn load_from_iter<I: Iterator<Item = char>>(source: I) -> Result<Vec<Yaml>, 
     load_from_parser(&mut parser)
 }
 
-/// Load the contents from the specified Parser as an array of YAML documents.
+/// Load the contents from the specified [`Parser`] as an array of YAML documents.
 ///
 /// See [`load_from_str`] for details.
 ///
@@ -104,8 +104,7 @@ impl<Node> MarkedEventReceiver for YamlLoader<Node>
 where
     Node: LoadableYamlNode,
 {
-    fn on_event(&mut self, ev: Event, _: Marker) {
-        // println!("EV {:?}", ev);
+    fn on_event(&mut self, ev: Event, marker: Marker) {
         match ev {
             Event::DocumentStart | Event::Nothing | Event::StreamStart | Event::StreamEnd => {
                 // do nothing
@@ -113,21 +112,29 @@ where
             Event::DocumentEnd => {
                 match self.doc_stack.len() {
                     // empty document
-                    0 => self.docs.push(Yaml::BadValue.into()),
+                    0 => self
+                        .docs
+                        .push(Node::from_bare_yaml(Yaml::BadValue).with_marker(marker)),
                     1 => self.docs.push(self.doc_stack.pop().unwrap().0),
                     _ => unreachable!(),
                 }
             }
             Event::SequenceStart(aid, _) => {
-                self.doc_stack.push((Yaml::Array(Vec::new()).into(), aid));
+                self.doc_stack.push((
+                    Node::from_bare_yaml(Yaml::Array(Vec::new())).with_marker(marker),
+                    aid,
+                ));
             }
             Event::SequenceEnd => {
                 let node = self.doc_stack.pop().unwrap();
                 self.insert_new_node(node);
             }
             Event::MappingStart(aid, _) => {
-                self.doc_stack.push((Yaml::Hash(Hash::new()).into(), aid));
-                self.key_stack.push(Yaml::BadValue.into());
+                self.doc_stack.push((
+                    Node::from_bare_yaml(Yaml::Hash(Hash::new())).with_marker(marker),
+                    aid,
+                ));
+                self.key_stack.push(Node::from_bare_yaml(Yaml::BadValue));
             }
             Event::MappingEnd => {
                 self.key_stack.pop().unwrap();
@@ -172,15 +179,14 @@ where
                     // Datatype is not specified, or unrecognized
                     Yaml::from_str(&v)
                 };
-
-                self.insert_new_node((node.into(), aid));
+                self.insert_new_node((Node::from_bare_yaml(node).with_marker(marker), aid));
             }
             Event::Alias(id) => {
                 let n = match self.anchor_map.get(&id) {
                     Some(v) => v.clone(),
-                    None => Yaml::BadValue.into(),
+                    None => Node::from_bare_yaml(Yaml::BadValue),
                 };
-                self.insert_new_node((n, 0));
+                self.insert_new_node((n.with_marker(marker), 0));
             }
         }
     }
@@ -214,6 +220,12 @@ where
                 }
             }
         }
+    }
+
+    /// Return the document nodes from `self`, consuming it in the process.
+    #[must_use]
+    pub fn into_documents(self) -> Vec<Node> {
+        self.docs
     }
 }
 
@@ -258,7 +270,19 @@ impl std::fmt::Display for LoadError {
 ///
 /// This trait must be implemented on YAML node types (i.e.: [`Yaml`] and annotated YAML nodes). It
 /// provides the necessary methods for [`YamlLoader`] to load data into the node.
-pub trait LoadableYamlNode: From<Yaml> + Clone + std::hash::Hash + Eq {
+pub trait LoadableYamlNode: Clone + std::hash::Hash + Eq {
+    /// Create an instance of `Self` from a [`Yaml`].
+    ///
+    /// Nodes must implement this to be built. The optional metadata that they contain will be
+    /// later provided by the loader and can be default initialized. The [`Yaml`] object passed as
+    /// parameter may be of the [`Array`] or [`Hash`] variants. In this event, the inner container
+    /// will always be empty. There is no need to traverse all elements to convert them from
+    /// [`Yaml`] to `Self`.
+    ///
+    /// [`Array`]: `Yaml::Array`
+    /// [`Hash`]: `Yaml::Hash`
+    fn from_bare_yaml(yaml: Yaml) -> Self;
+
     /// Return whether the YAML node is an array.
     fn is_array(&self) -> bool;
 
@@ -283,9 +307,20 @@ pub trait LoadableYamlNode: From<Yaml> + Clone + std::hash::Hash + Eq {
     /// Take the contained node out of `Self`, leaving a `BadValue` in its place.
     #[must_use]
     fn take(&mut self) -> Self;
+
+    /// Provide the marker for the node (builder-style).
+    #[inline]
+    #[must_use]
+    fn with_marker(self, _: Marker) -> Self {
+        self
+    }
 }
 
 impl LoadableYamlNode for Yaml {
+    fn from_bare_yaml(yaml: Yaml) -> Self {
+        yaml
+    }
+
     fn is_array(&self) -> bool {
         matches!(self, Yaml::Array(_))
     }

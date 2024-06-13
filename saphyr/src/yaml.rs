@@ -77,6 +77,7 @@ impl Yaml {
     define_is!(is_array, Self::Array(_));
     define_is!(is_badvalue, Self::BadValue);
     define_is!(is_boolean, Self::Boolean(_));
+    define_is!(is_hash, Self::Hash(_));
     define_is!(is_integer, Self::Integer(_));
     define_is!(is_null, Self::Null);
     define_is!(is_real, Self::Real(_));
