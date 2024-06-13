@@ -1,4 +1,4 @@
-use saphyr::{load_from_str, YamlEmitter};
+use saphyr::{Yaml, YamlEmitter};
 
 #[allow(clippy::similar_names)]
 #[test]
@@ -16,7 +16,7 @@ a4:
     - 2
 ";
 
-    let docs = load_from_str(s).unwrap();
+    let docs = Yaml::load_from_str(s).unwrap();
     let doc = &docs[0];
     let mut writer = String::new();
     {
@@ -25,7 +25,7 @@ a4:
     }
     println!("original:\n{s}");
     println!("emitted:\n{writer}");
-    let docs_new = match load_from_str(&writer) {
+    let docs_new = match Yaml::load_from_str(&writer) {
         Ok(y) => y,
         Err(e) => panic!("{}", e),
     };
@@ -55,14 +55,14 @@ products:
   {}:
     empty hash key
             ";
-    let docs = load_from_str(s).unwrap();
+    let docs = Yaml::load_from_str(s).unwrap();
     let doc = &docs[0];
     let mut writer = String::new();
     {
         let mut emitter = YamlEmitter::new(&mut writer);
         emitter.dump(doc).unwrap();
     }
-    let docs_new = match load_from_str(&writer) {
+    let docs_new = match Yaml::load_from_str(&writer) {
         Ok(y) => y,
         Err(e) => panic!("{}", e),
     };
@@ -106,7 +106,7 @@ x: test
 y: avoid quoting here
 z: string with spaces"#;
 
-    let docs = load_from_str(s).unwrap();
+    let docs = Yaml::load_from_str(s).unwrap();
     let doc = &docs[0];
     let mut writer = String::new();
     {
@@ -164,7 +164,7 @@ null0: ~
 bool0: true
 bool1: false"#;
 
-    let docs = load_from_str(input).unwrap();
+    let docs = Yaml::load_from_str(input).unwrap();
     let doc = &docs[0];
     let mut writer = String::new();
     {
@@ -212,7 +212,7 @@ e:
     h: []"
     };
 
-    let docs = load_from_str(s).unwrap();
+    let docs = Yaml::load_from_str(s).unwrap();
     let doc = &docs[0];
     let mut writer = String::new();
     {
@@ -234,7 +234,7 @@ a:
     - - e
       - f";
 
-    let docs = load_from_str(s).unwrap();
+    let docs = Yaml::load_from_str(s).unwrap();
     let doc = &docs[0];
     let mut writer = String::new();
     {
@@ -258,7 +258,7 @@ a:
       - - f
       - - e";
 
-    let docs = load_from_str(s).unwrap();
+    let docs = Yaml::load_from_str(s).unwrap();
     let doc = &docs[0];
     let mut writer = String::new();
     {
@@ -280,7 +280,7 @@ a:
       d:
         e: f";
 
-    let docs = load_from_str(s).unwrap();
+    let docs = Yaml::load_from_str(s).unwrap();
     let doc = &docs[0];
     let mut writer = String::new();
     {

@@ -102,7 +102,7 @@ impl<T: std::io::Read> YamlDecoder<T> {
         // Decode the input buffer.
         decode_loop(&buffer, &mut output, &mut decoder, self.trap)?;
 
-        crate::load_from_str(&output).map_err(LoadError::Scan)
+        Yaml::load_from_str(&output).map_err(LoadError::Scan)
     }
 }
 

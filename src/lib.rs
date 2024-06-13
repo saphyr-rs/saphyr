@@ -21,9 +21,9 @@
 //! Parse a string into `Vec<Yaml>` and then serialize it as a YAML string.
 //!
 //! ```
-//! use saphyr::{load_from_str, YamlEmitter};
+//! use saphyr::{Yaml, YamlEmitter};
 //!
-//! let docs = load_from_str("[1, 2, 3]").unwrap();
+//! let docs = Yaml::load_from_str("[1, 2, 3]").unwrap();
 //! let doc = &docs[0]; // select the first YAML document
 //! assert_eq!(doc[0].as_i64().unwrap(), 1); // access elements by index
 //!
@@ -56,9 +56,7 @@ pub use crate::annotated::{
     marked_yaml::MarkedYaml, AnnotatedArray, AnnotatedHash, AnnotatedYamlIter, YamlData,
 };
 pub use crate::emitter::YamlEmitter;
-pub use crate::loader::{
-    load_from_iter, load_from_parser, load_from_str, LoadableYamlNode, YamlLoader,
-};
+pub use crate::loader::{LoadableYamlNode, YamlLoader};
 pub use crate::yaml::{Array, Hash, Yaml, YamlIter};
 
 #[cfg(feature = "encoding")]
