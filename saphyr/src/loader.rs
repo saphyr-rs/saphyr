@@ -7,22 +7,42 @@ use saphyr_parser::{Event, MarkedEventReceiver, Marker, Parser, ScanError, TScal
 
 use crate::{Hash, Yaml};
 
-/// Load the given string as a set of YAML documents.
+/// Load the given string as an array of YAML documents.
 ///
 /// The `source` is interpreted as YAML documents and is parsed. Parsing succeeds if and only
 /// if all documents are parsed successfully. An error in a latter document prevents the former
 /// from being returned.
+///
+/// Most often, only one document is loaded in a YAML string. In this case, only the first element
+/// of the returned `Vec` will be used. Otherwise, each element in the `Vec` is a document:
+///
+/// ```
+/// use saphyr::{load_from_str, Yaml};
+///
+/// let docs = load_from_str(r#"
+/// First document
+/// ---
+/// - Second document
+/// "#).unwrap();
+/// let first_document = &docs[0]; // Select the first YAML document
+/// // The document is a string containing "First document".
+/// assert_eq!(*first_document, Yaml::String("First document".to_owned()));
+///
+/// let second_document = &docs[1]; // Select the second YAML document
+/// // The document is an array containing a single string, "Second document".
+/// assert_eq!(second_document[0], Yaml::String("Second document".to_owned()));
+/// ```
+///
 /// # Errors
 /// Returns `ScanError` when loading fails.
 pub fn load_from_str(source: &str) -> Result<Vec<Yaml>, ScanError> {
     load_from_iter(source.chars())
 }
 
-/// Load the contents of the given iterator as a set of YAML documents.
+/// Load the contents of the given iterator as an array of YAML documents.
 ///
-/// The `source` is interpreted as YAML documents and is parsed. Parsing succeeds if and only
-/// if all documents are parsed successfully. An error in a latter document prevents the former
-/// from being returned.
+/// See [`load_from_str`] for details.
+///
 /// # Errors
 /// Returns `ScanError` when loading fails.
 pub fn load_from_iter<I: Iterator<Item = char>>(source: I) -> Result<Vec<Yaml>, ScanError> {
@@ -30,10 +50,10 @@ pub fn load_from_iter<I: Iterator<Item = char>>(source: I) -> Result<Vec<Yaml>, 
     load_from_parser(&mut parser)
 }
 
-/// Load the contents from the specified Parser as a set of YAML documents.
+/// Load the contents from the specified Parser as an array of YAML documents.
 ///
-/// Parsing succeeds if and only if all documents are parsed successfully.
-/// An error in a latter document prevents the former from being returned.
+/// See [`load_from_str`] for details.
+///
 /// # Errors
 /// Returns `ScanError` when loading fails.
 pub fn load_from_parser<I: Iterator<Item = char>>(
@@ -44,9 +64,13 @@ pub fn load_from_parser<I: Iterator<Item = char>>(
     Ok(loader.docs)
 }
 
-/// Main structure for quickly parsing YAML.
+/// Main structure for parsing YAML.
 ///
-/// See [`load_from_str`].
+/// The `YamlLoader` may load raw YAML documents or add metadata if needed. The type of the `Node`
+/// dictates what data and metadata the loader will add to the `Node`.
+///
+/// Each node must implement [`LoadableYamlNode`]. The methods are required for the loader to
+/// manipulate and populate the `Node`.
 #[allow(clippy::module_name_repetitions)]
 pub struct YamlLoader<Node>
 where

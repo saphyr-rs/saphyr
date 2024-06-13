@@ -30,7 +30,6 @@
 //! let mut out_str = String::new();
 //! let mut emitter = YamlEmitter::new(&mut out_str);
 //! emitter.dump(doc).unwrap(); // dump the YAML object to a String
-//!
 //! ```
 //!
 //! # Features
