@@ -22,7 +22,7 @@ encoding = [ "dep:encoding_rs" ]
 
 [dependencies]
 arraydeque = "0.5.1"
-saphyr-parser = "0.0.1"
+saphyr-parser = "0.0.2"
 encoding_rs = { version = "0.8.33", optional = true }
 hashlink = "0.8"
 

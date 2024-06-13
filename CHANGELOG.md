@@ -2,7 +2,14 @@
 
 ## Upcoming
 
-**Features**
+**Breaking Changes**:
+- Move `load_from_*` methods out of the `YamlLoader`. Now, `YamlLoader` gained
+  a generic parameter. Moving those functions out of it spares having to
+  manually specify the generic in `YamlLoader::<Yaml>::load_from_str`.
+  Manipulating the `YamlLoader` directly was not common.
+
+
+**Features**:
 
 - ([#19](https://github.com/Ethiraric/yaml-rust2/pull/19)) `Yaml` now
   implements `IndexMut<usize>` and `IndexMut<&'a str>`. These functions may not
@@ -21,6 +28,14 @@
   default. Users of `@davvid`'s fork of `yaml-rust` or of `yaml-rust2` might
   already use this. Users of the original `yaml-rust` crate may freely disable
   this feature (`cargo <...> --no-default-features`) and lower MSRV to 1.65.0.
+
+- Load with metadata
+
+  The `YamlLoader` now supports adding metadata alongside the nodes. For now,
+  the only one supported is the `Marker`, pointing to the position in the input
+  stream of the start of the node.
+
+  This feature is extensible and should allow (later) to add comments.
 
 ## v0.8.0
 

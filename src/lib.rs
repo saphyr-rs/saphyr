@@ -21,16 +21,15 @@
 //! Parse a string into `Vec<Yaml>` and then serialize it as a YAML string.
 //!
 //! ```
-//! use saphyr::{YamlLoader, YamlEmitter};
+//! use saphyr::{Yaml, YamlEmitter};
 //!
-//! let docs = YamlLoader::load_from_str("[1, 2, 3]").unwrap();
+//! let docs = Yaml::load_from_str("[1, 2, 3]").unwrap();
 //! let doc = &docs[0]; // select the first YAML document
 //! assert_eq!(doc[0].as_i64().unwrap(), 1); // access elements by index
 //!
 //! let mut out_str = String::new();
 //! let mut emitter = YamlEmitter::new(&mut out_str);
 //! emitter.dump(doc).unwrap(); // dump the YAML object to a String
-//!
 //! ```
 //!
 //! # Features
@@ -43,15 +42,22 @@
 
 #![warn(missing_docs, clippy::pedantic)]
 
+#[macro_use]
+mod macros;
+
+mod annotated;
 mod char_traits;
 mod emitter;
 mod loader;
 mod yaml;
 
 // Re-export main components.
+pub use crate::annotated::{
+    marked_yaml::MarkedYaml, AnnotatedArray, AnnotatedHash, AnnotatedYamlIter, YamlData,
+};
 pub use crate::emitter::YamlEmitter;
-pub use crate::loader::YamlLoader;
-pub use crate::yaml::{Array, Hash, Yaml};
+pub use crate::loader::{LoadableYamlNode, YamlLoader};
+pub use crate::yaml::{Array, Hash, Yaml, YamlIter};
 
 #[cfg(feature = "encoding")]
 mod encoding;
@@ -61,3 +67,5 @@ pub use crate::encoding::{YAMLDecodingTrap, YAMLDecodingTrapFn, YamlDecoder};
 // Re-export `ScanError` as it is used as part of our public API and we want consumers to be able
 // to inspect it (e.g. perform a `match`). They wouldn't be able without it.
 pub use saphyr_parser::ScanError;
+// Re-export [`Marker`] which is used for annotated YAMLs.
+pub use saphyr_parser::Marker;

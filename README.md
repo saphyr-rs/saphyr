@@ -28,7 +28,7 @@ cargo add saphyr
 Use `saphyr::YamlLoader` to load YAML documents and access them as `Yaml` objects:
 
 ```rust
-use saphyr::{YamlLoader, YamlEmitter};
+use saphyr::{Yaml, YamlEmitter};
 
 fn main() {
     let s =
@@ -40,7 +40,7 @@ bar:
     - 1
     - 2.0
 ";
-    let docs = YamlLoader::load_from_str(s).unwrap();
+    let docs = Yaml::load_from_str(s).unwrap();
 
     // Multi document support, doc is a yaml::Yaml
     let doc = &docs[0];
@@ -71,6 +71,8 @@ Note that `saphyr::Yaml` implements `Index<&'a str>` and `Index<usize>`:
 * `Index<usize>` assumes the container is an array
 * `Index<&'a str>` assumes the container is a string to value map
 * otherwise, `Yaml::BadValue` is returned
+
+Note that `annotated::YamlData` cannot return `BadValue` and will panic.
 
 If your document does not conform to this convention (e.g. map with complex
 type key), you can use the `Yaml::as_XXX` family API of functions to access
