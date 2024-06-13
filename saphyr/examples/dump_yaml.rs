@@ -1,4 +1,4 @@
-use saphyr::{load_from_str, Yaml};
+use saphyr::Yaml;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
@@ -36,7 +36,7 @@ fn main() {
     let mut s = String::new();
     f.read_to_string(&mut s).unwrap();
 
-    let docs = load_from_str(&s).unwrap();
+    let docs = Yaml::load_from_str(&s).unwrap();
     for doc in &docs {
         println!("---");
         dump_node(doc, 0);

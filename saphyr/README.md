@@ -28,7 +28,7 @@ cargo add saphyr
 Use `saphyr::YamlLoader` to load YAML documents and access them as `Yaml` objects:
 
 ```rust
-use saphyr::{YamlLoader, YamlEmitter};
+use saphyr::{Yaml, YamlEmitter};
 
 fn main() {
     let s =
@@ -40,7 +40,7 @@ bar:
     - 1
     - 2.0
 ";
-    let docs = YamlLoader::load_from_str(s).unwrap();
+    let docs = Yaml::load_from_str(s).unwrap();
 
     // Multi document support, doc is a yaml::Yaml
     let doc = &docs[0];

@@ -36,9 +36,9 @@ impl From<fmt::Error> for EmitError {
 /// The YAML serializer.
 ///
 /// ```
-/// # use saphyr::{load_from_str, YamlEmitter};
+/// # use saphyr::{Yaml, YamlEmitter};
 /// let input_string = "a: b\nc: d";
-/// let yaml = load_from_str(input_string).unwrap();
+/// let yaml = Yaml::load_from_str(input_string).unwrap();
 ///
 /// let mut output = String::new();
 /// YamlEmitter::new(&mut output).dump(&yaml[0]).unwrap();
@@ -159,10 +159,10 @@ impl<'a> YamlEmitter<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// use saphyr::{Yaml, YamlEmitter, load_from_str};
+    /// use saphyr::{Yaml, YamlEmitter};
     ///
     /// let input = r#"{foo: "bar!\nbar!", baz: 42}"#;
-    /// let parsed = load_from_str(input).unwrap();
+    /// let parsed = Yaml::load_from_str(input).unwrap();
     /// eprintln!("{:?}", parsed);
     ///
     /// let mut output = String::new();
@@ -409,12 +409,14 @@ fn need_quotes(string: &str) -> bool {
 
 #[cfg(test)]
 mod test {
+    use crate::Yaml;
+
     use super::YamlEmitter;
 
     #[test]
     fn test_multiline_string() {
         let input = r#"{foo: "bar!\nbar!", baz: 42}"#;
-        let parsed = crate::load_from_str(input).unwrap();
+        let parsed = Yaml::load_from_str(input).unwrap();
         let mut output = String::new();
         let mut emitter = YamlEmitter::new(&mut output);
         emitter.multiline_strings(true);

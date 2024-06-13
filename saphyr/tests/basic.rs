@@ -1,7 +1,7 @@
 #![allow(clippy::bool_assert_comparison)]
 #![allow(clippy::float_cmp)]
 
-use saphyr::{load_from_str, Yaml, YamlEmitter};
+use saphyr::{Yaml, YamlEmitter};
 
 #[test]
 fn test_api() {
@@ -29,7 +29,7 @@ fn test_api() {
     - name: Staff
       damage: 3
 ";
-    let docs = load_from_str(s).unwrap();
+    let docs = Yaml::load_from_str(s).unwrap();
     let doc = &docs[0];
 
     assert_eq!(doc[0]["name"].as_str().unwrap(), "Ogre");
@@ -50,7 +50,7 @@ a: 1
 b: 2.2
 c: [1, 2]
 ";
-    let out = load_from_str(s).unwrap();
+    let out = Yaml::load_from_str(s).unwrap();
     let doc = &out[0];
     assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
     assert_eq!(doc["b"].as_f64().unwrap(), 2.2f64);
@@ -66,7 +66,7 @@ a1: &DEFAULT
     b2: d
 a2: *DEFAULT
 ";
-    let out = load_from_str(s).unwrap();
+    let out = Yaml::load_from_str(s).unwrap();
     let doc = &out[0];
     assert_eq!(doc["a2"]["b1"].as_i64().unwrap(), 4);
 }
@@ -78,7 +78,7 @@ a1: &DEFAULT
     b1: 4
     b2: *DEFAULT
 ";
-    let out = load_from_str(s).unwrap();
+    let out = Yaml::load_from_str(s).unwrap();
     let doc = &out[0];
     assert_eq!(doc["a1"]["b2"], Yaml::BadValue);
 }
@@ -114,7 +114,7 @@ fn test_plain_datatype() {
 - +12345
 - [ true, false ]
 ";
-    let out = load_from_str(s).unwrap();
+    let out = Yaml::load_from_str(s).unwrap();
     let doc = &out[0];
 
     assert_eq!(doc[0].as_str().unwrap(), "string");
@@ -171,7 +171,7 @@ fn test_plain_datatype_with_into_methods() {
 - .NAN
 - !!float .INF
 ";
-    let mut out = load_from_str(s).unwrap().into_iter();
+    let mut out = Yaml::load_from_str(s).unwrap().into_iter();
     let mut doc = out.next().unwrap().into_iter();
 
     assert_eq!(doc.next().unwrap().into_string().unwrap(), "string");
@@ -203,7 +203,7 @@ b: ~
 a: ~
 c: ~
 ";
-    let out = load_from_str(s).unwrap();
+    let out = Yaml::load_from_str(s).unwrap();
     let first = out.into_iter().next().unwrap();
     let mut iter = first.into_hash().unwrap().into_iter();
     assert_eq!(
@@ -229,7 +229,7 @@ fn test_integer_key() {
 1:
     important: false
 ";
-    let out = load_from_str(s).unwrap();
+    let out = Yaml::load_from_str(s).unwrap();
     let first = out.into_iter().next().unwrap();
     assert_eq!(first[0]["important"].as_bool().unwrap(), true);
 }

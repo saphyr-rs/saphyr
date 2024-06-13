@@ -1,10 +1,10 @@
-use saphyr::{load_from_str, Yaml, YamlEmitter};
+use saphyr::{Yaml, YamlEmitter};
 
 fn roundtrip(original: &Yaml) {
     let mut emitted = String::new();
     YamlEmitter::new(&mut emitted).dump(original).unwrap();
 
-    let documents = load_from_str(&emitted).unwrap();
+    let documents = Yaml::load_from_str(&emitted).unwrap();
     println!("emitted {emitted}");
 
     assert_eq!(documents.len(), 1);
@@ -12,12 +12,12 @@ fn roundtrip(original: &Yaml) {
 }
 
 fn double_roundtrip(original: &str) {
-    let parsed = load_from_str(original).unwrap();
+    let parsed = Yaml::load_from_str(original).unwrap();
 
     let mut serialized = String::new();
     YamlEmitter::new(&mut serialized).dump(&parsed[0]).unwrap();
 
-    let reparsed = load_from_str(&serialized).unwrap();
+    let reparsed = Yaml::load_from_str(&serialized).unwrap();
 
     assert_eq!(parsed, reparsed);
 }
@@ -55,12 +55,12 @@ fn test_numberlike_strings() {
 /// Example from <https://github.com/chyh1990/yaml-rust/issues/133>
 #[test]
 fn test_issue133() {
-    let doc = load_from_str("\"0x123\"").unwrap().pop().unwrap();
+    let doc = Yaml::load_from_str("\"0x123\"").unwrap().pop().unwrap();
     assert_eq!(doc, Yaml::String("0x123".to_string()));
 
     let mut out_str = String::new();
     YamlEmitter::new(&mut out_str).dump(&doc).unwrap();
-    let doc2 = load_from_str(&out_str).unwrap().pop().unwrap();
+    let doc2 = Yaml::load_from_str(&out_str).unwrap().pop().unwrap();
     assert_eq!(doc, doc2); // This failed because the type has changed to a number now
 }
 
