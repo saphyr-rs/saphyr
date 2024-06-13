@@ -42,7 +42,7 @@ pub enum TScalarStyle {
 }
 
 /// A location in a yaml document.
-#[derive(Clone, Copy, PartialEq, Debug, Eq)]
+#[derive(Clone, Copy, PartialEq, Debug, Eq, Default)]
 pub struct Marker {
     /// The index (in chars) in the input string.
     index: usize,
@@ -53,7 +53,9 @@ pub struct Marker {
 }
 
 impl Marker {
-    fn new(index: usize, line: usize, col: usize) -> Marker {
+    /// Create a new [`Marker`] at the given position.
+    #[must_use]
+    pub fn new(index: usize, line: usize, col: usize) -> Marker {
         Marker { index, line, col }
     }
 
