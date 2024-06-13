@@ -30,19 +30,19 @@ impl MarkedYaml {
     /// # Errors
     /// Returns `ScanError` when loading fails.
     ///
-    /// [`load_from_str`]: `crate::load_from_str`
+    /// [`load_from_str`]: `Yaml::load_from_str`
     pub fn load_from_str(source: &str) -> Result<Vec<Self>, ScanError> {
         Self::load_from_iter(source.chars())
     }
 
     /// Load the contents of the given iterator as an array of YAML documents.
     ///
-    /// See the function [`load_from_iter`] for more details.
+    /// See the function [`load_from_str`] for more details.
     ///
     /// # Errors
     /// Returns `ScanError` when loading fails.
     ///
-    /// [`load_from_iter`]: `crate::load_from_iter`
+    /// [`load_from_str`]: `Yaml::load_from_str`
     pub fn load_from_iter<I: Iterator<Item = char>>(source: I) -> Result<Vec<Self>, ScanError> {
         let mut parser = Parser::new(source);
         Self::load_from_parser(&mut parser)
@@ -50,12 +50,12 @@ impl MarkedYaml {
 
     /// Load the contents from the specified [`Parser`] as an array of YAML documents.
     ///
-    /// See the function [`load_from_parser`] for more details.
+    /// See the function [`load_from_str`] for more details.
     ///
     /// # Errors
     /// Returns `ScanError` when loading fails.
     ///
-    /// [`load_from_parser`]: `crate::load_from_parser`
+    /// [`load_from_str`]: `Yaml::load_from_str`
     pub fn load_from_parser<I: Iterator<Item = char>>(
         parser: &mut Parser<I>,
     ) -> Result<Vec<Self>, ScanError> {

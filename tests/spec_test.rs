@@ -1,4 +1,4 @@
-use saphyr::{load_from_str, Hash, Yaml, YamlEmitter};
+use saphyr::{Hash, Yaml, YamlEmitter};
 
 #[test]
 fn test_mapvec_legal() {
@@ -53,5 +53,5 @@ fn test_mapvec_legal() {
     //    - 6
     //  ```
 
-    load_from_str(&out_str).unwrap();
+    Yaml::load_from_str(&out_str).unwrap();
 }
