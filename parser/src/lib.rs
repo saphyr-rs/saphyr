@@ -17,7 +17,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! saphyr-parser = "0.0.1"
+//! saphyr-parser = "0.0.2"
 //! ```
 //!
 //! # Features
