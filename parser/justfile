@@ -16,3 +16,12 @@ ethi_bench:
   cd ../serde-yaml/ && cargo build --release --all-targets
   cd ../libfyaml/build && ninja
   cargo bench_compare run_bench
+
+ethi_build_dump:
+  (cargo test 2>&1 >/dev/null || (cargo test && false))
+  CARGO_PROFILE_RELEASE_DEBUG=true cargo build --release --bin time_parse
+  valgrind --tool=callgrind --dump-instr=yes --collect-jumps=yes ./target/release/time_parse ~/Projects/yaml-rust2/bench_yaml/strings_array.yaml
+
+ethi_compare: ethi_build_dump
+  cg_file=`\ls -1t callgrind.out.* | head -n1` && callgrind_annotate $cg_file --auto=no --threshold=99.99 > cg/WORK && rm $cg_file
+  callgrind_differ cg/00{05,06,07,08,09,10,11,12}* cg/WORK --show percentagediff,ircount --sort-by=-first-ir -a
