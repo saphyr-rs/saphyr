@@ -2144,7 +2144,13 @@ impl<T: Input> Scanner<T> {
                 ));
             }
 
-            if !is_blank_or_breakz(self.input.peek()) && self.next_can_be_plain_scalar() {
+            if !is_blank_or_breakz(self.input.peek())
+                && next_can_be_plain_scalar(
+                    self.input.peek(),
+                    self.input.peek_nth(1),
+                    self.flow_level > 0,
+                )
+            {
                 if self.leading_whitespace {
                     if leading_break.is_empty() {
                         string.push_str(&leading_break);
@@ -2179,7 +2185,16 @@ impl<T: Input> Scanner<T> {
                     // hence the `for` loop looping `self.input.bufmaxlen() - 1` times.
                     self.input.lookahead(self.input.bufmaxlen());
                     for _ in 0..self.input.bufmaxlen() - 1 {
-                        if is_blank_or_breakz(self.input.peek()) || !self.next_can_be_plain_scalar()
+                        // We need to have `c` and `nc`'s assignations at the beginning of the
+                        // loop. If at the end of it, we will peek one index further than we
+                        // looked ahead. On the first iteration of the loop, `c` is a characte we
+                        // already pushed in `string` a bit earlier.
+                        if is_blank_or_breakz(self.input.peek())
+                            || !next_can_be_plain_scalar(
+                                self.input.peek(),
+                                self.input.peek_nth(1),
+                                self.flow_level > 0,
+                            )
                         {
                             end = true;
                             break;
@@ -2507,25 +2522,6 @@ impl<T: Input> Scanner<T> {
         Ok(())
     }
 
-    /// Check whether the next characters may be part of a plain scalar.
-    ///
-    /// This function assumes we are not given a blankz character.
-    // For some reason, `#[inline]` is not enough.
-    #[allow(clippy::inline_always)]
-    #[inline(always)]
-    fn next_can_be_plain_scalar(&self) -> bool {
-        match self.input.peek() {
-            // indicators can end a plain scalar, see 7.3.3. Plain Style
-            ':' if is_blank_or_breakz(self.input.peek_nth(1))
-                || (self.flow_level > 0 && is_flow(self.input.peek_nth(1))) =>
-            {
-                false
-            }
-            c if self.flow_level > 0 && is_flow(c) => false,
-            _ => true,
-        }
-    }
-
     /// Return whether the scanner is inside a block but outside of a flow sequence.
     fn is_within_block(&self) -> bool {
         !self.indents.is_empty()
@@ -2593,6 +2589,21 @@ pub enum Chomping {
     Clip,
     /// The final line break and trailing empty lines are included.
     Keep,
+}
+
+/// Check whether the next characters may be part of a plain scalar.
+///
+/// This function assumes we are not given a blankz character.
+// For some reason, `#[inline]` is not enough.
+#[allow(clippy::inline_always)]
+#[inline(always)]
+pub fn next_can_be_plain_scalar(c: char, nc: char, in_flow: bool) -> bool {
+    match c {
+        // indicators can end a plain scalar, see 7.3.3. Plain Style
+        ':' if is_blank_or_breakz(nc) || (in_flow && is_flow(nc)) => false,
+        c if in_flow && is_flow(c) => false,
+        _ => true,
+    }
 }
 
 #[cfg(test)]
