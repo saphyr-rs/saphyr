@@ -309,6 +309,40 @@ struct Indent {
     needs_block_end: bool,
 }
 
+/// The knowledge we have about an implicit mapping.
+///
+/// Implicit mappings occur in flow sequences where the opening `{` for a mapping in a flow
+/// sequence is omitted:
+/// ```yaml
+/// [ a: b, c: d ]
+/// # Equivalent to
+/// [ { a: b }, { c: d } ]
+/// # Equivalent to
+/// - a: b
+/// - c: d
+/// ```
+///
+/// The state must be carefully tracked for each nested flow sequence since we must emit a
+/// [`FlowMappingStart`] event when encountering `a` and `c` in our previous example without a
+/// character hinting us. Similarly, we must emit a [`FlowMappingEnd`] event when we reach the `,`
+/// or the `]`. If the state is not properly tracked, we may omit to emit these events or emit them
+/// out-of-order.
+///
+/// [`FlowMappingStart`]: TokenType::FlowMappingStart
+/// [`FlowMappingEnd`]: TokenType::FlowMappingEnd
+#[derive(Debug, PartialEq)]
+enum ImplicitMappingState {
+    /// It is possible there is an implicit mapping.
+    ///
+    /// This state is the one when we have just encountered the opening `[`. We need more context
+    /// to know whether an implicit mapping follows.
+    Possible,
+    /// We are inside the implcit mapping.
+    ///
+    /// Note that this state is not set immediately (we need to have encountered the `:` to know).
+    Inside,
+}
+
 /// The size of the [`Scanner`] buffer.
 ///
 /// The buffer is statically allocated to avoid conditions for reallocations each time we
@@ -386,8 +420,19 @@ pub struct Scanner<T> {
     /// [ : foo ] # { null: "foo" }
     /// ```
     flow_mapping_started: bool,
-    /// Whether we currently are in an implicit flow mapping.
-    implicit_flow_mapping: bool,
+    /// An array of states, representing whether flow sequences have implicit mappings.
+    ///
+    /// When a flow mapping is possible (when encountering the first `[` or a `,` in a sequence),
+    /// the state is set to [`Possible`].
+    /// When we encounter the `:`, we know we are in an implicit mapping and can set the state to
+    /// [`Inside`].
+    ///
+    /// There is one entry in this [`Vec`] for each nested flow sequence that we are in.
+    /// The entries are created with the opening `]` and popped with the closing `]`.
+    ///
+    /// [`Possible`]: ImplicitMappingState::Possible
+    /// [`Inside`]: ImplicitMappingState::Inside
+    implicit_flow_mapping_states: Vec<ImplicitMappingState>,
 }
 
 impl<T: Iterator<Item = char>> Iterator for Scanner<T> {
@@ -439,7 +484,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             token_available: false,
             leading_whitespace: true,
             flow_mapping_started: false,
-            implicit_flow_mapping: false,
+            implicit_flow_mapping_states: vec![],
         }
     }
 
@@ -705,11 +750,11 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             ',' => self.fetch_flow_entry(),
             '-' if is_blank_or_breakz(nc) => self.fetch_block_entry(),
             '?' if is_blank_or_breakz(nc) => self.fetch_key(),
-            ':' if is_blank_or_breakz(nc)
-                || (self.flow_level > 0
-                    && (is_flow(nc) || self.mark.index == self.adjacent_value_allowed_at)) =>
+            ':' if is_blank_or_breakz(nc) => self.fetch_value(),
+            ':' if self.flow_level > 0
+                && (is_flow(nc) || self.mark.index == self.adjacent_value_allowed_at) =>
             {
-                self.fetch_value()
+                self.fetch_flow_value()
             }
             // Is it an alias?
             '*' => self.fetch_anchor(true),
@@ -1404,6 +1449,9 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
         if tok == TokenType::FlowMappingStart {
             self.flow_mapping_started = true;
+        } else {
+            self.implicit_flow_mapping_states
+                .push(ImplicitMappingState::Possible);
         }
 
         self.skip_ws_to_eol(SkipTabs::Yes)?;
@@ -1418,7 +1466,11 @@ impl<T: Iterator<Item = char>> Scanner<T> {
 
         self.disallow_simple_key();
 
-        self.end_implicit_mapping(self.mark);
+        if matches!(tok, TokenType::FlowSequenceEnd) {
+            self.end_implicit_mapping(self.mark);
+            // We are out exiting the flow sequence, nesting goes down 1 level.
+            self.implicit_flow_mapping_states.pop();
+        }
 
         let start_mark = self.mark;
         self.skip_non_blank();
@@ -2292,7 +2344,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                 start_mark,
             );
         } else {
-            // The parser, upon receiving a `Key`, will insert a `MappingStart` event.
+            // The scanner, upon emitting a `Key`, will prepend a `MappingStart` event.
             self.flow_mapping_started = true;
         }
 
@@ -2316,11 +2368,45 @@ impl<T: Iterator<Item = char>> Scanner<T> {
         Ok(())
     }
 
+    /// Fetch a value in a mapping inside of a flow collection.
+    ///
+    /// This must not be called if [`self.flow_level`] is 0. This ensures the rules surrounding
+    /// values in flow collections are respected prior to calling [`fetch_value`].
+    ///
+    /// [`self.flow_level`]: Self::flow_level
+    /// [`fetch_value`]: Self::fetch_value
+    fn fetch_flow_value(&mut self) -> ScanResult {
+        let nc = self.buffer[1];
+
+        // If we encounter a ':' inside a flow collection and it is not immediately
+        // followed by a blank or breakz:
+        //   - We must check whether an adjacent value is allowed
+        //     `["a":[]]` is valid. If the key is double-quoted, no need for a space. This
+        //     is needed for JSON compatibility.
+        //   - If not, we must ensure there is a space after the ':' and before its value.
+        //     `[a: []]` is valid while `[a:[]]` isn't. `[a:b]` is treated as `["a:b"]`.
+        //   - But if the value is empty (null), then it's okay.
+        // The last line is for YAMLs like `[a:]`. The ':' is followed by a ']' (which is a
+        // flow character), but the ']' is not the value. The value is an invisible empty
+        // space which is represented as null ('~').
+        if self.mark.index != self.adjacent_value_allowed_at && (nc == '[' || nc == '{') {
+            return Err(ScanError::new_str(
+                self.mark,
+                "':' may not precede any of `[{` in flow mapping",
+            ));
+        }
+
+        self.fetch_value()
+    }
+
     /// Fetch a value from a mapping (after a `:`).
     fn fetch_value(&mut self) -> ScanResult {
         let sk = self.simple_keys.last().unwrap().clone();
         let start_mark = self.mark;
-        self.implicit_flow_mapping = self.flow_level > 0 && !self.flow_mapping_started;
+        let is_implicit_flow_mapping = self.flow_level > 0 && !self.flow_mapping_started;
+        if is_implicit_flow_mapping {
+            *self.implicit_flow_mapping_states.last_mut().unwrap() = ImplicitMappingState::Inside;
+        }
 
         // Skip over ':'.
         self.skip_non_blank();
@@ -2338,7 +2424,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             // insert simple key
             let tok = Token(sk.mark, TokenType::Key);
             self.insert_token(sk.token_number - self.tokens_parsed, tok);
-            if self.implicit_flow_mapping {
+            if is_implicit_flow_mapping {
                 if sk.mark.line < start_mark.line {
                     return Err(ScanError::new_str(
                         start_mark,
@@ -2363,7 +2449,7 @@ impl<T: Iterator<Item = char>> Scanner<T> {
             self.simple_keys.last_mut().unwrap().possible = false;
             self.disallow_simple_key();
         } else {
-            if self.implicit_flow_mapping {
+            if is_implicit_flow_mapping {
                 self.tokens
                     .push_back(Token(self.mark, TokenType::FlowMappingStart));
             }
@@ -2527,12 +2613,18 @@ impl<T: Iterator<Item = char>> Scanner<T> {
     }
 
     /// If an implicit mapping had started, end it.
+    ///
+    /// This function does not pop the state in [`implicit_flow_mapping_states`].
+    ///
+    /// [`implicit_flow_mapping_states`]: Self::implicit_flow_mapping_states
     fn end_implicit_mapping(&mut self, mark: Marker) {
-        if self.implicit_flow_mapping {
-            self.implicit_flow_mapping = false;
-            self.flow_mapping_started = false;
-            self.tokens
-                .push_back(Token(mark, TokenType::FlowMappingEnd));
+        if let Some(implicit_mapping) = self.implicit_flow_mapping_states.last_mut() {
+            if *implicit_mapping == ImplicitMappingState::Inside {
+                self.flow_mapping_started = false;
+                *implicit_mapping = ImplicitMappingState::Possible;
+                self.tokens
+                    .push_back(Token(mark, TokenType::FlowMappingEnd));
+            }
         }
     }
 }
