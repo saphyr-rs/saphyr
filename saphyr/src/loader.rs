@@ -144,10 +144,7 @@ where
         if node.1 > 0 {
             self.anchor_map.insert(node.1, node.0.clone());
         }
-        if self.doc_stack.is_empty() {
-            self.doc_stack.push(node);
-        } else {
-            let parent = self.doc_stack.last_mut().unwrap();
+        if let Some(parent) = self.doc_stack.last_mut() {
             let parent_node = &mut parent.0;
             if parent_node.is_array() {
                 parent_node.array_mut().push(node.0);
@@ -162,6 +159,8 @@ where
                     hash.insert(cur_key.take(), node.0);
                 }
             }
+        } else {
+            self.doc_stack.push(node);
         }
     }
 
