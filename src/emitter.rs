@@ -171,7 +171,7 @@ impl<'a> YamlEmitter<'a> {
     /// emitter.dump(&parsed[0]).unwrap();
     /// assert_eq!(output.as_str(), "\
     /// ---
-    /// foo: |
+    /// foo: |-
     ///   bar!
     ///   bar!
     /// baz: 42");
@@ -219,15 +219,7 @@ impl<'a> YamlEmitter<'a> {
                     && v.contains('\n')
                     && char_traits::is_valid_literal_block_scalar(v)
                 {
-                    write!(self.writer, "|")?;
-                    self.level += 1;
-                    for line in v.lines() {
-                        writeln!(self.writer)?;
-                        self.write_indent()?;
-                        // It's literal text, so don't escape special chars.
-                        write!(self.writer, "{line}")?;
-                    }
-                    self.level -= 1;
+                    self.emit_literal_block(v)?;
                 } else if need_quotes(v) {
                     escape_str(self.writer, v)?;
                 } else {
@@ -258,6 +250,26 @@ impl<'a> YamlEmitter<'a> {
             // XXX(chenyh) Alias
             Yaml::Alias(_) => Ok(()),
         }
+    }
+
+    fn emit_literal_block(&mut self, v: &String) -> EmitResult {
+        let ends_with_newline = v.chars().last() == Some('\n');
+        if ends_with_newline {
+            write!(self.writer, "|")?;
+        } else {
+            write!(self.writer, "|-")?;
+        }
+
+        self.level += 1;
+        // lines() will omit the last line if it is empty.
+        for line in v.lines() {
+            writeln!(self.writer)?;
+            self.write_indent()?;
+            // It's literal text, so don't escape special chars.
+            write!(self.writer, "{line}")?;
+        }
+        self.level -= 1;
+        Ok(())
     }
 
     fn emit_array(&mut self, v: &[Yaml]) -> EmitResult {
