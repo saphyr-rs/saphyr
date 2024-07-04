@@ -1,3 +1,8 @@
+pub mod buffered;
+
+#[allow(clippy::module_name_repetitions)]
+pub use buffered::BufferedInput;
+
 use crate::char_traits::is_blank_or_breakz;
 
 /// Interface for a source of characters.

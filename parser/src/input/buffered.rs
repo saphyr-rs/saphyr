@@ -21,6 +21,7 @@ const BUFFER_LEN: usize = 16;
 /// characters at a time and sometimes pushing some back into the stream.
 /// There is no "easy" way of doing this without itertools. In order to avoid pulling the entierty
 /// of itertools for one method, we use this structure.
+#[allow(clippy::module_name_repetitions)]
 pub struct BufferedInput<T: Iterator<Item = char>> {
     /// The iterator source,
     input: T,
