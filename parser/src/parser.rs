@@ -5,9 +5,8 @@
 //! YAML objects.
 
 use crate::{
-    input::Input,
+    input::{str::StrInput, Input},
     scanner::{Marker, ScanError, Scanner, TScalarStyle, Token, TokenType},
-    BufferedInput,
 };
 use std::collections::HashMap;
 
@@ -229,11 +228,11 @@ impl<R: EventReceiver> MarkedEventReceiver for R {
 /// A convenience alias for a `Result` of a parser event.
 pub type ParseResult = Result<(Event, Marker), ScanError>;
 
-impl<'a> Parser<BufferedInput<std::str::Chars<'a>>> {
+impl<'a> Parser<StrInput<'a>> {
     /// Create a new instance of a parser from a &str.
     #[must_use]
     pub fn new_from_str(value: &'a str) -> Self {
-        Parser::new(BufferedInput::new(value.chars()))
+        Parser::new(StrInput::new(value))
     }
 }
 

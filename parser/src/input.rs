@@ -1,4 +1,5 @@
 pub mod buffered;
+pub mod str;
 
 #[allow(clippy::module_name_repetitions)]
 pub use buffered::BufferedInput;

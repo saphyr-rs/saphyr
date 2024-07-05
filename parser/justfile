@@ -24,4 +24,4 @@ ethi_build_dump:
 
 ethi_compare: ethi_build_dump
   cg_file=`\ls -1t callgrind.out.* | head -n1` && callgrind_annotate $cg_file --auto=no --threshold=99.99 > cg/WORK && rm $cg_file
-  callgrind_differ cg/00{05,06,07,08,09,10,11,12}* cg/WORK --show percentagediff,ircount --sort-by=-first-ir -a
+  callgrind_differ `\ls cg/0*` cg/WORK --show percentagediff,ircount --sort-by=-first-ir -a
