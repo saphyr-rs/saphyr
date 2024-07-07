@@ -252,12 +252,12 @@ impl<'a> YamlEmitter<'a> {
         }
     }
 
-    fn emit_literal_block(&mut self, v: &String) -> EmitResult {
-        let ends_with_newline = v.chars().last() == Some('\n');
+    fn emit_literal_block(&mut self, v: &str) -> EmitResult {
+        let ends_with_newline = v.ends_with('\n');
         if ends_with_newline {
-            write!(self.writer, "|")?;
+            self.writer.write_str("|")?;
         } else {
-            write!(self.writer, "|-")?;
+            self.writer.write_str("|-")?;
         }
 
         self.level += 1;
@@ -266,7 +266,7 @@ impl<'a> YamlEmitter<'a> {
             writeln!(self.writer)?;
             self.write_indent()?;
             // It's literal text, so don't escape special chars.
-            write!(self.writer, "{line}")?;
+            self.writer.write_str(line)?;
         }
         self.level -= 1;
         Ok(())
