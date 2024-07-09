@@ -91,32 +91,24 @@ fn test_crlf() {
 
 #[test]
 fn test_multiline_noline() {
-    let y = Yaml::Array(vec![
-        Yaml::String("a".to_owned())
-    ]);
+    let y = Yaml::Array(vec![Yaml::String("a".to_owned())]);
     roundtrip_multiline(&y);
 }
 
 #[test]
 fn test_multiline_inner_newline() {
-    let y = Yaml::Array(vec![
-        Yaml::String("a\nb".to_owned())
-    ]);
+    let y = Yaml::Array(vec![Yaml::String("a\nb".to_owned())]);
     roundtrip_multiline(&y);
 }
 
 #[test]
 fn test_multiline_trailing_newline() {
-    let y = Yaml::Array(vec![
-        Yaml::String("a\n".to_owned())
-    ]);
+    let y = Yaml::Array(vec![Yaml::String("a\n".to_owned())]);
     roundtrip_multiline(&y);
 }
 
 #[test]
 fn test_multiline_leading_newline() {
-    let y = Yaml::Array(vec![
-        Yaml::String("\na".to_owned())
-    ]);
+    let y = Yaml::Array(vec![Yaml::String("\na".to_owned())]);
     roundtrip_multiline(&y);
 }
