@@ -11,6 +11,19 @@ fn roundtrip(original: &Yaml) {
     assert_eq!(documents[0], *original);
 }
 
+fn roundtrip_multiline(original: &Yaml) {
+    let mut emitted = String::new();
+    let mut emitter = YamlEmitter::new(&mut emitted);
+    emitter.multiline_strings(true);
+    emitter.dump(original).unwrap();
+
+    let documents = Yaml::load_from_str(&emitted).unwrap();
+    println!("emitted {emitted}");
+
+    assert_eq!(documents.len(), 1);
+    assert_eq!(documents[0], *original);
+}
+
 fn double_roundtrip(original: &str) {
     let parsed = Yaml::load_from_str(original).unwrap();
 
@@ -74,4 +87,28 @@ fn test_newline() {
 fn test_crlf() {
     let y = Yaml::Array(vec![Yaml::String("\r\n".to_owned())]);
     roundtrip(&y);
+}
+
+#[test]
+fn test_multiline_noline() {
+    let y = Yaml::Array(vec![Yaml::String("a".to_owned())]);
+    roundtrip_multiline(&y);
+}
+
+#[test]
+fn test_multiline_inner_newline() {
+    let y = Yaml::Array(vec![Yaml::String("a\nb".to_owned())]);
+    roundtrip_multiline(&y);
+}
+
+#[test]
+fn test_multiline_trailing_newline() {
+    let y = Yaml::Array(vec![Yaml::String("a\n".to_owned())]);
+    roundtrip_multiline(&y);
+}
+
+#[test]
+fn test_multiline_leading_newline() {
+    let y = Yaml::Array(vec![Yaml::String("\na".to_owned())]);
+    roundtrip_multiline(&y);
 }
