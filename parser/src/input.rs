@@ -4,7 +4,7 @@ pub mod str;
 #[allow(clippy::module_name_repetitions)]
 pub use buffered::BufferedInput;
 
-use crate::char_traits::is_blank_or_breakz;
+use crate::char_traits::{is_blank_or_breakz, is_breakz};
 
 /// Interface for a source of characters.
 ///
@@ -164,5 +164,89 @@ pub trait Input {
     fn next_is_document_end(&self) -> bool {
         assert!(self.buflen() >= 4);
         self.next_3_are('.', '.', '.') && is_blank_or_breakz(self.peek_nth(3))
+    }
+
+    /// Skip yaml whitespace at most up to eol. Also skips comments. Advances the input.
+    ///
+    /// # Return
+    /// Return a tuple with the number of characters that were consumed and the result of skipping
+    /// whitespace. The number of characters returned can be used to advance the index and columns,
+    /// since no end-of-line character will be consumed.
+    /// See [`SkipTabs`] For more details on the success variant.
+    ///
+    /// # Errors
+    /// Errors if a comment is encountered but it was not preceded by a whitespace. In that event,
+    /// the first tuple element will contain the number of characters consumed prior to reaching
+    /// the `#`.
+    fn skip_ws_to_eol(&mut self, skip_tabs: SkipTabs) -> (usize, Result<SkipTabs, &'static str>) {
+        let mut encountered_tab = false;
+        let mut has_yaml_ws = false;
+        let mut chars_consumed = 0;
+        loop {
+            match self.look_ch() {
+                ' ' => {
+                    has_yaml_ws = true;
+                    self.skip();
+                }
+                '\t' if skip_tabs != SkipTabs::No => {
+                    encountered_tab = true;
+                    self.skip();
+                }
+                // YAML comments must be preceded by whitespace.
+                '#' if !encountered_tab && !has_yaml_ws => {
+                    return (
+                        chars_consumed,
+                        Err("comments must be separated from other tokens by whitespace"),
+                    );
+                }
+                '#' => {
+                    while !is_breakz(self.look_ch()) {
+                        self.skip();
+                        chars_consumed += 1;
+                    }
+                }
+                _ => break,
+            }
+            chars_consumed += 1;
+        }
+
+        (
+            chars_consumed,
+            Ok(SkipTabs::Result(encountered_tab, has_yaml_ws)),
+        )
+    }
+}
+
+/// Behavior to adopt regarding treating tabs as whitespace.
+///
+/// Although tab is a valid yaml whitespace, it doesn't always behave the same as a space.
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum SkipTabs {
+    /// Skip all tabs as whitespace.
+    Yes,
+    /// Don't skip any tab. Return from the function when encountering one.
+    No,
+    /// Return value from the function.
+    Result(
+        /// Whether tabs were encountered.
+        bool,
+        /// Whether at least 1 valid yaml whitespace has been encountered.
+        bool,
+    ),
+}
+
+impl SkipTabs {
+    /// Whether tabs were found while skipping whitespace.
+    ///
+    /// This function must be called after a call to `skip_ws_to_eol`.
+    pub fn found_tabs(self) -> bool {
+        matches!(self, SkipTabs::Result(true, _))
+    }
+
+    /// Whether a valid YAML whitespace has been found in skipped-over content.
+    ///
+    /// This function must be called after a call to `skip_ws_to_eol`.
+    pub fn has_valid_yaml_ws(self) -> bool {
+        matches!(self, SkipTabs::Result(_, true))
     }
 }
