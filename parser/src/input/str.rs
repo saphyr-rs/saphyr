@@ -1,5 +1,5 @@
 use crate::{
-    char_traits::{is_blank_or_breakz, is_breakz},
+    char_traits::{is_blank_or_breakz, is_breakz, is_flow},
     input::{Input, SkipTabs},
 };
 
@@ -247,6 +247,28 @@ impl<'a> Input for StrInput<'a> {
             chars_consumed,
             Ok(SkipTabs::Result(encountered_tab, has_yaml_ws)),
         )
+    }
+
+    #[allow(clippy::inline_always)]
+    #[inline(always)]
+    fn next_can_be_plain_scalar(&self, in_flow: bool) -> bool {
+        let c = self.buffer.as_bytes()[0];
+        if self.buffer.len() > 1 {
+            let nc = self.buffer.as_bytes()[1];
+            match c {
+                // indicators can end a plain scalar, see 7.3.3. Plain Style
+                b':' if is_blank_or_breakz(nc as char) || (in_flow && is_flow(nc as char)) => false,
+                c if in_flow && is_flow(c as char) => false,
+                _ => true,
+            }
+        } else {
+            match c {
+                // indicators can end a plain scalar, see 7.3.3. Plain Style
+                b':' => false,
+                c if in_flow && is_flow(c as char) => false,
+                _ => true,
+            }
+        }
     }
 }
 

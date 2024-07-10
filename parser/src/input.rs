@@ -4,7 +4,7 @@ pub mod str;
 #[allow(clippy::module_name_repetitions)]
 pub use buffered::BufferedInput;
 
-use crate::char_traits::{is_blank_or_breakz, is_breakz};
+use crate::char_traits::{is_blank_or_breakz, is_breakz, is_flow};
 
 /// Interface for a source of characters.
 ///
@@ -214,6 +214,21 @@ pub trait Input {
             chars_consumed,
             Ok(SkipTabs::Result(encountered_tab, has_yaml_ws)),
         )
+    }
+
+    /// Check whether the next characters may be part of a plain scalar.
+    ///
+    /// This function assumes we are not given a blankz character.
+    #[allow(clippy::inline_always)]
+    #[inline(always)]
+    fn next_can_be_plain_scalar(&self, in_flow: bool) -> bool {
+        let nc = self.peek_nth(1);
+        match self.peek() {
+            // indicators can end a plain scalar, see 7.3.3. Plain Style
+            ':' if is_blank_or_breakz(nc) || (in_flow && is_flow(nc)) => false,
+            c if in_flow && is_flow(c) => false,
+            _ => true,
+        }
     }
 }
 
