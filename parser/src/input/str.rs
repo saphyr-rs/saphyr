@@ -1,5 +1,7 @@
 use crate::{
-    char_traits::{is_blank_or_breakz, is_breakz, is_flow},
+    char_traits::{
+        is_alpha, is_blank, is_blank_or_breakz, is_break, is_breakz, is_digit, is_flow, is_z,
+    },
     input::{Input, SkipTabs},
 };
 
@@ -60,7 +62,9 @@ impl<'a> Input for StrInput<'a> {
 
     #[inline]
     fn push_back(&mut self, c: char) {
-        self.buffer = put_back_in_str(self.buffer, c);
+        // SAFETY: The preconditions of this function is that the character we are given is the one
+        // immediately preceding `self.buffer`.
+        self.buffer = unsafe { put_back_in_str(self.buffer, c) };
     }
 
     #[inline]
@@ -270,6 +274,122 @@ impl<'a> Input for StrInput<'a> {
             }
         }
     }
+
+    #[inline]
+    fn next_is_blank_or_break(&self) -> bool {
+        !self.buffer.is_empty()
+            && (is_blank(self.buffer.as_bytes()[0] as char)
+                || is_break(self.buffer.as_bytes()[0] as char))
+    }
+
+    #[inline]
+    fn next_is_blank_or_breakz(&self) -> bool {
+        self.buffer.is_empty()
+            || (is_blank(self.buffer.as_bytes()[0] as char)
+                || is_breakz(self.buffer.as_bytes()[0] as char))
+    }
+
+    #[inline]
+    fn next_is_blank(&self) -> bool {
+        !self.buffer.is_empty() && is_blank(self.buffer.as_bytes()[0] as char)
+    }
+
+    #[inline]
+    fn next_is_break(&self) -> bool {
+        !self.buffer.is_empty() && is_break(self.buffer.as_bytes()[0] as char)
+    }
+
+    #[inline]
+    fn next_is_breakz(&self) -> bool {
+        self.buffer.is_empty() || is_breakz(self.buffer.as_bytes()[0] as char)
+    }
+
+    #[inline]
+    fn next_is_z(&self) -> bool {
+        self.buffer.is_empty() || is_z(self.buffer.as_bytes()[0] as char)
+    }
+
+    #[inline]
+    fn next_is_flow(&self) -> bool {
+        !self.buffer.is_empty() && is_flow(self.buffer.as_bytes()[0] as char)
+    }
+
+    #[inline]
+    fn next_is_digit(&self) -> bool {
+        !self.buffer.is_empty() && is_digit(self.buffer.as_bytes()[0] as char)
+    }
+
+    #[inline]
+    fn next_is_alpha(&self) -> bool {
+        !self.buffer.is_empty() && is_alpha(self.buffer.as_bytes()[0] as char)
+    }
+
+    fn skip_while_non_breakz(&mut self) -> usize {
+        let mut found_breakz = false;
+        let mut count = 0;
+
+        // Skip over all non-breaks.
+        let mut chars = self.buffer.chars();
+        for c in chars.by_ref() {
+            if is_breakz(c) {
+                found_breakz = true;
+                break;
+            }
+            count += 1;
+        }
+
+        self.buffer = if found_breakz {
+            // If we read a breakz, we need to put it back to the buffer.
+            // SAFETY: The last character we extracted is either a '\n', '\r' or '\0', all of which
+            // are 1-byte long.
+            unsafe { extend_left(chars.as_str(), 1) }
+        } else {
+            chars.as_str()
+        };
+
+        count
+    }
+
+    fn skip_while_blank(&mut self) -> usize {
+        // Since all characters we look for are ascii, we can directly use the byte API of str.
+        let mut i = 0;
+        while i < self.buffer.len() {
+            if !is_blank(self.buffer.as_bytes()[i] as char) {
+                break;
+            }
+            i += 1;
+        }
+        self.buffer = &self.buffer[i..];
+        i
+    }
+
+    fn fetch_while_is_alpha(&mut self, out: &mut String) -> usize {
+        let mut not_alpha = None;
+
+        // Skip while we have alpha characters.
+        let mut chars = self.buffer.chars();
+        for c in chars.by_ref() {
+            if !is_alpha(c) {
+                not_alpha = Some(c);
+                break;
+            }
+        }
+
+        let remaining_string = if let Some(c) = not_alpha {
+            let n_bytes_read = chars.as_str().as_ptr() as usize - self.buffer.as_ptr() as usize;
+            let last_char_bytes = c.len_utf8();
+            &self.buffer[n_bytes_read - last_char_bytes..]
+        } else {
+            chars.as_str()
+        };
+
+        let n_bytes_to_append = remaining_string.as_ptr() as usize - self.buffer.as_ptr() as usize;
+        out.reserve(n_bytes_to_append);
+        out.push_str(&self.buffer[..n_bytes_to_append]);
+        self.buffer = remaining_string;
+
+        n_bytes_to_append
+    }
 }
 
 /// The buffer size we return to the scanner.
@@ -309,13 +429,13 @@ const BUFFER_LEN: usize = 128;
 /// assert_eq!(s1, s3);
 /// assert_eq!(s1.as_ptr(), s3.as_ptr());
 /// ```
-fn put_back_in_str(s: &str, c: char) -> &str {
+unsafe fn put_back_in_str(s: &str, c: char) -> &str {
     let n_bytes = c.len_utf8();
 
     // SAFETY: The character that gets pushed back is guaranteed to be the one that is
     // immediately preceding our buffer. We can compute the length of the character and move
     // our buffer back that many bytes.
-    unsafe { extend_left(s, n_bytes) }
+    extend_left(s, n_bytes)
 }
 
 /// Extend the string by moving the start pointer to the left by `n` bytes.
@@ -369,7 +489,7 @@ mod test {
     pub fn put_back_in_str_example() {
         let s1 = "foo";
         let s2 = &s1[1..];
-        let s3 = put_back_in_str(s2, 'f'); // OK, 'f' is the character immediately preceding
+        let s3 = unsafe { put_back_in_str(s2, 'f') }; // OK, 'f' is the character immediately preceding
         assert_eq!(s1, s3);
         assert_eq!(s1.as_ptr(), s3.as_ptr());
     }

@@ -4,7 +4,9 @@ pub mod str;
 #[allow(clippy::module_name_repetitions)]
 pub use buffered::BufferedInput;
 
-use crate::char_traits::{is_blank_or_breakz, is_breakz, is_flow};
+use crate::char_traits::{
+    is_alpha, is_blank, is_blank_or_breakz, is_break, is_breakz, is_digit, is_flow, is_z,
+};
 
 /// Interface for a source of characters.
 ///
@@ -170,7 +172,7 @@ pub trait Input {
     ///
     /// # Return
     /// Return a tuple with the number of characters that were consumed and the result of skipping
-    /// whitespace. The number of characters returned can be used to advance the index and columns,
+    /// whitespace. The number of characters returned can be used to advance the index and column,
     /// since no end-of-line character will be consumed.
     /// See [`SkipTabs`] For more details on the success variant.
     ///
@@ -229,6 +231,188 @@ pub trait Input {
             c if in_flow && is_flow(c) => false,
             _ => true,
         }
+    }
+
+    /// Check whether the next character is [a blank] or [a break].
+    ///
+    /// The character must have previously been fetched through [`lookahead`]
+    ///
+    /// # Return
+    /// Returns true if the character is [a blank] or [a break], false otherwise.
+    ///
+    /// [`lookahead`]: Input::lookahead
+    /// [a blank]: is_blank
+    /// [a break]: is_break
+    #[inline]
+    fn next_is_blank_or_break(&self) -> bool {
+        is_blank(self.peek()) || is_break(self.peek())
+    }
+
+    /// Check whether the next character is [a blank] or [a breakz].
+    ///
+    /// The character must have previously been fetched through [`lookahead`]
+    ///
+    /// # Return
+    /// Returns true if the character is [a blank] or [a break], false otherwise.
+    ///
+    /// [`lookahead`]: Input::lookahead
+    /// [a blank]: is_blank
+    /// [a breakz]: is_breakz
+    #[inline]
+    fn next_is_blank_or_breakz(&self) -> bool {
+        is_blank(self.peek()) || is_breakz(self.peek())
+    }
+
+    /// Check whether the next character is [a blank].
+    ///
+    /// The character must have previously been fetched through [`lookahead`]
+    ///
+    /// # Return
+    /// Returns true if the character is [a blank], false otherwise.
+    ///
+    /// [`lookahead`]: Input::lookahead
+    /// [a blank]: is_blank
+    #[inline]
+    fn next_is_blank(&self) -> bool {
+        is_blank(self.peek())
+    }
+
+    /// Check whether the next character is [a break].
+    ///
+    /// The character must have previously been fetched through [`lookahead`]
+    ///
+    /// # Return
+    /// Returns true if the character is [a break], false otherwise.
+    ///
+    /// [`lookahead`]: Input::lookahead
+    /// [a break]: is_break
+    #[inline]
+    fn next_is_break(&self) -> bool {
+        is_break(self.peek())
+    }
+
+    /// Check whether the next character is [a breakz].
+    ///
+    /// The character must have previously been fetched through [`lookahead`]
+    ///
+    /// # Return
+    /// Returns true if the character is [a breakz], false otherwise.
+    ///
+    /// [`lookahead`]: Input::lookahead
+    /// [a breakz]: is_breakz
+    #[inline]
+    fn next_is_breakz(&self) -> bool {
+        is_breakz(self.peek())
+    }
+
+    /// Check whether the next character is [a z].
+    ///
+    /// The character must have previously been fetched through [`lookahead`]
+    ///
+    /// # Return
+    /// Returns true if the character is [a z], false otherwise.
+    ///
+    /// [`lookahead`]: Input::lookahead
+    /// [a z]: is_z
+    #[inline]
+    fn next_is_z(&self) -> bool {
+        is_z(self.peek())
+    }
+
+    /// Check whether the next character is [a flow].
+    ///
+    /// The character must have previously been fetched through [`lookahead`]
+    ///
+    /// # Return
+    /// Returns true if the character is [a flow], false otherwise.
+    ///
+    /// [`lookahead`]: Input::lookahead
+    /// [a flow]: is_flow
+    #[inline]
+    fn next_is_flow(&self) -> bool {
+        is_flow(self.peek())
+    }
+
+    /// Check whether the next character is [a digit].
+    ///
+    /// The character must have previously been fetched through [`lookahead`]
+    ///
+    /// # Return
+    /// Returns true if the character is [a digit], false otherwise.
+    ///
+    /// [`lookahead`]: Input::lookahead
+    /// [a digit]: is_digit
+    #[inline]
+    fn next_is_digit(&self) -> bool {
+        is_digit(self.peek())
+    }
+
+    /// Check whether the next character is [a letter].
+    ///
+    /// The character must have previously been fetched through [`lookahead`]
+    ///
+    /// # Return
+    /// Returns true if the character is [a letter], false otherwise.
+    ///
+    /// [`lookahead`]: Input::lookahead
+    /// [a letter]: is_alpha
+    #[inline]
+    fn next_is_alpha(&self) -> bool {
+        is_alpha(self.peek())
+    }
+
+    /// Skip characters from the input until a [breakz] is found.
+    ///
+    /// The characters are consumed from the input.
+    ///
+    /// # Return
+    /// Return the number of characters that were consumed. The number of characters returned can
+    /// be used to advance the index and column, since no end-of-line character will be consumed.
+    ///
+    /// [breakz]: is_breakz
+    #[inline]
+    fn skip_while_non_breakz(&mut self) -> usize {
+        let mut count = 0;
+        while !is_breakz(self.look_ch()) {
+            count += 1;
+            self.skip();
+        }
+        count
+    }
+
+    /// Skip characters from the input while [blanks] are found.
+    ///
+    /// The characters are consumed from the input.
+    ///
+    /// # Return
+    /// Return the number of characters that were consumed. The number of characters returned can
+    /// be used to advance the index and column, since no end-of-line character will be consumed.
+    ///
+    /// [blanks]: is_blank
+    fn skip_while_blank(&mut self) -> usize {
+        let mut n_chars = 0;
+        while is_blank(self.look_ch()) {
+            n_chars += 1;
+            self.skip();
+        }
+        n_chars
+    }
+
+    /// Fetch characters from the input while we encounter letters and store them in `out`.
+    ///
+    /// The characters are consumed from the input.
+    ///
+    /// # Return
+    /// Return the number of characters that were consumed. The number of characters returned can
+    /// be used to advance the index and column, since no end-of-line character will be consumed.
+    fn fetch_while_is_alpha(&mut self, out: &mut String) -> usize {
+        let mut n_chars = 0;
+        while is_alpha(self.look_ch()) {
+            n_chars += 1;
+            out.push(self.peek());
+            self.skip();
+        }
+        n_chars
     }
 }
 
