@@ -1,6 +1,6 @@
 use std::{fs::File, io::BufWriter, io::Write, path::Path};
 
-use anyhow::Error;
+use anyhow::{Context, Error};
 use serde::{Deserialize, Serialize};
 
 fn main() {
@@ -51,11 +51,12 @@ fn run_bench(config: &Config) -> Result<(), Error> {
             println!("Running {input_basename} against {}", parser.name);
             // Run benchmark
             let path = Path::new(&parser.path).join("run_bench");
-            let output = std::process::Command::new(path)
+            let output = std::process::Command::new(&path)
                 .arg(input)
                 .arg(&iterations)
                 .arg("--output-yaml")
-                .output()?;
+                .output()
+                .with_context(|| format!("While running {path:?} against {input}"))?;
             // Check exit status.
             if output.status.code().unwrap_or(1) == 0 {
                 let s = String::from_utf8_lossy(&output.stdout);

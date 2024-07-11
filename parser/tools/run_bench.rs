@@ -1,11 +1,9 @@
 #![allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
 
-use std::{env, fs::File, io::prelude::*};
 use saphyr_parser::{
-    parser::{MarkedEventReceiver, Parser},
-    scanner::Marker,
-    Event,
+    Event, Marker, {MarkedEventReceiver, Parser},
 };
+use std::{env, fs::File, io::prelude::*};
 
 /// A sink which discards any event sent.
 struct NullSink {}
