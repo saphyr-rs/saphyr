@@ -422,6 +422,9 @@ pub struct Scanner<T> {
     /// [`Possible`]: ImplicitMappingState::Possible
     /// [`Inside`]: ImplicitMappingState::Inside
     implicit_flow_mapping_states: Vec<ImplicitMappingState>,
+    buf_leading_break: String,
+    buf_trailing_breaks: String,
+    buf_whitespaces: String,
 }
 
 impl<T: Input> Iterator for Scanner<T> {
@@ -473,6 +476,10 @@ impl<T: Input> Scanner<T> {
             leading_whitespace: true,
             flow_mapping_started: false,
             implicit_flow_mapping_states: vec![],
+
+            buf_leading_break: String::new(),
+            buf_trailing_breaks: String::new(),
+            buf_whitespaces: String::new(),
         }
     }
 
@@ -564,6 +571,16 @@ impl<T: Input> Scanner<T> {
     // If the next characters do not correspond to a line break.
     #[inline]
     fn read_break(&mut self, s: &mut String) {
+        self.skip_break();
+        s.push('\n');
+    }
+
+    // Read and consume a line break (either `\r`, `\n` or `\r\n`).
+    //
+    // # Panics (in debug)
+    // If the next characters do not correspond to a line break.
+    #[inline]
+    fn skip_break(&mut self) {
         let c = self.input.peek();
         let nc = self.input.peek_nth(1);
         debug_assert!(is_break(c));
@@ -571,8 +588,6 @@ impl<T: Input> Scanner<T> {
             self.skip_blank();
         }
         self.skip_nl();
-
-        s.push('\n');
     }
 
     /// Insert a token at the given position.
@@ -2102,9 +2117,9 @@ impl<T: Input> Scanner<T> {
         }
 
         let mut string = String::with_capacity(32);
-        let mut leading_break = String::with_capacity(32);
-        let mut trailing_breaks = String::with_capacity(32);
-        let mut whitespaces = String::with_capacity(32);
+        self.buf_whitespaces.clear();
+        self.buf_leading_break.clear();
+        self.buf_trailing_breaks.clear();
 
         loop {
             self.input.lookahead(4);
@@ -2123,24 +2138,24 @@ impl<T: Input> Scanner<T> {
                 && self.input.next_can_be_plain_scalar(self.flow_level > 0)
             {
                 if self.leading_whitespace {
-                    if leading_break.is_empty() {
-                        string.push_str(&leading_break);
-                        string.push_str(&trailing_breaks);
-                        trailing_breaks.clear();
-                        leading_break.clear();
+                    if self.buf_leading_break.is_empty() {
+                        string.push_str(&self.buf_leading_break);
+                        string.push_str(&self.buf_trailing_breaks);
+                        self.buf_trailing_breaks.clear();
+                        self.buf_leading_break.clear();
                     } else {
-                        if trailing_breaks.is_empty() {
+                        if self.buf_trailing_breaks.is_empty() {
                             string.push(' ');
                         } else {
-                            string.push_str(&trailing_breaks);
-                            trailing_breaks.clear();
+                            string.push_str(&self.buf_trailing_breaks);
+                            self.buf_trailing_breaks.clear();
                         }
-                        leading_break.clear();
+                        self.buf_leading_break.clear();
                     }
                     self.leading_whitespace = false;
-                } else if !whitespaces.is_empty() {
-                    string.push_str(&whitespaces);
-                    whitespaces.clear();
+                } else if !self.buf_whitespaces.is_empty() {
+                    string.push_str(&self.buf_whitespaces);
+                    self.buf_whitespaces.clear();
                 }
 
                 // We can unroll the first iteration of the loop.
@@ -2182,7 +2197,7 @@ impl<T: Input> Scanner<T> {
             while self.input.next_is_blank_or_break() {
                 if self.input.next_is_blank() {
                     if !self.leading_whitespace {
-                        whitespaces.push(self.input.peek());
+                        self.buf_whitespaces.push(self.input.peek());
                         self.skip_blank();
                     } else if (self.mark.col as isize) < indent && self.input.peek() == '\t' {
                         // Tabs in an indentation columns are allowed if and only if the line is
@@ -2200,10 +2215,12 @@ impl<T: Input> Scanner<T> {
                 } else {
                     // Check if it is a first line break
                     if self.leading_whitespace {
-                        self.read_break(&mut trailing_breaks);
+                        self.skip_break();
+                        self.buf_trailing_breaks.push('\n');
                     } else {
-                        whitespaces.clear();
-                        self.read_break(&mut leading_break);
+                        self.buf_whitespaces.clear();
+                        self.skip_break();
+                        self.buf_leading_break.push('\n');
                         self.leading_whitespace = true;
                     }
                 }
