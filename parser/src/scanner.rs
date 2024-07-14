@@ -1853,7 +1853,10 @@ impl<T: Iterator<Item = char>> Scanner<T> {
                     while !self.buffer.is_empty() && self.mark.col < indent && self.ch() == ' ' {
                         self.skip_blank();
                     }
-                    if !(!self.buffer.is_empty() && self.mark.col < indent && self.ch() == ' ') {
+                    // If we reached our indent, we can break. We must also break if we have
+                    // reached content or EOF; that is, the buffer is not empty and the next
+                    // character is not a space.
+                    if self.mark.col == indent || (!self.buffer.is_empty() && self.ch() != ' ') {
                         break;
                     }
                 }

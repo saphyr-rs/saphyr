@@ -201,6 +201,33 @@ foobar";
         ]
     );
 }
+#[test]
+fn test_large_block_scalar_indent() {
+    // https://github.com/Ethiraric/yaml-rust2/issues/29
+    // https://github.com/saphyr-rs/saphyr-parser/issues/2
+    // Tests the `loop` fallback of `skip_block_scalar_indent`. The indent in the YAML string must
+    // be greater than `BUFFER_LEN - 2`. The second line is further indented with spaces, and the
+    // resulting string should be "a\n    b".
+    let s = "
+a: |-
+                  a
+                      b
+";
+
+    assert_eq!(
+        run_parser(s).unwrap(),
+        [
+            Event::StreamStart,
+            Event::DocumentStart,
+            Event::MappingStart(0, None),
+            Event::Scalar("a".to_string(), TScalarStyle::Plain, 0, None),
+            Event::Scalar("a\n    b".to_string(), TScalarStyle::Literal, 0, None),
+            Event::MappingEnd,
+            Event::DocumentEnd,
+            Event::StreamEnd,
+        ]
+    );
+}
 
 #[test]
 fn test_bad_docstart() {
