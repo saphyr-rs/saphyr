@@ -79,6 +79,37 @@ impl Marker {
     }
 }
 
+/// A range of locations in a Yaml document.
+#[derive(Clone, Copy, PartialEq, Debug, Eq, Default)]
+pub struct Span {
+    /// The start (inclusive) of the range.
+    pub start: Marker,
+    /// The end (exclusive) of the range.
+    pub end: Marker,
+}
+
+impl Span {
+    /// Create a new [`Span`] for the given range.
+    #[must_use]
+    pub fn new(start: Marker, end: Marker) -> Span {
+        Span { start, end }
+    }
+
+    /// Create a empty [`Span`] at a given location.
+    ///
+    /// An empty span doesn't contain any characters, but its position may still be meaningful.
+    /// For example, for an indented sequence [`SequenceEnd`] has a location but an empty span.
+    ///
+    /// [`SequenceEnd`]: crate::Event::SequenceEnd
+    #[must_use]
+    pub fn empty(mark: Marker) -> Span {
+        Span {
+            start: mark,
+            end: mark,
+        }
+    }
+}
+
 /// An error that occurred while scanning.
 #[derive(Clone, PartialEq, Debug, Eq)]
 pub struct ScanError {
@@ -204,7 +235,7 @@ pub enum TokenType {
 
 /// A scanner token.
 #[derive(Clone, PartialEq, Debug, Eq)]
-pub struct Token(pub Marker, pub TokenType);
+pub struct Token(pub Span, pub TokenType);
 
 /// A scalar that was parsed and may correspond to a simple key.
 ///
@@ -874,8 +905,10 @@ impl<T: Input> Scanner<T> {
         self.indent = -1;
         self.stream_start_produced = true;
         self.allow_simple_key();
-        self.tokens
-            .push_back(Token(mark, TokenType::StreamStart(TEncoding::Utf8)));
+        self.tokens.push_back(Token(
+            Span::empty(mark),
+            TokenType::StreamStart(TEncoding::Utf8),
+        ));
         self.simple_keys.push(SimpleKey::new(Marker::new(0, 0, 0)));
     }
 
@@ -900,7 +933,7 @@ impl<T: Input> Scanner<T> {
         self.disallow_simple_key();
 
         self.tokens
-            .push_back(Token(self.mark, TokenType::StreamEnd));
+            .push_back(Token(Span::empty(self.mark), TokenType::StreamEnd));
         Ok(())
     }
 
@@ -932,7 +965,7 @@ impl<T: Input> Scanner<T> {
                 self.mark.col += line_len;
                 // XXX return an empty TagDirective token
                 Token(
-                    start_mark,
+                    Span::new(start_mark, self.mark),
                     TokenType::TagDirective(String::new(), String::new()),
                 )
                 // return Err(ScanError::new_str(start_mark,
@@ -971,7 +1004,10 @@ impl<T: Input> Scanner<T> {
 
         let minor = self.scan_version_directive_number(mark)?;
 
-        Ok(Token(*mark, TokenType::VersionDirective(major, minor)))
+        Ok(Token(
+            Span::new(*mark, self.mark),
+            TokenType::VersionDirective(major, minor),
+        ))
     }
 
     fn scan_directive_name(&mut self) -> Result<String, ScanError> {
@@ -1040,7 +1076,10 @@ impl<T: Input> Scanner<T> {
         self.input.lookahead(1);
 
         if self.input.next_is_blank_or_breakz() {
-            Ok(Token(*mark, TokenType::TagDirective(handle, prefix)))
+            Ok(Token(
+                Span::new(*mark, self.mark),
+                TokenType::TagDirective(handle, prefix),
+            ))
         } else {
             Err(ScanError::new_str(
                 *mark,
@@ -1093,7 +1132,10 @@ impl<T: Input> Scanner<T> {
             || (self.flow_level > 0 && self.input.next_is_flow())
         {
             // XXX: ex 7.2, an empty scalar can follow a secondary tag
-            Ok(Token(start_mark, TokenType::Tag(handle, suffix)))
+            Ok(Token(
+                Span::new(start_mark, self.mark),
+                TokenType::Tag(handle, suffix),
+            ))
         } else {
             Err(ScanError::new_str(
                 start_mark,
@@ -1323,11 +1365,12 @@ impl<T: Input> Scanner<T> {
             return Err(ScanError::new_str(start_mark, "while scanning an anchor or alias, did not find expected alphabetic or numeric character"));
         }
 
-        if alias {
-            Ok(Token(start_mark, TokenType::Alias(string)))
+        let tok = if alias {
+            TokenType::Alias(string)
         } else {
-            Ok(Token(start_mark, TokenType::Anchor(string)))
-        }
+            TokenType::Anchor(string)
+        };
+        Ok(Token(Span::new(start_mark, self.mark), tok))
     }
 
     fn fetch_flow_collection_start(&mut self, tok: TokenType) -> ScanResult {
@@ -1351,7 +1394,8 @@ impl<T: Input> Scanner<T> {
 
         self.skip_ws_to_eol(SkipTabs::Yes)?;
 
-        self.tokens.push_back(Token(start_mark, tok));
+        self.tokens
+            .push_back(Token(Span::new(start_mark, self.mark), tok));
         Ok(())
     }
 
@@ -1380,7 +1424,8 @@ impl<T: Input> Scanner<T> {
             self.adjacent_value_allowed_at = self.mark.index;
         }
 
-        self.tokens.push_back(Token(start_mark, tok));
+        self.tokens
+            .push_back(Token(Span::new(start_mark, self.mark), tok));
         Ok(())
     }
 
@@ -1395,8 +1440,10 @@ impl<T: Input> Scanner<T> {
         self.skip_non_blank();
         self.skip_ws_to_eol(SkipTabs::Yes)?;
 
-        self.tokens
-            .push_back(Token(start_mark, TokenType::FlowEntry));
+        self.tokens.push_back(Token(
+            Span::new(start_mark, self.mark),
+            TokenType::FlowEntry,
+        ));
         Ok(())
     }
 
@@ -1438,9 +1485,12 @@ impl<T: Input> Scanner<T> {
         }
 
         // ???, fixes test G9HC.
-        if let Some(Token(mark, TokenType::Anchor(..) | TokenType::Tag(..))) = self.tokens.back() {
-            if self.mark.col == 0 && mark.col == 0 && self.indent > -1 {
-                return Err(ScanError::new_str(*mark, "invalid indentation for anchor"));
+        if let Some(Token(span, TokenType::Anchor(..) | TokenType::Tag(..))) = self.tokens.back() {
+            if self.mark.col == 0 && span.start.col == 0 && self.indent > -1 {
+                return Err(ScanError::new_str(
+                    span.start,
+                    "invalid indentation for anchor",
+                ));
             }
         }
 
@@ -1470,7 +1520,7 @@ impl<T: Input> Scanner<T> {
         self.allow_simple_key();
 
         self.tokens
-            .push_back(Token(self.mark, TokenType::BlockEntry));
+            .push_back(Token(Span::empty(self.mark), TokenType::BlockEntry));
 
         Ok(())
     }
@@ -1484,7 +1534,7 @@ impl<T: Input> Scanner<T> {
 
         self.skip_n_non_blank(3);
 
-        self.tokens.push_back(Token(mark, t));
+        self.tokens.push_back(Token(Span::new(mark, self.mark), t));
         Ok(())
     }
 
@@ -1616,7 +1666,10 @@ impl<T: Input> Scanner<T> {
                 // Otherwise, the newline after chomping is ignored.
                 Chomping::Keep => trailing_breaks,
             };
-            return Ok(Token(start_mark, TokenType::Scalar(style, contents)));
+            return Ok(Token(
+                Span::new(start_mark, self.mark),
+                TokenType::Scalar(style, contents),
+            ));
         }
 
         if self.mark.col < indent && (self.mark.col as isize) > self.indent {
@@ -1682,7 +1735,10 @@ impl<T: Input> Scanner<T> {
             string.push_str(&trailing_breaks);
         }
 
-        Ok(Token(start_mark, TokenType::Scalar(style, string)))
+        Ok(Token(
+            Span::new(start_mark, self.mark),
+            TokenType::Scalar(style, string),
+        ))
     }
 
     /// Retrieve the contents of the line, parsing it as a block scalar.
@@ -1963,7 +2019,10 @@ impl<T: Input> Scanner<T> {
         } else {
             TScalarStyle::DoubleQuoted
         };
-        Ok(Token(start_mark, TokenType::Scalar(style, string)))
+        Ok(Token(
+            Span::new(start_mark, self.mark),
+            TokenType::Scalar(style, string),
+        ))
     }
 
     /// Consume successive non-whitespace characters from a flow scalar.
@@ -2120,6 +2179,7 @@ impl<T: Input> Scanner<T> {
         self.buf_whitespaces.clear();
         self.buf_leading_break.clear();
         self.buf_trailing_breaks.clear();
+        let mut end_mark = self.mark;
 
         loop {
             self.input.lookahead(4);
@@ -2182,6 +2242,7 @@ impl<T: Input> Scanner<T> {
                         self.skip_non_blank();
                     }
                 }
+                end_mark = self.mark;
             }
 
             // We may reach the end of a plain scalar if:
@@ -2238,7 +2299,7 @@ impl<T: Input> Scanner<T> {
         }
 
         Ok(Token(
-            start_mark,
+            Span::new(start_mark, end_mark),
             TokenType::Scalar(TScalarStyle::Plain, string),
         ))
     }
@@ -2280,7 +2341,8 @@ impl<T: Input> Scanner<T> {
                 "tabs disallowed in this context",
             ));
         }
-        self.tokens.push_back(Token(start_mark, TokenType::Key));
+        self.tokens
+            .push_back(Token(Span::new(start_mark, self.mark), TokenType::Key));
         Ok(())
     }
 
@@ -2338,7 +2400,7 @@ impl<T: Input> Scanner<T> {
 
         if sk.possible {
             // insert simple key
-            let tok = Token(sk.mark, TokenType::Key);
+            let tok = Token(Span::empty(sk.mark), TokenType::Key);
             self.insert_token(sk.token_number - self.tokens_parsed, tok);
             if is_implicit_flow_mapping {
                 if sk.mark.line < start_mark.line {
@@ -2349,7 +2411,7 @@ impl<T: Input> Scanner<T> {
                 }
                 self.insert_token(
                     sk.token_number - self.tokens_parsed,
-                    Token(self.mark, TokenType::FlowMappingStart),
+                    Token(Span::empty(self.mark), TokenType::FlowMappingStart),
                 );
             }
 
@@ -2367,7 +2429,7 @@ impl<T: Input> Scanner<T> {
         } else {
             if is_implicit_flow_mapping {
                 self.tokens
-                    .push_back(Token(self.mark, TokenType::FlowMappingStart));
+                    .push_back(Token(Span::empty(self.mark), TokenType::FlowMappingStart));
             }
             // The ':' indicator follows a complex key.
             if self.flow_level == 0 {
@@ -2393,7 +2455,8 @@ impl<T: Input> Scanner<T> {
                 self.disallow_simple_key();
             }
         }
-        self.tokens.push_back(Token(start_mark, TokenType::Value));
+        self.tokens
+            .push_back(Token(Span::empty(start_mark), TokenType::Value));
 
         Ok(())
     }
@@ -2428,8 +2491,8 @@ impl<T: Input> Scanner<T> {
             self.indent = col as isize;
             let tokens_parsed = self.tokens_parsed;
             match number {
-                Some(n) => self.insert_token(n - tokens_parsed, Token(mark, tok)),
-                None => self.tokens.push_back(Token(mark, tok)),
+                Some(n) => self.insert_token(n - tokens_parsed, Token(Span::empty(mark), tok)),
+                None => self.tokens.push_back(Token(Span::empty(mark), tok)),
             }
         }
     }
@@ -2447,7 +2510,8 @@ impl<T: Input> Scanner<T> {
             let indent = self.indents.pop().unwrap();
             self.indent = indent.indent;
             if indent.needs_block_end {
-                self.tokens.push_back(Token(self.mark, TokenType::BlockEnd));
+                self.tokens
+                    .push_back(Token(Span::empty(self.mark), TokenType::BlockEnd));
             }
         }
     }
@@ -2520,7 +2584,7 @@ impl<T: Input> Scanner<T> {
                 self.flow_mapping_started = false;
                 *implicit_mapping = ImplicitMappingState::Possible;
                 self.tokens
-                    .push_back(Token(mark, TokenType::FlowMappingEnd));
+                    .push_back(Token(Span::empty(mark), TokenType::FlowMappingEnd));
             }
         }
     }

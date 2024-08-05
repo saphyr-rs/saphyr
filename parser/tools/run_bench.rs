@@ -1,15 +1,13 @@
 #![allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
 
-use saphyr_parser::{
-    Event, Marker, {MarkedEventReceiver, Parser},
-};
+use saphyr_parser::{Event, Parser, Span, SpannedEventReceiver};
 use std::{env, fs::File, io::prelude::*};
 
 /// A sink which discards any event sent.
 struct NullSink {}
 
-impl MarkedEventReceiver for NullSink {
-    fn on_event(&mut self, _: Event, _: Marker) {}
+impl SpannedEventReceiver for NullSink {
+    fn on_event(&mut self, _: Event, _: Span) {}
 }
 
 /// Parse the given input, returning elapsed time in nanoseconds.

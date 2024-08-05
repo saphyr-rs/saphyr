@@ -2,21 +2,21 @@ use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 
-use saphyr_parser::{Event, MarkedEventReceiver, Marker, Parser};
+use saphyr_parser::{Event, Parser, Span, SpannedEventReceiver};
 
 #[derive(Debug)]
 struct EventSink {
-    events: Vec<(Event, Marker)>,
+    events: Vec<(Event, Span)>,
 }
 
-impl MarkedEventReceiver for EventSink {
-    fn on_event(&mut self, ev: Event, mark: Marker) {
+impl SpannedEventReceiver for EventSink {
+    fn on_event(&mut self, ev: Event, span: Span) {
         eprintln!("      \x1B[;34m\u{21B3} {:?}\x1B[;m", &ev);
-        self.events.push((ev, mark));
+        self.events.push((ev, span));
     }
 }
 
-fn str_to_events(yaml: &str) -> Vec<(Event, Marker)> {
+fn str_to_events(yaml: &str) -> Vec<(Event, Span)> {
     let mut sink = EventSink { events: Vec::new() };
     let mut parser = Parser::new_from_str(yaml);
     // Load events using our sink as the receiver.

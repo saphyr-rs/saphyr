@@ -6,8 +6,9 @@
 
 use crate::{
     input::{str::StrInput, Input},
-    scanner::{Marker, ScanError, Scanner, TScalarStyle, Token, TokenType},
+    scanner::{ScanError, Scanner, Span, TScalarStyle, Token, TokenType},
 };
+
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, PartialEq, Debug, Eq)]
@@ -116,7 +117,7 @@ pub struct Parser<T: Input> {
     /// The next token from the scanner.
     token: Option<Token>,
     /// The next YAML event to emit.
-    current: Option<(Event, Marker)>,
+    current: Option<(Event, Span)>,
     /// Anchors that have been encountered in the YAML document.
     anchors: HashMap<String, usize>,
     /// Next ID available for an anchor.
@@ -142,8 +143,8 @@ pub struct Parser<T: Input> {
 /// The low-level parsing API is event-based (a push parser), calling [`EventReceiver::on_event`]
 /// for each YAML [`Event`] that occurs.
 /// The [`EventReceiver`] trait only receives events. In order to receive both events and their
-/// location in the source, use [`MarkedEventReceiver`]. Note that [`EventReceiver`]s implement
-/// [`MarkedEventReceiver`] automatically.
+/// location in the source, use [`SpannedEventReceiver`]. Note that [`EventReceiver`]s implement
+/// [`SpannedEventReceiver`] automatically.
 ///
 /// # Event hierarchy
 /// The event stream starts with an [`Event::StreamStart`] event followed by an
@@ -213,20 +214,20 @@ pub trait EventReceiver {
 
 /// Trait to be implemented for using the low-level parsing API.
 ///
-/// Functionally similar to [`EventReceiver`], but receives a [`Marker`] as well as the event.
-pub trait MarkedEventReceiver {
+/// Functionally similar to [`EventReceiver`], but receives a [`Span`] as well as the event.
+pub trait SpannedEventReceiver {
     /// Handler called for each event that occurs.
-    fn on_event(&mut self, ev: Event, _mark: Marker);
+    fn on_event(&mut self, ev: Event, span: Span);
 }
 
-impl<R: EventReceiver> MarkedEventReceiver for R {
-    fn on_event(&mut self, ev: Event, _mark: Marker) {
+impl<R: EventReceiver> SpannedEventReceiver for R {
+    fn on_event(&mut self, ev: Event, _span: Span) {
         self.on_event(ev);
     }
 }
 
 /// A convenience alias for a `Result` of a parser event.
-pub type ParseResult = Result<(Event, Marker), ScanError>;
+pub type ParseResult = Result<(Event, Span), ScanError>;
 
 impl<'a> Parser<StrInput<'a>> {
     /// Create a new instance of a parser from a &str.
@@ -290,7 +291,7 @@ impl<T: Input> Parser<T> {
     ///
     /// # Errors
     /// Returns `ScanError` when loading the next event fails.
-    pub fn peek(&mut self) -> Option<Result<&(Event, Marker), ScanError>> {
+    pub fn peek(&mut self) -> Option<Result<&(Event, Span), ScanError>> {
         if let Some(ref x) = self.current {
             Some(Ok(x))
         } else {
@@ -379,7 +380,7 @@ impl<T: Input> Parser<T> {
 
     fn parse(&mut self) -> ParseResult {
         if self.state == State::End {
-            return Ok((Event::StreamEnd, self.scanner.mark()));
+            return Ok((Event::StreamEnd, Span::empty(self.scanner.mark())));
         }
         let (ev, mark) = self.state_machine()?;
         Ok((ev, mark))
@@ -393,40 +394,40 @@ impl<T: Input> Parser<T> {
     /// If `multi` is set to `true`, the parser will allow parsing of multiple YAML documents
     /// inside the stream.
     ///
-    /// Note that any [`EventReceiver`] is also a [`MarkedEventReceiver`], so implementing the
+    /// Note that any [`EventReceiver`] is also a [`SpannedEventReceiver`], so implementing the
     /// former is enough to call this function.
     /// # Errors
     /// Returns `ScanError` when loading fails.
-    pub fn load<R: MarkedEventReceiver>(
+    pub fn load<R: SpannedEventReceiver>(
         &mut self,
         recv: &mut R,
         multi: bool,
     ) -> Result<(), ScanError> {
         if !self.scanner.stream_started() {
-            let (ev, mark) = self.next_event_impl()?;
+            let (ev, span) = self.next_event_impl()?;
             if ev != Event::StreamStart {
                 return Err(ScanError::new_str(
-                    mark,
+                    span.start,
                     "did not find expected <stream-start>",
                 ));
             }
-            recv.on_event(ev, mark);
+            recv.on_event(ev, span);
         }
 
         if self.scanner.stream_ended() {
             // XXX has parsed?
-            recv.on_event(Event::StreamEnd, self.scanner.mark());
+            recv.on_event(Event::StreamEnd, Span::empty(self.scanner.mark()));
             return Ok(());
         }
         loop {
-            let (ev, mark) = self.next_event_impl()?;
+            let (ev, span) = self.next_event_impl()?;
             if ev == Event::StreamEnd {
-                recv.on_event(ev, mark);
+                recv.on_event(ev, span);
                 return Ok(());
             }
             // clear anchors before a new document
             self.anchors.clear();
-            self.load_document(ev, mark, recv)?;
+            self.load_document(ev, span, recv)?;
             if !multi {
                 break;
             }
@@ -434,22 +435,22 @@ impl<T: Input> Parser<T> {
         Ok(())
     }
 
-    fn load_document<R: MarkedEventReceiver>(
+    fn load_document<R: SpannedEventReceiver>(
         &mut self,
         first_ev: Event,
-        mark: Marker,
+        span: Span,
         recv: &mut R,
     ) -> Result<(), ScanError> {
         if first_ev != Event::DocumentStart {
             return Err(ScanError::new_str(
-                mark,
+                span.start,
                 "did not find expected <document-start>",
             ));
         }
-        recv.on_event(first_ev, mark);
+        recv.on_event(first_ev, span);
 
-        let (ev, mark) = self.next_event_impl()?;
-        self.load_node(ev, mark, recv)?;
+        let (ev, span) = self.next_event_impl()?;
+        self.load_node(ev, span, recv)?;
 
         // DOCUMENT-END is expected.
         let (ev, mark) = self.next_event_impl()?;
@@ -459,23 +460,23 @@ impl<T: Input> Parser<T> {
         Ok(())
     }
 
-    fn load_node<R: MarkedEventReceiver>(
+    fn load_node<R: SpannedEventReceiver>(
         &mut self,
         first_ev: Event,
-        mark: Marker,
+        span: Span,
         recv: &mut R,
     ) -> Result<(), ScanError> {
         match first_ev {
             Event::Alias(..) | Event::Scalar(..) => {
-                recv.on_event(first_ev, mark);
+                recv.on_event(first_ev, span);
                 Ok(())
             }
             Event::SequenceStart(..) => {
-                recv.on_event(first_ev, mark);
+                recv.on_event(first_ev, span);
                 self.load_sequence(recv)
             }
             Event::MappingStart(..) => {
-                recv.on_event(first_ev, mark);
+                recv.on_event(first_ev, span);
                 self.load_mapping(recv)
             }
             _ => {
@@ -485,7 +486,7 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn load_mapping<R: MarkedEventReceiver>(&mut self, recv: &mut R) -> Result<(), ScanError> {
+    fn load_mapping<R: SpannedEventReceiver>(&mut self, recv: &mut R) -> Result<(), ScanError> {
         let (mut key_ev, mut key_mark) = self.next_event_impl()?;
         while key_ev != Event::MappingEnd {
             // key
@@ -504,7 +505,7 @@ impl<T: Input> Parser<T> {
         Ok(())
     }
 
-    fn load_sequence<R: MarkedEventReceiver>(&mut self, recv: &mut R) -> Result<(), ScanError> {
+    fn load_sequence<R: SpannedEventReceiver>(&mut self, recv: &mut R) -> Result<(), ScanError> {
         let (mut ev, mut mark) = self.next_event_impl()?;
         while ev != Event::SequenceEnd {
             self.load_node(ev, mark, recv)?;
@@ -562,13 +563,13 @@ impl<T: Input> Parser<T> {
 
     fn stream_start(&mut self) -> ParseResult {
         match *self.peek_token()? {
-            Token(mark, TokenType::StreamStart(_)) => {
+            Token(span, TokenType::StreamStart(_)) => {
                 self.state = State::ImplicitDocumentStart;
                 self.skip();
-                Ok((Event::StreamStart, mark))
+                Ok((Event::StreamStart, span))
             }
-            Token(mark, _) => Err(ScanError::new_str(
-                mark,
+            Token(span, _) => Err(ScanError::new_str(
+                span.start,
                 "did not find expected <stream-start>",
             )),
         }
@@ -580,10 +581,10 @@ impl<T: Input> Parser<T> {
         }
 
         match *self.peek_token()? {
-            Token(mark, TokenType::StreamEnd) => {
+            Token(span, TokenType::StreamEnd) => {
                 self.state = State::End;
                 self.skip();
-                Ok((Event::StreamEnd, mark))
+                Ok((Event::StreamEnd, span))
             }
             Token(
                 _,
@@ -594,11 +595,11 @@ impl<T: Input> Parser<T> {
                 // explicit document
                 self.explicit_document_start()
             }
-            Token(mark, _) if implicit => {
+            Token(span, _) if implicit => {
                 self.parser_process_directives()?;
                 self.push_state(State::DocumentEnd);
                 self.state = State::BlockNode;
-                Ok((Event::DocumentStart, mark))
+                Ok((Event::DocumentStart, span))
             }
             _ => {
                 // explicit document
@@ -612,20 +613,23 @@ impl<T: Input> Parser<T> {
         loop {
             let mut tags = HashMap::new();
             match self.peek_token()? {
-                Token(mark, TokenType::VersionDirective(_, _)) => {
+                Token(span, TokenType::VersionDirective(_, _)) => {
                     // XXX parsing with warning according to spec
                     //if major != 1 || minor > 2 {
                     //    return Err(ScanError::new_str(tok.0,
                     //        "found incompatible YAML document"));
                     //}
                     if version_directive_received {
-                        return Err(ScanError::new_str(*mark, "duplicate version directive"));
+                        return Err(ScanError::new_str(
+                            span.start,
+                            "duplicate version directive",
+                        ));
                     }
                     version_directive_received = true;
                 }
                 Token(mark, TokenType::TagDirective(handle, prefix)) => {
                     if tags.contains_key(handle) {
-                        return Err(ScanError::new_str(*mark, "the TAG directive must only be given at most once per handle in the same document"));
+                        return Err(ScanError::new_str(mark.start, "the TAG directive must only be given at most once per handle in the same document"));
                     }
                     tags.insert(handle.to_string(), prefix.to_string());
                 }
@@ -646,8 +650,8 @@ impl<T: Input> Parser<T> {
                 self.skip();
                 Ok((Event::DocumentStart, mark))
             }
-            Token(mark, _) => Err(ScanError::new_str(
-                mark,
+            Token(span, _) => Err(ScanError::new_str(
+                span.start,
                 "did not find expected <document start>",
             )),
         }
@@ -673,13 +677,13 @@ impl<T: Input> Parser<T> {
 
     fn document_end(&mut self) -> ParseResult {
         let mut explicit_end = false;
-        let marker: Marker = match *self.peek_token()? {
-            Token(mark, TokenType::DocumentEnd) => {
+        let span: Span = match *self.peek_token()? {
+            Token(span, TokenType::DocumentEnd) => {
                 explicit_end = true;
                 self.skip();
-                mark
+                span
             }
-            Token(mark, _) => mark,
+            Token(span, _) => span,
         };
 
         if !self.keep_tags {
@@ -688,21 +692,21 @@ impl<T: Input> Parser<T> {
         if explicit_end {
             self.state = State::ImplicitDocumentStart;
         } else {
-            if let Token(mark, TokenType::VersionDirective(..) | TokenType::TagDirective(..)) =
+            if let Token(span, TokenType::VersionDirective(..) | TokenType::TagDirective(..)) =
                 *self.peek_token()?
             {
                 return Err(ScanError::new_str(
-                    mark,
+                    span.start,
                     "missing explicit document end marker before directive",
                 ));
             }
             self.state = State::DocumentStart;
         }
 
-        Ok((Event::DocumentEnd, marker))
+        Ok((Event::DocumentEnd, span))
     }
 
-    fn register_anchor(&mut self, name: String, _: &Marker) -> usize {
+    fn register_anchor(&mut self, name: String, _: &Span) -> usize {
         // anchors can be overridden/reused
         // if self.anchors.contains_key(name) {
         //     return Err(ScanError::new_str(*mark,
@@ -720,25 +724,25 @@ impl<T: Input> Parser<T> {
         match *self.peek_token()? {
             Token(_, TokenType::Alias(_)) => {
                 self.pop_state();
-                if let Token(mark, TokenType::Alias(name)) = self.fetch_token() {
+                if let Token(span, TokenType::Alias(name)) = self.fetch_token() {
                     match self.anchors.get(&name) {
                         None => {
                             return Err(ScanError::new_str(
-                                mark,
+                                span.start,
                                 "while parsing node, found unknown anchor",
                             ))
                         }
-                        Some(id) => return Ok((Event::Alias(*id), mark)),
+                        Some(id) => return Ok((Event::Alias(*id), span)),
                     }
                 }
                 unreachable!()
             }
             Token(_, TokenType::Anchor(_)) => {
-                if let Token(mark, TokenType::Anchor(name)) = self.fetch_token() {
-                    anchor_id = self.register_anchor(name, &mark);
+                if let Token(span, TokenType::Anchor(name)) = self.fetch_token() {
+                    anchor_id = self.register_anchor(name, &span);
                     if let TokenType::Tag(..) = self.peek_token()?.1 {
                         if let TokenType::Tag(handle, suffix) = self.fetch_token().1 {
-                            tag = Some(self.resolve_tag(mark, &handle, suffix)?);
+                            tag = Some(self.resolve_tag(span, &handle, suffix)?);
                         } else {
                             unreachable!()
                         }
@@ -797,8 +801,8 @@ impl<T: Input> Parser<T> {
                 self.pop_state();
                 Ok((Event::empty_scalar_with_anchor(anchor_id, tag), mark))
             }
-            Token(mark, _) => Err(ScanError::new_str(
-                mark,
+            Token(span, _) => Err(ScanError::new_str(
+                span.start,
                 "while parsing a node, did not find expected node content",
             )),
         }
@@ -835,8 +839,8 @@ impl<T: Input> Parser<T> {
                 self.skip();
                 Ok((Event::MappingEnd, mark))
             }
-            Token(mark, _) => Err(ScanError::new_str(
-                mark,
+            Token(span, _) => Err(ScanError::new_str(
+                span.start,
                 "while parsing a block mapping, did not find expected key",
             )),
         }
@@ -870,15 +874,15 @@ impl<T: Input> Parser<T> {
             let _ = self.peek_token()?;
             self.skip();
         }
-        let marker: Marker = {
+        let span: Span = {
             match *self.peek_token()? {
                 Token(mark, TokenType::FlowMappingEnd) => mark,
                 Token(mark, _) => {
                     if !first {
                         match *self.peek_token()? {
                             Token(_, TokenType::FlowEntry) => self.skip(),
-                            Token(mark, _) => return Err(ScanError::new_str(
-                                mark,
+                            Token(span, _) => return Err(ScanError::new_str(
+                                span.start,
                                 "while parsing a flow mapping, did not find expected ',' or '}'",
                             )),
                         }
@@ -916,18 +920,18 @@ impl<T: Input> Parser<T> {
 
         self.pop_state();
         self.skip();
-        Ok((Event::MappingEnd, marker))
+        Ok((Event::MappingEnd, span))
     }
 
     fn flow_mapping_value(&mut self, empty: bool) -> ParseResult {
-        let mark: Marker = {
+        let span: Span = {
             if empty {
                 let Token(mark, _) = *self.peek_token()?;
                 self.state = State::FlowMappingKey;
                 return Ok((Event::empty_scalar(), mark));
             }
             match *self.peek_token()? {
-                Token(marker, TokenType::Value) => {
+                Token(span, TokenType::Value) => {
                     self.skip();
                     match self.peek_token()?.1 {
                         TokenType::FlowEntry | TokenType::FlowMappingEnd => {}
@@ -936,14 +940,14 @@ impl<T: Input> Parser<T> {
                             return self.parse_node(false, false);
                         }
                     }
-                    marker
+                    span
                 }
                 Token(marker, _) => marker,
             }
         };
 
         self.state = State::FlowMappingKey;
-        Ok((Event::empty_scalar(), mark))
+        Ok((Event::empty_scalar(), span))
     }
 
     fn flow_sequence_entry(&mut self, first: bool) -> ParseResult {
@@ -962,9 +966,9 @@ impl<T: Input> Parser<T> {
             Token(_, TokenType::FlowEntry) if !first => {
                 self.skip();
             }
-            Token(mark, _) if !first => {
+            Token(span, _) if !first => {
                 return Err(ScanError::new_str(
-                    mark,
+                    span.start,
                     "while parsing a flow sequence, expected ',' or ']'",
                 ));
             }
@@ -1035,8 +1039,8 @@ impl<T: Input> Parser<T> {
                     self.parse_node(true, false)
                 }
             }
-            Token(mark, _) => Err(ScanError::new_str(
-                mark,
+            Token(span, _) => Err(ScanError::new_str(
+                span.start,
                 "while parsing a block collection, did not find expected '-' indicator",
             )),
         }
@@ -1080,11 +1084,11 @@ impl<T: Input> Parser<T> {
     #[allow(clippy::unnecessary_wraps)]
     fn flow_sequence_entry_mapping_end(&mut self) -> ParseResult {
         self.state = State::FlowSequenceEntry;
-        Ok((Event::MappingEnd, self.scanner.mark()))
+        Ok((Event::MappingEnd, Span::empty(self.scanner.mark())))
     }
 
     /// Resolve a tag from the handle and the suffix.
-    fn resolve_tag(&self, mark: Marker, handle: &str, suffix: String) -> Result<Tag, ScanError> {
+    fn resolve_tag(&self, span: Span, handle: &str, suffix: String) -> Result<Tag, ScanError> {
         if handle == "!!" {
             // "!!" is a shorthand for "tag:yaml.org,2002:". However, that default can be
             // overridden.
@@ -1121,7 +1125,7 @@ impl<T: Input> Parser<T> {
                 // If the handle is of the form "!foo!", this cannot be a local handle and we need
                 // to error.
                 if handle.len() >= 2 && handle.starts_with('!') && handle.ends_with('!') {
-                    Err(ScanError::new_str(mark, "the handle wasn't declared"))
+                    Err(ScanError::new_str(span.start, "the handle wasn't declared"))
                 } else {
                     Ok(Tag {
                         handle: handle.to_string(),
@@ -1134,7 +1138,7 @@ impl<T: Input> Parser<T> {
 }
 
 impl<T: Input> Iterator for Parser<T> {
-    type Item = Result<(Event, Marker), ScanError>;
+    type Item = Result<(Event, Span), ScanError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_event()

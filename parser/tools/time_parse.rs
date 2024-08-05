@@ -2,13 +2,13 @@ use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 
-use saphyr_parser::{Event, MarkedEventReceiver, Marker, Parser};
+use saphyr_parser::{Event, Parser, Span, SpannedEventReceiver};
 
 /// A sink which discards any event sent.
 struct NullSink {}
 
-impl MarkedEventReceiver for NullSink {
-    fn on_event(&mut self, _: Event, _: Marker) {}
+impl SpannedEventReceiver for NullSink {
+    fn on_event(&mut self, _: Event, _: Span) {}
 }
 
 fn main() {
