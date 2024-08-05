@@ -34,7 +34,7 @@ fn test_issue1() {
 
     let expected = [
         Event::StreamStart,
-        Event::DocumentStart,
+        Event::DocumentStart(false),
         Event::SequenceStart(0, None),
         Event::MappingStart(0, None),
         Event::Scalar("a".to_string(), TScalarStyle::Plain, 0, None),
@@ -57,7 +57,7 @@ fn test_issue1() {
         run_parser("[foo: [bar]]: baz").unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(false),
             Event::MappingStart(0, None),
             Event::SequenceStart(0, None),
             Event::MappingStart(0, None),
@@ -79,7 +79,7 @@ fn test_issue1() {
         run_parser("[:]").unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(false),
             Event::SequenceStart(0, None),
             Event::MappingStart(0, None),
             Event::Scalar("~".to_string(), TScalarStyle::Plain, 0, None),
@@ -96,7 +96,7 @@ fn test_issue1() {
         run_parser("[: [:]]").unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(false),
             Event::SequenceStart(0, None),
             Event::MappingStart(0, None),
             Event::Scalar("~".to_string(), TScalarStyle::Plain, 0, None),
@@ -123,7 +123,7 @@ fn test_issue1() {
         // third nested sequences, but not the second.
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(false),
             Event::SequenceStart(0, None),
             Event::MappingStart(0, None),
             Event::Scalar("a".to_string(), TScalarStyle::Plain, 0, None),
@@ -153,7 +153,7 @@ fn test_issue1() {
         run_parser(r#"["a":[]]"#).unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(false),
             Event::SequenceStart(0, None),
             Event::MappingStart(0, None),
             Event::Scalar("a".to_string(), TScalarStyle::DoubleQuoted, 0, None),

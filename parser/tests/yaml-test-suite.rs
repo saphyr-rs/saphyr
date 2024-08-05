@@ -142,7 +142,7 @@ impl EventReceiver for EventReporter {
             Event::StreamStart => "+STR".into(),
             Event::StreamEnd => "-STR".into(),
 
-            Event::DocumentStart => "+DOC".into(),
+            Event::DocumentStart(_) => "+DOC".into(),
             Event::DocumentEnd => "-DOC".into(),
 
             Event::SequenceStart(idx, tag) => {

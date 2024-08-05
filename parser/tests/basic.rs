@@ -45,7 +45,7 @@ fn test_empty_doc() {
         run_parser("---").unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(true),
             Event::Scalar("~".to_string(), TScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::StreamEnd,
@@ -59,7 +59,7 @@ fn test_utf() {
         run_parser("a: 你好").unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(false),
             Event::MappingStart(0, None),
             Event::Scalar("a".to_string(), TScalarStyle::Plain, 0, None),
             Event::Scalar("你好".to_string(), TScalarStyle::Plain, 0, None),
@@ -83,7 +83,7 @@ a: b # This is another comment
         run_parser(s).unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(false),
             Event::MappingStart(0, None),
             Event::Scalar("a".to_string(), TScalarStyle::Plain, 0, None),
             Event::Scalar("b".to_string(), TScalarStyle::Plain, 0, None),
@@ -106,7 +106,7 @@ fn test_quoting() {
         run_parser(s).unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(false),
             Event::SequenceStart(0, None),
             Event::Scalar("plain".to_string(), TScalarStyle::Plain, 0, None),
             Event::Scalar("squote".to_string(), TScalarStyle::SingleQuoted, 0, None),
@@ -131,13 +131,13 @@ a scalar
         run_parser(s).unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(false),
             Event::Scalar("a scalar".to_string(), TScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
-            Event::DocumentStart,
+            Event::DocumentStart(true),
             Event::Scalar("a scalar".to_string(), TScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
-            Event::DocumentStart,
+            Event::DocumentStart(true),
             Event::Scalar("a scalar".to_string(), TScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::StreamEnd,
@@ -152,7 +152,7 @@ fn test_github_27() {
         run_parser("&a").unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(false),
             Event::Scalar(String::new(), TScalarStyle::Plain, 1, None),
             Event::DocumentEnd,
             Event::StreamEnd,
@@ -194,7 +194,7 @@ foobar";
         run_parser(s).unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(true),
             Event::Scalar("foobar".to_string(), TScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::StreamEnd,
@@ -218,7 +218,7 @@ a: |-
         run_parser(s).unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(false),
             Event::MappingStart(0, None),
             Event::Scalar("a".to_string(), TScalarStyle::Plain, 0, None),
             Event::Scalar("a\n    b".to_string(), TScalarStyle::Literal, 0, None),
@@ -236,7 +236,7 @@ fn test_bad_docstart() {
         run_parser("----").unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(false),
             Event::Scalar("----".to_string(), TScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::StreamEnd,
@@ -247,7 +247,7 @@ fn test_bad_docstart() {
         run_parser("--- #comment").unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(true),
             Event::Scalar("~".to_string(), TScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::StreamEnd,
@@ -258,7 +258,7 @@ fn test_bad_docstart() {
         run_parser("---- #comment").unwrap(),
         [
             Event::StreamStart,
-            Event::DocumentStart,
+            Event::DocumentStart(false),
             Event::Scalar("----".to_string(), TScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::StreamEnd,
