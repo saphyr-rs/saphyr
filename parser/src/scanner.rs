@@ -1770,16 +1770,9 @@ impl<T: Input> Scanner<T> {
             // characters are appended here as their real size (1B for ascii, or up to 4 bytes for
             // UTF-8). We can then use the internal `line_buffer` `Vec` to push data into `string`
             // (using `String::push_str`).
-            let mut c = self.input.raw_read_ch();
-            while !is_breakz(c) {
+            while let Some(c) = self.input.raw_read_non_breakz_ch() {
                 line_buffer.push(c);
-                c = self.input.raw_read_ch();
             }
-
-            // Our last character read is stored in `c`. It is either an EOF or a break. In any
-            // case, we need to push it back into `self.buffer` so it may be properly read
-            // after. We must not insert it in `string`.
-            self.input.push_back(c);
 
             // We need to manually update our position; we haven't called a `skip` function.
             self.mark.col += line_buffer.len();

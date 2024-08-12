@@ -45,16 +45,18 @@ pub trait Input {
 
     /// Read a character from the input stream and return it directly.
     ///
-    /// The internal buffer (is any) is bypassed.
+    /// The internal buffer (if any) is bypassed.
     #[must_use]
     fn raw_read_ch(&mut self) -> char;
 
-    /// Put a character back in the buffer.
+    /// Read a non-breakz a character from the input stream and return it directly.
     ///
-    /// This function is only called when we read one too many characters and the pushed back
-    /// character is exactly the last character that was read. This function will not be called
-    /// multiple times consecutively.
-    fn push_back(&mut self, c: char);
+    /// The internal buffer (if any) is bypassed.
+    ///
+    /// If the next character is a breakz, it is either not consumed or placed into the buffer (if
+    /// any).
+    #[must_use]
+    fn raw_read_non_breakz_ch(&mut self) -> Option<char>;
 
     /// Consume the next character.
     fn skip(&mut self);

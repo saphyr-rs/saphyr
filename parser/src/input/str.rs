@@ -61,10 +61,17 @@ impl<'a> Input for StrInput<'a> {
     }
 
     #[inline]
-    fn push_back(&mut self, c: char) {
-        // SAFETY: The preconditions of this function is that the character we are given is the one
-        // immediately preceding `self.buffer`.
-        self.buffer = unsafe { put_back_in_str(self.buffer, c) };
+    fn raw_read_non_breakz_ch(&mut self) -> Option<char> {
+        if let Some((c, sub_str)) = split_first_char(self.buffer) {
+            if is_breakz(c) {
+                None
+            } else {
+                self.buffer = sub_str;
+                Some(c)
+            }
+        } else {
+            None
+        }
     }
 
     #[inline]
@@ -177,45 +184,34 @@ impl<'a> Input for StrInput<'a> {
     fn skip_ws_to_eol(&mut self, skip_tabs: SkipTabs) -> (usize, Result<SkipTabs, &'static str>) {
         assert!(!matches!(skip_tabs, SkipTabs::Result(..)));
 
-        let mut new_str = self.buffer.as_bytes();
+        let mut new_str = self.buffer;
         let mut has_yaml_ws = false;
         let mut encountered_tab = false;
 
         // This ugly pair of loops is the fastest way of trimming spaces (and maybe tabs) I found
         // while keeping track of whether we encountered spaces and/or tabs.
         if skip_tabs == SkipTabs::Yes {
-            let mut i = 0;
-            while i < new_str.len() {
-                if new_str[i] == b' ' {
+            loop {
+                if let Some(sub_str) = new_str.strip_prefix(' ') {
                     has_yaml_ws = true;
-                } else if new_str[i] == b'\t' {
+                    new_str = sub_str;
+                } else if let Some(sub_str) = new_str.strip_prefix('\t') {
                     encountered_tab = true;
+                    new_str = sub_str;
                 } else {
                     break;
                 }
-                i += 1;
             }
-            new_str = &new_str[i..];
         } else {
-            let mut i = 0;
-            while i < new_str.len() {
-                if new_str[i] != b' ' {
-                    break;
-                }
-                i += 1;
+            while let Some(sub_str) = new_str.strip_prefix(' ') {
+                has_yaml_ws = true;
+                new_str = sub_str;
             }
-            has_yaml_ws = i != 0;
-            new_str = &new_str[i..];
         }
 
         // All characters consumed were ascii. We can use the byte length difference to count the
         // number of whitespace ignored.
         let mut chars_consumed = self.buffer.len() - new_str.len();
-        // SAFETY: We only trimmed spaces and tabs, both of which are bytes. This means we won't
-        // start the string outside of a valid UTF-8 boundary.
-        // It is assumed the input string is valid UTF-8, so the rest of the string is assumed to
-        // be valid UTF-8 as well.
-        let mut new_str = unsafe { std::str::from_utf8_unchecked(new_str) };
 
         if !new_str.is_empty() && new_str.as_bytes()[0] == b'#' {
             if !encountered_tab && !has_yaml_ws {
@@ -225,24 +221,14 @@ impl<'a> Input for StrInput<'a> {
                 );
             }
 
-            let mut chars = new_str.chars();
-            let mut found_breakz = false;
-            // Iterate over all remaining chars until we hit a breakz.
-            for c in chars.by_ref() {
+            // Skip remaining characters until we hit a breakz.
+            while let Some((c, sub_str)) = split_first_char(new_str) {
                 if is_breakz(c) {
-                    found_breakz = true;
                     break;
                 }
+                new_str = sub_str;
                 chars_consumed += 1;
             }
-
-            new_str = if found_breakz {
-                // SAFETY: The last character we pulled out of the `chars()` is a breakz, one of
-                // '\0', '\r', '\n'. All 3 of them are 1-byte long.
-                unsafe { extend_left(chars.as_str(), 1) }
-            } else {
-                chars.as_str()
-            };
         }
 
         self.buffer = new_str;
@@ -325,27 +311,19 @@ impl<'a> Input for StrInput<'a> {
     }
 
     fn skip_while_non_breakz(&mut self) -> usize {
-        let mut found_breakz = false;
+        let mut new_str = self.buffer;
         let mut count = 0;
 
         // Skip over all non-breaks.
-        let mut chars = self.buffer.chars();
-        for c in chars.by_ref() {
+        while let Some((c, sub_str)) = split_first_char(new_str) {
             if is_breakz(c) {
-                found_breakz = true;
                 break;
             }
+            new_str = sub_str;
             count += 1;
         }
 
-        self.buffer = if found_breakz {
-            // If we read a breakz, we need to put it back to the buffer.
-            // SAFETY: The last character we extracted is either a '\n', '\r' or '\0', all of which
-            // are 1-byte long.
-            unsafe { extend_left(chars.as_str(), 1) }
-        } else {
-            chars.as_str()
-        };
+        self.buffer = new_str;
 
         count
     }
@@ -416,40 +394,18 @@ impl<'a> Input for StrInput<'a> {
 /// [`buflen`]: `StrInput::buflen`
 const BUFFER_LEN: usize = 128;
 
-/// Fake prepending a character to the given string.
-///
-/// The character given as parameter MUST be the one that precedes the given string.
-///
-/// # Exmaple
-/// ```ignore
-/// let s1 = "foo";
-/// let s2 = &s1[1..];
-/// let s3 = put_back_in_str(s2, 'f'); // OK, 'f' is the character immediately preceding
-/// // let s3 = put_back_in_str('g'); // Not allowed
-/// assert_eq!(s1, s3);
-/// assert_eq!(s1.as_ptr(), s3.as_ptr());
-/// ```
-unsafe fn put_back_in_str(s: &str, c: char) -> &str {
-    let n_bytes = c.len_utf8();
-
-    // SAFETY: The character that gets pushed back is guaranteed to be the one that is
-    // immediately preceding our buffer. We can compute the length of the character and move
-    // our buffer back that many bytes.
-    extend_left(s, n_bytes)
-}
-
-/// Extend the string by moving the start pointer to the left by `n` bytes.
+/// Splits the first character of the given string and returns it along with the rest of the
+/// string.
 #[inline]
-unsafe fn extend_left(s: &str, n: usize) -> &str {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        s.as_ptr().wrapping_sub(n),
-        s.len() + n,
-    ))
+fn split_first_char(s: &str) -> Option<(char, &str)> {
+    let mut chars = s.chars();
+    let c = chars.next()?;
+    Some((c, chars.as_str()))
 }
 
 #[cfg(test)]
 mod test {
-    use crate::input::{str::put_back_in_str, Input};
+    use crate::input::Input;
 
     use super::StrInput;
 
@@ -483,14 +439,5 @@ mod test {
         let input = StrInput::new("... ");
         assert!(input.next_is_document_end());
         assert!(input.next_is_document_indicator());
-    }
-
-    #[test]
-    pub fn put_back_in_str_example() {
-        let s1 = "foo";
-        let s2 = &s1[1..];
-        let s3 = unsafe { put_back_in_str(s2, 'f') }; // OK, 'f' is the character immediately preceding
-        assert_eq!(s1, s3);
-        assert_eq!(s1.as_ptr(), s3.as_ptr());
     }
 }
