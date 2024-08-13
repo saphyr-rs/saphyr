@@ -5,6 +5,7 @@ use crate::{
     input::{Input, SkipTabs},
 };
 
+/// A parser input that uses a `&str` as source.
 #[allow(clippy::module_name_repetitions)]
 pub struct StrInput<'a> {
     /// The input str buffer.
@@ -18,6 +19,7 @@ pub struct StrInput<'a> {
 
 impl<'a> StrInput<'a> {
     /// Create a new [`StrInput`] with the given str.
+    #[must_use]
     pub fn new(input: &'a str) -> Self {
         Self {
             buffer: input,

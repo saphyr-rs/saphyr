@@ -39,6 +39,6 @@ mod input;
 mod parser;
 mod scanner;
 
-pub use crate::input::{BufferedInput, Input};
+pub use crate::input::{str::StrInput, BufferedInput, Input};
 pub use crate::parser::{Event, EventReceiver, Parser, SpannedEventReceiver, Tag};
 pub use crate::scanner::{Marker, ScanError, Span, TScalarStyle};
