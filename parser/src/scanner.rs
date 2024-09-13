@@ -2230,7 +2230,6 @@ impl<T: Input> Scanner<T> {
                             end = true;
                             break;
                         }
-                        assert!(string.len() < string.capacity());
                         string.push(self.input.peek());
                         self.skip_non_blank();
                     }
