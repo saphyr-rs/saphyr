@@ -197,3 +197,17 @@ fn test_pr12() {
         ]
     );
 }
+
+#[test]
+fn test_issue13() {
+    let s = "{---";
+    let Err(error) = run_parser(s) else { panic!() };
+    assert_eq!(
+        error.info(),
+        "while parsing a flow mapping, did not find expected ',' or '}'"
+    );
+    assert_eq!(
+        error.to_string(),
+        "while parsing a flow mapping, did not find expected ',' or '}' at byte 4 line 2 column 1"
+    );
+}
