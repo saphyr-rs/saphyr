@@ -1,6 +1,6 @@
 //! The default loader.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 use hashlink::LinkedHashMap;
 use saphyr_parser::{Event, MarkedEventReceiver, Marker, ScanError, TScalarStyle, Tag};
@@ -172,10 +172,10 @@ where
 }
 
 /// An error that happened when loading a YAML document.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LoadError {
     /// An I/O error.
-    IO(std::io::Error),
+    IO(Arc<std::io::Error>),
     /// An error within the scanner. This indicates a malformed YAML input.
     Scan(ScanError),
     /// A decoding error (e.g.: Invalid UTF-8).
@@ -184,7 +184,7 @@ pub enum LoadError {
 
 impl From<std::io::Error> for LoadError {
     fn from(error: std::io::Error) -> Self {
-        LoadError::IO(error)
+        LoadError::IO(Arc::new(error))
     }
 }
 
