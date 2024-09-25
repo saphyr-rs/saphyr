@@ -3,7 +3,9 @@ use std::fs::{self, DirEntry};
 use libtest_mimic::{run_tests, Arguments, Outcome, Test};
 
 use saphyr::{Hash, Yaml};
-use saphyr_parser::{Event, EventReceiver, Parser, ScanError, TScalarStyle, Tag};
+use saphyr_parser::{
+    Event, Marker, Parser, ScanError, Span, SpannedEventReceiver, TScalarStyle, Tag,
+};
 
 type Result<T, E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 
@@ -34,41 +36,56 @@ fn main() -> Result<()> {
 
 fn run_yaml_test(test: &Test<YamlTest>) -> Outcome {
     let desc = &test.data;
-    let actual_events = parse_to_events(&desc.yaml);
-    let events_diff = actual_events.map(|events| events_differ(&events, &desc.expected_events));
-    let mut error_text = match (&events_diff, desc.expected_error) {
+    let reporter = parse_to_events(&desc.yaml);
+    let actual_events = reporter.as_ref().map(|reporter| &reporter.events);
+    let events_diff = actual_events.map(|events| events_differ(events, &desc.expected_events));
+    let error_text = match (&events_diff, desc.expected_error) {
         (Ok(x), true) => Some(format!("no error when expected: {x:#?}")),
         (Err(_), true) | (Ok(None), false) => None,
         (Err(e), false) => Some(format!("unexpected error {e:?}")),
         (Ok(Some(diff)), false) => Some(format!("events differ: {diff}")),
     };
 
-    // Show a caret on error.
-    if let Some(text) = &mut error_text {
-        use std::fmt::Write;
-        let _ = writeln!(text, "\n### Input:\n{}\n### End", desc.yaml_visual);
-        if let Err(err) = &events_diff {
-            writeln!(text, "### Error position").unwrap();
-            let mut lines = desc.yaml.lines();
-            for _ in 0..(err.marker().line() - 1) {
-                let l = lines.next().unwrap();
-                writeln!(text, "{l}").unwrap();
-            }
-            writeln!(text, "\x1B[91;1m{}", lines.next().unwrap()).unwrap();
-            for _ in 0..err.marker().col() {
-                write!(text, " ").unwrap();
-            }
-            writeln!(text, "^\x1b[m").unwrap();
-            for l in lines {
-                writeln!(text, "{l}").unwrap();
-            }
-            writeln!(text, "### End error position").unwrap();
-        }
+    if let Some(mut txt) = error_text {
+        add_error_context(
+            &mut txt,
+            desc,
+            events_diff.err().map(saphyr::ScanError::marker),
+        );
+        Outcome::Failed { msg: Some(txt) }
+    } else if let Some((mut msg, span)) = reporter
+        .as_ref()
+        .ok()
+        .and_then(|reporter| reporter.span_failures.first().cloned())
+    {
+        add_error_context(&mut msg, desc, Some(&span.start));
+        Outcome::Failed { msg: Some(msg) }
+    } else {
+        Outcome::Passed
     }
+}
 
-    match error_text {
-        None => Outcome::Passed,
-        Some(txt) => Outcome::Failed { msg: Some(txt) },
+// Enrich the error message with the failing input, and a caret pointing
+// at the position that errored.
+fn add_error_context(text: &mut String, desc: &YamlTest, marker: Option<&Marker>) {
+    use std::fmt::Write;
+    let _ = writeln!(text, "\n### Input:\n{}\n### End", desc.yaml_visual);
+    if let Some(mark) = marker {
+        writeln!(text, "### Error position").unwrap();
+        let mut lines = desc.yaml.lines();
+        for _ in 0..(mark.line() - 1) {
+            let l = lines.next().unwrap();
+            writeln!(text, "{l}").unwrap();
+        }
+        writeln!(text, "\x1B[91;1m{}", lines.next().unwrap()).unwrap();
+        for _ in 0..mark.col() {
+            write!(text, " ").unwrap();
+        }
+        writeln!(text, "^\x1b[m").unwrap();
+        for l in lines {
+            writeln!(text, "{l}").unwrap();
+        }
+        writeln!(text, "### End error position").unwrap();
     }
 }
 
@@ -118,26 +135,37 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
     Ok(result)
 }
 
-fn parse_to_events(source: &str) -> Result<Vec<String>, ScanError> {
-    let mut reporter = EventReporter::new();
+fn parse_to_events(source: &str) -> Result<EventReporter, ScanError> {
+    let mut reporter = EventReporter::default();
     for x in Parser::new_from_str(source) {
-        reporter.on_event(x?.0);
+        let x = x?;
+        reporter.on_event(x.0, x.1);
     }
-    Ok(reporter.events)
+    Ok(reporter)
 }
 
-struct EventReporter {
-    events: Vec<String>,
+#[derive(Default)]
+/// A [`SpannedEventReceiver`] checking for inconsistencies in event [`Spans`].
+pub struct EventReporter {
+    pub events: Vec<String>,
+    last_span: Option<(Event, Span)>,
+    pub span_failures: Vec<(String, Span)>,
 }
 
-impl EventReporter {
-    fn new() -> Self {
-        Self { events: vec![] }
-    }
-}
+impl SpannedEventReceiver for EventReporter {
+    fn on_event(&mut self, ev: Event, span: Span) {
+        if let Some((last_ev, last_span)) = self.last_span.take() {
+            if span.start.index() < last_span.start.index()
+                || span.end.index() < last_span.end.index()
+            {
+                self.span_failures.push((
+                    format!("event {ev:?}@{span:?} came before event {last_ev:?}@{last_span:?}"),
+                    span,
+                ));
+            }
+        }
+        self.last_span = Some((ev.clone(), span));
 
-impl EventReceiver for EventReporter {
-    fn on_event(&mut self, ev: Event) {
         let line: String = match ev {
             Event::StreamStart => "+STR".into(),
             Event::StreamEnd => "-STR".into(),

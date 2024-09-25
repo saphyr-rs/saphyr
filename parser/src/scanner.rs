@@ -2403,7 +2403,7 @@ impl<T: Input> Scanner<T> {
                 }
                 self.insert_token(
                     sk.token_number - self.tokens_parsed,
-                    Token(Span::empty(self.mark), TokenType::FlowMappingStart),
+                    Token(Span::empty(sk.mark), TokenType::FlowMappingStart),
                 );
             }
 
@@ -2412,7 +2412,7 @@ impl<T: Input> Scanner<T> {
                 sk.mark.col,
                 Some(sk.token_number),
                 TokenType::BlockMappingStart,
-                start_mark,
+                sk.mark,
             );
             self.roll_one_col_indent();
 
@@ -2421,7 +2421,7 @@ impl<T: Input> Scanner<T> {
         } else {
             if is_implicit_flow_mapping {
                 self.tokens
-                    .push_back(Token(Span::empty(self.mark), TokenType::FlowMappingStart));
+                    .push_back(Token(Span::empty(start_mark), TokenType::FlowMappingStart));
             }
             // The ':' indicator follows a complex key.
             if self.flow_level == 0 {

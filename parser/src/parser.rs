@@ -7,6 +7,7 @@
 use crate::{
     input::{str::StrInput, Input},
     scanner::{ScanError, Scanner, Span, TScalarStyle, Token, TokenType},
+    Marker,
 };
 
 use std::collections::HashMap;
@@ -29,7 +30,7 @@ enum State {
     FlowSequenceEntry,
     FlowSequenceEntryMappingKey,
     FlowSequenceEntryMappingValue,
-    FlowSequenceEntryMappingEnd,
+    FlowSequenceEntryMappingEnd(Marker),
     FlowMappingFirstKey,
     FlowMappingKey,
     FlowMappingValue,
@@ -559,7 +560,7 @@ impl<T: Input> Parser<T> {
 
             State::FlowSequenceEntryMappingKey => self.flow_sequence_entry_mapping_key(),
             State::FlowSequenceEntryMappingValue => self.flow_sequence_entry_mapping_value(),
-            State::FlowSequenceEntryMappingEnd => self.flow_sequence_entry_mapping_end(),
+            State::FlowSequenceEntryMappingEnd(mark) => self.flow_sequence_entry_mapping_end(mark),
             State::FlowMappingEmptyValue => self.flow_mapping_value(true),
 
             /* impossible */
@@ -1070,27 +1071,26 @@ impl<T: Input> Parser<T> {
             Token(_, TokenType::Value) => {
                 self.skip();
                 self.state = State::FlowSequenceEntryMappingValue;
-                if let Token(mark, TokenType::FlowEntry | TokenType::FlowSequenceEnd) =
-                    *self.peek_token()?
-                {
-                    self.state = State::FlowSequenceEntryMappingEnd;
-                    Ok((Event::empty_scalar(), mark))
+                let Token(span, ref tok) = *self.peek_token()?;
+                if matches!(tok, TokenType::FlowEntry | TokenType::FlowSequenceEnd) {
+                    self.state = State::FlowSequenceEntryMappingEnd(span.end);
+                    Ok((Event::empty_scalar(), span))
                 } else {
-                    self.push_state(State::FlowSequenceEntryMappingEnd);
+                    self.push_state(State::FlowSequenceEntryMappingEnd(span.end));
                     self.parse_node(false, false)
                 }
             }
             Token(mark, _) => {
-                self.state = State::FlowSequenceEntryMappingEnd;
+                self.state = State::FlowSequenceEntryMappingEnd(mark.end);
                 Ok((Event::empty_scalar(), mark))
             }
         }
     }
 
     #[allow(clippy::unnecessary_wraps)]
-    fn flow_sequence_entry_mapping_end(&mut self) -> ParseResult {
+    fn flow_sequence_entry_mapping_end(&mut self, mark: Marker) -> ParseResult {
         self.state = State::FlowSequenceEntry;
-        Ok((Event::MappingEnd, Span::empty(self.scanner.mark())))
+        Ok((Event::MappingEnd, Span::empty(mark)))
     }
 
     /// Resolve a tag from the handle and the suffix.
