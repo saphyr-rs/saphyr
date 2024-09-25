@@ -7,6 +7,8 @@
   a generic parameter. Moving those functions out of it spares having to
   manually specify the generic in `YamlLoader::<Yaml>::load_from_str`.
   Manipulating the `YamlLoader` directly was not common.
+- Make `LoadError` `Clone` by storing an `Arc<std::io::Error>` instead of the
+  error directly.
 
 
 **Features**:
