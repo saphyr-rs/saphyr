@@ -67,3 +67,19 @@ macro_rules! assert_next {
 // auto generated from handler_spec_test.cpp
 include!("specexamples.rs.inc");
 include!("spec_test.rs.inc");
+
+mod with_buffered_input {
+    use super::{Parser, TestEvent, YamlChecker};
+
+    fn str_to_test_events(docs: &str) -> Vec<TestEvent> {
+        use saphyr_parser::BufferedInput;
+
+        let mut p = YamlChecker { evs: Vec::new() };
+        let input = BufferedInput::new(docs.chars());
+        let mut parser = Parser::new(input);
+        parser.load(&mut p, true).unwrap();
+        p.evs
+    }
+    include!("specexamples.rs.inc");
+    include!("spec_test.rs.inc");
+}

@@ -1709,11 +1709,11 @@ impl<T: Input> Scanner<T> {
             self.scan_block_scalar_content_line(&mut string, &mut line_buffer);
 
             // break on EOF
+            self.input.lookahead(2);
             if self.input.next_is_z() {
                 break;
             }
 
-            self.input.lookahead(2);
             self.read_break(&mut leading_break);
 
             // Eat the following indentation spaces and line breaks.

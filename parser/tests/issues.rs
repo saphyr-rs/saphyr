@@ -1,12 +1,24 @@
-use saphyr_parser::{Event, Parser, ScanError, TScalarStyle};
+use saphyr_parser::{BufferedInput, Event, Parser, ScanError, TScalarStyle};
 
 /// Run the parser through the string.
 ///
 /// # Returns
-/// This functions returns the events if parsing succeeds, the error the parser returned otherwise.
+/// This function returns the events if parsing succeeds, the error the parser returned otherwise.
 fn run_parser(input: &str) -> Result<Vec<Event>, ScanError> {
     let mut events = vec![];
     for x in Parser::new_from_str(input) {
+        events.push(x?.0);
+    }
+    Ok(events)
+}
+
+/// Run the parser through the string, using a `BufferedInput`
+///
+/// # Returns
+/// This function returns the events if parsing succeeds, the error the parser returned otherwise.
+fn run_parser_buffered(input: &str) -> Result<Vec<Event>, ScanError> {
+    let mut events = vec![];
+    for x in Parser::new(BufferedInput::new(input.chars())) {
         events.push(x?.0);
     }
     Ok(events)
@@ -160,6 +172,22 @@ fn test_issue1() {
             Event::SequenceStart(0, None),
             Event::SequenceEnd,
             Event::MappingEnd,
+            Event::SequenceEnd,
+            Event::DocumentEnd,
+            Event::StreamEnd,
+        ]
+    );
+}
+
+#[test]
+fn test_pr12() {
+    assert_eq!(
+        run_parser_buffered("---\n- |\n  a").unwrap(),
+        [
+            Event::StreamStart,
+            Event::DocumentStart(true),
+            Event::SequenceStart(0, None),
+            Event::Scalar("a\n".to_string(), TScalarStyle::Literal, 0, None),
             Event::SequenceEnd,
             Event::DocumentEnd,
             Event::StreamEnd,
