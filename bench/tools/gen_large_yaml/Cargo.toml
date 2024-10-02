@@ -1,0 +1,19 @@
+[package]
+name = "gen_large_yaml"
+version = "0.6.0"
+authors = [
+  "Ethiraric <ethiraric@gmail.com>"
+]
+license = "MIT OR Apache-2.0"
+description = "A helper to generate large YAML files"
+repository = "https://github.com/Ethiraric/yaml-rust2"
+readme = "README.md"
+edition = "2018"
+
+[dependencies]
+rand = { version = "0.8.5", features = [ "small_rng" ] }
+lipsum = "0.9.0"
+
+[profile.release-lto]
+inherits = "release"
+lto = true
