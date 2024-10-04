@@ -1,0 +1,7 @@
+/Cargo.lock
+/bench/perf.*
+/bench/coverage.sh
+/parser/perf.*
+/parser/coverage.sh
+/target
+*.swp
