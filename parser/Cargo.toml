@@ -1,36 +1,28 @@
 [package]
 name = "saphyr-parser"
-version = "0.0.2"
-authors = [
-  "Yuheng Chen <yuhengchen@sensetime.com>",
-  "Ethiraric <ethiraric@gmail.com>",
-  "David Aguilar <davvid@gmail.com>"
-]
-documentation = "https://docs.rs/saphyr-parser"
-keywords = [ "yaml", "parser", "deserialization" ]
-categories = [ "encoding", "parser-implementations", "parsing" ]
-license = "MIT OR Apache-2.0"
-description = "A fully YAML 1.2 compliant YAML parser"
-repository = "https://github.com/saphyr-rs/saphyr-parser"
 readme = "README.md"
-edition = "2021"
-rust-version = "1.70.0"
+authors = { workspace = true }
+categories = { workspace = true }
+description = { workspace = true }
+documentation = { workspace = true }
+edition = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+version = { workspace = true }
 
 [features]
 debug_prints = []
 
 [dependencies]
-arraydeque = "0.5.1"
-hashlink = "0.8"
+arraydeque = { workspace = true }
+hashlink = { workspace = true }
 
 [dev-dependencies]
-libtest-mimic = "0.3.0"
-quickcheck = "1.0"
-saphyr = "0.0.1"
-
-[profile.release-lto]
-inherits = "release"
-lto = true
+libtest-mimic = { workspace = true }
+quickcheck = { workspace = true }
+saphyr = { workspace = true }
 
 [[test]]
 name = "yaml-test-suite"
@@ -41,9 +33,9 @@ name = "dump_events"
 path = "tools/dump_events.rs"
 
 [[bin]]
-name = "time_parse"
+name = "time_parser_parse"
 path = "tools/time_parse.rs"
 
 [[bin]]
-name = "run_bench"
+name = "run_parser_bench"
 path = "tools/run_bench.rs"

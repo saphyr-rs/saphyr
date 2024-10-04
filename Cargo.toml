@@ -1,0 +1,40 @@
+[profile.release]
+lto = true
+
+[workspace]
+members = [
+    "parser",
+    "saphyr",
+    "bench",
+]
+resolver = "2"
+
+[workspace.package]
+authors = [
+  "Ethiraric <ethiraric@gmail.com>",
+  "David Aguilar <davvid@gmail.com>",
+  "Yuheng Chen <yuhengchen@sensetime.com>"
+]
+version = "0.0.2"
+documentation = "https://docs.rs/saphyr"
+keywords = [ "yaml", "parser" ]
+categories = [ "encoding", "parser-implementations" ]
+license = "MIT OR Apache-2.0"
+description = "A fully YAML 1.2 compliant YAML library"
+repository = "https://github.com/saphyr-rs/saphyr"
+readme = "README.md"
+edition = "2021"
+rust-version = "1.70.0"
+
+[workspace.dependencies]
+arraydeque = "0.5.1"
+encoding_rs = { version = "0.8.33" }
+hashlink = "0.8"
+libtest-mimic = "0.3.0"
+quickcheck = "1.0"
+saphyr = { path = "saphyr" }
+saphyr-bench = { path = "bench" }
+saphyr-parser = { path = "parser" }
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"

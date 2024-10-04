@@ -1,14 +1,14 @@
 [package]
 name = "saphyr-bench"
-version = "0.0.1"
 authors = [ "Ethiraric <ethiraric@gmail.com>" ]
-license = "MIT"
 description = "Utilities to benchmark saphyr"
+license = "MIT"
 readme = "README.md"
-edition = "2021"
+edition = { workspace = true }
+version = { workspace = true }
 
 [dependencies]
-saphyr-parser = "0.0.1"
+saphyr-parser = { workspace = true }
 
 [[bin]]
 name = "time_parse"

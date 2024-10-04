@@ -1,34 +1,29 @@
 [package]
 name = "saphyr"
-version = "0.0.1"
-authors = [
-  "Yuheng Chen <yuhengchen@sensetime.com>",
-  "Ethiraric <ethiraric@gmail.com>",
-  "David Aguilar <davvid@gmail.com>"
-]
-documentation = "https://docs.rs/saphyr"
-keywords = [ "yaml", "parser" ]
-categories = [ "encoding", "parser-implementations" ]
-license = "MIT OR Apache-2.0"
-description = "A fully YAML 1.2 compliant YAML library"
-repository = "https://github.com/saphyr-rs/saphyr"
-readme = "README.md"
-edition = "2021"
-rust-version = "1.70.0"
+authors = { workspace = true }
+categories = { workspace = true }
+description = { workspace = true }
+documentation = { workspace = true }
+edition = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+version = { workspace = true }
+readme = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [features]
 default = [ "encoding" ]
 encoding = [ "dep:encoding_rs" ]
 
 [dependencies]
-arraydeque = "0.5.1"
-saphyr-parser = "0.0.2"
-encoding_rs = { version = "0.8.33", optional = true }
-hashlink = "0.8"
+arraydeque = { workspace = true }
+encoding_rs = { workspace = true, optional = true }
+hashlink = { workspace = true }
+saphyr-parser = { workspace = true }
 
 [dev-dependencies]
-quickcheck = "1.0"
+quickcheck = { workspace = true }
 
-[profile.release-lto]
-inherits = "release"
-lto = true
+[lints]
+workspace = true
