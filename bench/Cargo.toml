@@ -9,11 +9,3 @@ version = { workspace = true }
 
 [dependencies]
 saphyr-parser = { workspace = true }
-
-[[bin]]
-name = "time_parse"
-path = "tools/time_parse.rs"
-
-[[bin]]
-name = "run_bench"
-path = "tools/run_bench.rs"

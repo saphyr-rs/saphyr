@@ -33,9 +33,9 @@ name = "dump_events"
 path = "tools/dump_events.rs"
 
 [[bin]]
-name = "time_parser_parse"
+name = "time_parser"
 path = "tools/time_parse.rs"
 
 [[bin]]
-name = "run_parser_bench"
+name = "run_parser"
 path = "tools/run_bench.rs"

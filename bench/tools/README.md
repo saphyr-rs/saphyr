@@ -1,14 +1,12 @@
-# `yaml-rust2` tools
+# `saphyr` tools
 This directory contains tools that are used to develop the crate.
-Due to dependency management, only some of them are available as binaries from the `yaml-rust2` crate.
+Due to dependency management, only some of them are available as binaries from the `saphyr` crate.
 
 | Tool | Invocation |
 |------|------------|
 | `bench_compare` | `cargo bench_compare` |
 | `dump_events` | `cargo run --bin dump_events -- [...]` |
 | `gen_large_yaml` | `cargo gen_large_yaml` |
-| `run_bench` | `cargo run --bin run_bench -- [...]` |
-| `time_parse` | `cargo run --bin time_parse -- [...]` |
 
 ## `bench_compare`
 See the [dedicated README file](./bench_compare/README.md).
@@ -175,55 +173,3 @@ The generated files are the following:
 All generated files are meant to be between 200 and 250 MiB in size.
 
 This tool depends on external dependencies that are not part of `yaml-rust2`'s dependencies or `dev-dependencies` and as such can't be called through `cargo run` directly. A dedicated `cargo gen_large_yaml` alias can be used to generate the benchmark files.
-
-## `run_bench`
-This is a benchmarking helper that runs the parser on the given file a given number of times and is able to extract simple metrics out of the results. The `--output-yaml` flag can be specified to make the output a YAML file that can be fed into other tools.
-
-This binary is made to be used by `bench_compare`.
-
-Synopsis: `run_bench input.yaml <iterations> [--output-yaml]`
-
-### Examples
-```sh
-$> cargo run --release --bin run_bench -- bench_yaml/big.yaml 10
-Average: 1.631936191s
-Min: 1.629654651s
-Max: 1.633045284s
-95%: 1.633045284s
-
-$> cargo run --release --bin run_bench -- bench_yaml/big.yaml 10 --output-yaml
-parser: yaml-rust2
-input: bench_yaml/big.yaml
-average: 1649847674
-min: 1648277149
-max: 1651936305
-percentile95: 1651936305
-iterations: 10
-times:
-  - 1650216129
-  - 1649349978
-  - 1649507018
-  - 1648277149
-  - 1649036548
-  - 1650323982
-  - 1650917692
-  - 1648702081
-  - 1650209860
-  - 1651936305
-```
-
-## `time_parse`
-This is a benchmarking helper that times how long it takes for the parser to emit all events. It calls the parser on the given input file, receives parsing events and then immediately discards them. It is advised to run this tool with `--release`.
-
-### Examples
-Loading a small file could output the following:
-```sh
-$> cargo run --release --bin time_parse -- input.yaml
-Loaded 0MiB in 14.189µs
-```
-
-While loading a larger file could output the following:
-```sh
-$> cargo run --release --bin time_parse -- bench_yaml/big.yaml
-Loaded 220MiB in 1.612677853s
-```

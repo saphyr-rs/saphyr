@@ -1,116 +1,73 @@
-# saphyr
+# Saphyr libraries
 
-[saphyr](https://github.com/saphyr-rs/saphyr) is a fully compliant YAML 1.2
-library written in pure Rust.
+This repository is home to `saphyr-parser`, `saphyr` and soon-to-be
+`saphyr-serde`. These crates provide fully YAML 1.2 compliant parsing and
+manipulation, with a focus on correctness, performance and API friendliness (in that order).
 
-This work is based on [`yaml-rust`](https://github.com/chyh1990/yaml-rust) with
-fixes towards being compliant to the [YAML test
-suite](https://github.com/yaml/yaml-test-suite/). `yaml-rust`'s parser is
-heavily influenced by `libyaml` and `yaml-cpp`.
+[`saphyr`](https://docs.rs/saphyr/latest/saphyr/) is the most user-friendly and
+high-level crate, providing quick-and-easy YAML importing, exporting and object
+manipulation.
 
-`saphyr` is a pure Rust YAML 1.2 implementation that benefits from the
-memory safety and other benefits from the Rust language.
+```rs
+use saphyr::{YamlLoader, YamlEmitter};
 
-## Quick Start
-### Installing
-Add the following to your Cargo.toml:
+let docs = YamlLoader::load_from_str("[1, 2, 3]").unwrap();
+let doc = &docs[0]; // select the first YAML document
+assert_eq!(doc[0].as_i64().unwrap(), 1); // access elements by index
 
-```toml
-[dependencies]
-saphyr = "0.0.1"
-```
-or use `cargo add` to get the latest version automatically:
-```sh
-cargo add saphyr
+let mut out_str = String::new();
+let mut emitter = YamlEmitter::new(&mut out_str);
+emitter.dump(doc).unwrap(); // dump the YAML object to a String
 ```
 
-### Example
-Use `saphyr::YamlLoader` to load YAML documents and access them as `Yaml` objects:
+---
 
-```rust
-use saphyr::{Yaml, YamlEmitter};
+[`saphyr-parser`](https://docs.rs/saphyr-parser/latest/saphyr_parser/) is the
+parser behind `saphyr`. It provides direct access to the parsing process by
+emitting [YAML
+events](https://docs.rs/saphyr-parser/latest/saphyr_parser/parser/enum.Event.html).
+It does not include YAML to object mapping, but is a lightweight alternative to
+`saphyr` for those interested in building directly atop the parser, without
+having an intermediate conversion to a Rust object. More details on where to
+start are available [on
+doc.rs](https://docs.rs/saphyr-parser/latest/saphyr_parser/parser/trait.EventReceiver.html).
 
-fn main() {
-    let s =
-"
-foo:
-    - list1
-    - list2
-bar:
-    - 1
-    - 2.0
-";
-    let docs = Yaml::load_from_str(s).unwrap();
+```rs
+/// Sink of events. Collects them into an array.
+struct EventSink {
+    events: Vec<Event>,
+}
 
-    // Multi document support, doc is a yaml::Yaml
-    let doc = &docs[0];
-
-    // Debug support
-    println!("{:?}", doc);
-
-    // Index access for map & array
-    assert_eq!(doc["foo"][0].as_str().unwrap(), "list1");
-    assert_eq!(doc["bar"][1].as_f64().unwrap(), 2.0);
-
-    // Array/map-like accesses are checked and won't panic.
-    // They will return `BadValue` if the access is invalid.
-    assert!(doc["INVALID_KEY"][100].is_badvalue());
-
-    // Dump the YAML object
-    let mut out_str = String::new();
-    {
-        let mut emitter = YamlEmitter::new(&mut out_str);
-        emitter.dump(doc).unwrap(); // dump the YAML object to a String
+/// Implement `on_event`, pushing into `self.events`.
+impl EventReceiver for EventSink {
+    fn on_event(&mut self, ev: Event) {
+        self.events.push(ev);
     }
-    println!("{}", out_str);
+}
+
+/// Load events from a yaml string.
+fn str_to_events(yaml: &str) -> Vec<Event> {
+    let mut sink = EventSink { events: Vec::new() };
+    let mut parser = Parser::new_from_str(yaml);
+    // Load events using our sink as the receiver.
+    parser.load(&mut sink, true).unwrap();
+    sink.events
 }
 ```
 
-Note that `saphyr::Yaml` implements `Index<&'a str>` and `Index<usize>`:
-
-* `Index<usize>` assumes the container is an array
-* `Index<&'a str>` assumes the container is a string to value map
-* otherwise, `Yaml::BadValue` is returned
-
-Note that `annotated::YamlData` cannot return `BadValue` and will panic.
-
-If your document does not conform to this convention (e.g. map with complex
-type key), you can use the `Yaml::as_XXX` family API of functions to access
-your objects.
-
-## Features
-
-* Pure Rust
-* `Vec`/`HashMap` access API
-
-## Security
-
-This library does not try to interpret any type specifiers in a YAML document,
-so there is no risk of, say, instantiating a socket with fields and
-communicating with the outside world just by parsing a YAML document.
-
 ## Specification Compliance
 
-This implementation is fully compatible with the YAML 1.2 specification. The
-parser behind this library
-([`saphyr-parser`](https://github.com/saphyr-rs/saphyr-parser)) tests against
-(and passes) the [YAML test suite](https://github.com/yaml/yaml-test-suite/).
+This implementation is fully compatible with the YAML 1.2 specification.
+`saphyr-parser`) tests against (and passes) the [YAML test
+suite](https://github.com/yaml/yaml-test-suite/).
 
 ## License
 
-Licensed under either of
-
- * Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license (http://opensource.org/licenses/MIT)
-
-at your option.
-
-Since this repository was originally maintained by
-[chyh1990](https://github.com/chyh1990), there are 2 sets of licenses.
-A license of each set must be included in redistributions. See the
-[LICENSE](LICENSE) file for more details.
-
-You can find licences in the [`.licenses`](.licenses) subfolder.
+Sets of licences are available for each of the crates. Due to this project
+being based on a fork of [chyh1990's
+`yaml-rust`](https://github.com/chyh1990/yaml-rust), there are 2 licenses to be
+included if using `saphyr` or `saphyr-parser`. Refer to the projects' READMEs
+for details.
 
 ## Contribution
 
@@ -123,13 +80,16 @@ for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 be dual licensed as above, without any additional terms or conditions.
 
 ## Links
-
-* [saphyr source code repository](https://github.com/saphyr-rs/saphyr)
-
+### `saphyr`
+* [saphyr source code repository](https://github.com/saphyr-rs/saphyr/tree/master/saphyr)
 * [saphyr releases on crates.io](https://crates.io/crates/saphyr)
-
 * [saphyr documentation on docs.rs](https://docs.rs/saphyr/latest/saphyr/)
 
+### `saphyr-parser`
+* [saphyr-parser source code repository](https://github.com/saphyr-rs/saphyr/tree/master/parser)
 * [saphyr-parser releases on crates.io](https://crates.io/crates/saphyr-parser)
+* [saphyr-parser documentation on docs.rs](https://docs.rs/saphyr-parser/latest/saphyr-parser/)
 
+### Other links
 * [yaml-test-suite](https://github.com/yaml/yaml-test-suite)
+* [YAML 1.2 specification](https://yaml.org/spec/1.2.2/)
