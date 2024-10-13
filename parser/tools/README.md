@@ -4,14 +4,9 @@ Due to dependency management, only some of them are available as binaries from t
 
 | Tool | Invocation |
 |------|------------|
-| `bench_compare` | `cargo bench_compare` |
 | `dump_events` | `cargo run --bin dump_events -- [...]` |
-| `gen_large_yaml` | `cargo gen_large_yaml` |
 | `run_bench` | `cargo run --bin run_bench -- [...]` |
 | `time_parse` | `cargo run --bin time_parse -- [...]` |
-
-## `bench_compare`
-See the [dedicated README file](./bench_compare/README.md).
 
 ## `dump_events`
 This is a debugging helper for the parser. It outputs events emitted by the parser for a given file. This can be paired with the `SAPHYR_DEBUG` environment variable to have an in-depth overview of which steps the scanner and the parser are taking.
@@ -161,20 +156,6 @@ Parser state: DocumentStart
 </details>
 
 While this cannot be shown in Markdown, the output is colored so that it is a bit easier to read.
-
-## `gen_large_yaml`
-It is hard to find large (100+MiB) real-world YAML files that could be used to benchmark a parser. This utility generates multiple large files that are meant to stress the parser with different layouts of YAML files. The resulting files do not look like anything that would be encountered in production, but can serve as a base to test several features of a YAML parser.
-
-The generated files are the following:
-
-  - `big.yaml`: A large array of records with few fields. One of the fields is a description, a large text block scalar spanning multiple lines. Most of the scanning happens in block scalars.
-  - `nested.yaml`: Very short key-value pairs that nest deeply.
-  - `small_objects.yaml`: A large array of 2 key-value mappings.
-  - `strings_array.yaml`: A large array of lipsum one-liners (~150-175 characters in length).
-
-All generated files are meant to be between 200 and 250 MiB in size.
-
-This tool depends on external dependencies that are not part of `saphyr-parser`'s dependencies or `dev-dependencies` and as such can't be called through `cargo run` directly. A dedicated `cargo gen_large_yaml` alias can be used to generate the benchmark files.
 
 ## `run_bench`
 This is a benchmarking helper that runs the parser on the given file a given number of times and is able to extract simple metrics out of the results. The `--output-yaml` flag can be specified to make the output a YAML file that can be fed into other tools.
