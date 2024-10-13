@@ -1,10 +1,15 @@
-pub mod buffered;
-pub mod str;
+//! Utilities to create a source of input to the parser.
+//!
+//! [`Input`] must be implemented for the parser to fetch input. Make sure your needs aren't
+//! covered by the [`BufferedInput`].
+
+pub(crate) mod buffered;
+pub(crate) mod str;
 
 #[allow(clippy::module_name_repetitions)]
 pub use buffered::BufferedInput;
 
-use crate::char_traits::{
+pub use crate::char_traits::{
     is_alpha, is_blank, is_blank_or_breakz, is_break, is_breakz, is_digit, is_flow, is_z,
 };
 
@@ -440,6 +445,7 @@ impl SkipTabs {
     /// Whether tabs were found while skipping whitespace.
     ///
     /// This function must be called after a call to `skip_ws_to_eol`.
+    #[must_use]
     pub fn found_tabs(self) -> bool {
         matches!(self, SkipTabs::Result(true, _))
     }
@@ -447,6 +453,7 @@ impl SkipTabs {
     /// Whether a valid YAML whitespace has been found in skipped-over content.
     ///
     /// This function must be called after a call to `skip_ws_to_eol`.
+    #[must_use]
     pub fn has_valid_yaml_ws(self) -> bool {
         matches!(self, SkipTabs::Result(_, true))
     }

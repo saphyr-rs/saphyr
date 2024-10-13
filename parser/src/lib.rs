@@ -35,7 +35,7 @@
 mod char_traits;
 #[macro_use]
 mod debug;
-mod input;
+pub mod input;
 mod parser;
 mod scanner;
 
