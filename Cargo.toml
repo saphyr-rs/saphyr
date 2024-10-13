@@ -6,6 +6,8 @@ members = [
     "parser",
     "saphyr",
     "bench",
+    "bench/tools/gen_large_yaml",
+    "bench/tools/bench_compare",
 ]
 resolver = "2"
 
