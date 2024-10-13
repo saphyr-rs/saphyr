@@ -3,7 +3,7 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use hashlink::LinkedHashMap;
-use saphyr_parser::{Event, MarkedEventReceiver, Marker, ScanError, TScalarStyle, Tag};
+use saphyr_parser::{Event, ScanError, Span, SpannedEventReceiver, TScalarStyle, Tag};
 
 use crate::{Hash, Yaml};
 
@@ -43,13 +43,13 @@ where
     }
 }
 
-impl<Node> MarkedEventReceiver for YamlLoader<Node>
+impl<Node> SpannedEventReceiver for YamlLoader<Node>
 where
     Node: LoadableYamlNode,
 {
-    fn on_event(&mut self, ev: Event, marker: Marker) {
+    fn on_event(&mut self, ev: Event, span: Span) {
         match ev {
-            Event::DocumentStart | Event::Nothing | Event::StreamStart | Event::StreamEnd => {
+            Event::DocumentStart(_) | Event::Nothing | Event::StreamStart | Event::StreamEnd => {
                 // do nothing
             }
             Event::DocumentEnd => {
@@ -57,14 +57,14 @@ where
                     // empty document
                     0 => self
                         .docs
-                        .push(Node::from_bare_yaml(Yaml::BadValue).with_marker(marker)),
+                        .push(Node::from_bare_yaml(Yaml::BadValue).with_span(span)),
                     1 => self.docs.push(self.doc_stack.pop().unwrap().0),
                     _ => unreachable!(),
                 }
             }
             Event::SequenceStart(aid, _) => {
                 self.doc_stack.push((
-                    Node::from_bare_yaml(Yaml::Array(Vec::new())).with_marker(marker),
+                    Node::from_bare_yaml(Yaml::Array(Vec::new())).with_span(span),
                     aid,
                 ));
             }
@@ -74,7 +74,7 @@ where
             }
             Event::MappingStart(aid, _) => {
                 self.doc_stack.push((
-                    Node::from_bare_yaml(Yaml::Hash(Hash::new())).with_marker(marker),
+                    Node::from_bare_yaml(Yaml::Hash(Hash::new())).with_span(span),
                     aid,
                 ));
                 self.key_stack.push(Node::from_bare_yaml(Yaml::BadValue));
@@ -122,14 +122,14 @@ where
                     // Datatype is not specified, or unrecognized
                     Yaml::from_str(&v)
                 };
-                self.insert_new_node((Node::from_bare_yaml(node).with_marker(marker), aid));
+                self.insert_new_node((Node::from_bare_yaml(node).with_span(span), aid));
             }
             Event::Alias(id) => {
                 let n = match self.anchor_map.get(&id) {
                     Some(v) => v.clone(),
                     None => Node::from_bare_yaml(Yaml::BadValue),
                 };
-                self.insert_new_node((n.with_marker(marker), 0));
+                self.insert_new_node((n.with_span(span), 0));
             }
         }
     }
@@ -253,7 +253,7 @@ pub trait LoadableYamlNode: Clone + std::hash::Hash + Eq {
     /// Provide the marker for the node (builder-style).
     #[inline]
     #[must_use]
-    fn with_marker(self, _: Marker) -> Self {
+    fn with_span(self, _: Span) -> Self {
         self
     }
 }

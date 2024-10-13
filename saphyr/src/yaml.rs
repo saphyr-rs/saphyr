@@ -5,7 +5,7 @@
 use std::{convert::TryFrom, ops::Index, ops::IndexMut};
 
 use hashlink::LinkedHashMap;
-use saphyr_parser::{Parser, ScanError};
+use saphyr_parser::{BufferedInput, Input, Parser, ScanError};
 
 use crate::{loader::parse_f64, YamlLoader};
 
@@ -97,7 +97,7 @@ impl Yaml {
     /// # Errors
     /// Returns `ScanError` when loading fails.
     pub fn load_from_iter<I: Iterator<Item = char>>(source: I) -> Result<Vec<Yaml>, ScanError> {
-        let mut parser = Parser::new(source);
+        let mut parser = Parser::new(BufferedInput::new(source));
         Self::load_from_parser(&mut parser)
     }
 
@@ -107,9 +107,7 @@ impl Yaml {
     ///
     /// # Errors
     /// Returns `ScanError` when loading fails.
-    pub fn load_from_parser<I: Iterator<Item = char>>(
-        parser: &mut Parser<I>,
-    ) -> Result<Vec<Yaml>, ScanError> {
+    pub fn load_from_parser<I: Input>(parser: &mut Parser<I>) -> Result<Vec<Yaml>, ScanError> {
         let mut loader = YamlLoader::default();
         parser.load(&mut loader, true)?;
         Ok(loader.into_documents())

@@ -2,7 +2,7 @@ use std::fs::{self, DirEntry};
 
 use libtest_mimic::{run_tests, Arguments, Outcome, Test};
 
-use saphyr::{yaml, Yaml, YamlLoader};
+use saphyr::{Hash, Yaml};
 use saphyr_parser::{Event, EventReceiver, Parser, ScanError, TScalarStyle, Tag};
 
 type Result<T, E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
@@ -77,11 +77,11 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
     let test_name = file_name
         .strip_suffix(".yaml")
         .ok_or("unexpected filename")?;
-    let tests = YamlLoader::load_from_str(&fs::read_to_string(entry.path())?)?;
+    let tests = Yaml::load_from_str(&fs::read_to_string(entry.path())?)?;
     let tests = tests[0].as_vec().ok_or("no test list found in file")?;
 
     let mut result = vec![];
-    let mut current_test = yaml::Hash::new();
+    let mut current_test = Hash::new();
     for (idx, test_data) in tests.iter().enumerate() {
         let name = if tests.len() > 1 {
             format!("{test_name}-{idx:02}")

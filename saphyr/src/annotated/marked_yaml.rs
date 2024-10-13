@@ -3,21 +3,21 @@
 //! This is set aside so as to not clutter `annotated.rs`.
 
 use hashlink::LinkedHashMap;
-use saphyr_parser::{Marker, Parser, ScanError};
+use saphyr_parser::{BufferedInput, Input, Parser, ScanError, Span};
 
 use crate::{LoadableYamlNode, Yaml, YamlData, YamlLoader};
 
-/// A YAML node with [`Marker`]s pointing to the start of the node.
+/// A YAML node with [`Span`]s pointing to the start of the node.
 ///
 /// This structure does not implement functions to operate on the YAML object. To access those,
 /// refer to the [`Self::data`] field.
 #[derive(Clone, Debug)]
 pub struct MarkedYaml {
-    /// The marker pointing to the start of the node.
+    /// The span indicating where in the input stream the object is.
     ///
-    /// The marker is relative to the start of the input stream that was given to the parser, not
+    /// The markers are relative to the start of the input stream that was given to the parser, not
     /// to the start of the document within the input stream.
-    pub marker: Marker,
+    pub span: Span,
     /// The YAML contents of the node.
     pub data: YamlData<MarkedYaml>,
 }
@@ -44,7 +44,7 @@ impl MarkedYaml {
     ///
     /// [`load_from_str`]: `Yaml::load_from_str`
     pub fn load_from_iter<I: Iterator<Item = char>>(source: I) -> Result<Vec<Self>, ScanError> {
-        let mut parser = Parser::new(source);
+        let mut parser = Parser::new(BufferedInput::new(source));
         Self::load_from_parser(&mut parser)
     }
 
@@ -56,9 +56,7 @@ impl MarkedYaml {
     /// Returns `ScanError` when loading fails.
     ///
     /// [`load_from_str`]: `Yaml::load_from_str`
-    pub fn load_from_parser<I: Iterator<Item = char>>(
-        parser: &mut Parser<I>,
-    ) -> Result<Vec<Self>, ScanError> {
+    pub fn load_from_parser<I: Input>(parser: &mut Parser<I>) -> Result<Vec<Self>, ScanError> {
         let mut loader = YamlLoader::<Self>::default();
         parser.load(&mut loader, true)?;
         Ok(loader.into_documents())
@@ -83,7 +81,7 @@ impl std::hash::Hash for MarkedYaml {
 impl From<YamlData<MarkedYaml>> for MarkedYaml {
     fn from(value: YamlData<MarkedYaml>) -> Self {
         Self {
-            marker: Marker::default(),
+            span: Span::default(),
             data: value,
         }
     }
@@ -92,7 +90,7 @@ impl From<YamlData<MarkedYaml>> for MarkedYaml {
 impl LoadableYamlNode for MarkedYaml {
     fn from_bare_yaml(yaml: Yaml) -> Self {
         Self {
-            marker: Marker::default(),
+            span: Span::default(),
             data: match yaml {
                 Yaml::Real(x) => YamlData::Real(x),
                 Yaml::Integer(x) => YamlData::Integer(x),
@@ -138,15 +136,15 @@ impl LoadableYamlNode for MarkedYaml {
 
     fn take(&mut self) -> Self {
         let mut taken_out = MarkedYaml {
-            marker: Marker::default(),
+            span: Span::default(),
             data: YamlData::BadValue,
         };
         std::mem::swap(&mut taken_out, self);
         taken_out
     }
 
-    fn with_marker(mut self, marker: Marker) -> Self {
-        self.marker = marker;
+    fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
         self
     }
 }
