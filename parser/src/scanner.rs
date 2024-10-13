@@ -2176,7 +2176,10 @@ impl<T: Input> Scanner<T> {
 
         loop {
             self.input.lookahead(4);
-            if self.input.next_is_document_indicator() || self.input.peek() == '#' {
+            if self.input.next_is_document_end()
+                || (self.input.next_is_document_start() && self.leading_whitespace)
+                || self.input.peek() == '#'
+            {
                 break;
             }
 
