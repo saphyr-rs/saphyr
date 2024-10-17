@@ -199,7 +199,9 @@ fn test_pr12() {
 }
 
 #[test]
-fn test_issue13() {
+fn test_issue14() {
+    // The following input creates an infinite loop.
+    // https://github.com/saphyr-rs/saphyr/issues/14
     let s = "{---";
     let Err(error) = run_parser(s) else { panic!() };
     assert_eq!(
@@ -209,5 +211,56 @@ fn test_issue13() {
     assert_eq!(
         error.to_string(),
         "while parsing a flow mapping, did not find expected ',' or '}' at byte 4 line 2 column 1"
+    );
+}
+
+#[test]
+fn test_issue13() {
+    // The following input creates an infinite loop.
+    // https://github.com/saphyr-rs/saphyr/issues/13
+    let s = r"---
+array:
+  - object:
+      array:
+        - object:
+            array:
+              - text: >-
+                  Line 1
+                  Line 2
+...";
+
+    assert_eq!(
+        run_parser(s).unwrap(),
+        [
+            Event::StreamStart,
+            Event::DocumentStart(true),
+            Event::MappingStart(0, None),
+            Event::Scalar("array".to_string(), TScalarStyle::Plain, 0, None),
+            Event::SequenceStart(0, None),
+            Event::MappingStart(0, None),
+            Event::Scalar("object".to_string(), TScalarStyle::Plain, 0, None),
+            Event::MappingStart(0, None),
+            Event::Scalar("array".to_string(), TScalarStyle::Plain, 0, None),
+            Event::SequenceStart(0, None),
+            Event::MappingStart(0, None),
+            Event::Scalar("object".to_string(), TScalarStyle::Plain, 0, None),
+            Event::MappingStart(0, None),
+            Event::Scalar("array".to_string(), TScalarStyle::Plain, 0, None),
+            Event::SequenceStart(0, None),
+            Event::MappingStart(0, None),
+            Event::Scalar("text".to_string(), TScalarStyle::Plain, 0, None),
+            Event::Scalar("Line 1 Line 2".to_string(), TScalarStyle::Folded, 0, None),
+            Event::MappingEnd,
+            Event::SequenceEnd,
+            Event::MappingEnd,
+            Event::MappingEnd,
+            Event::SequenceEnd,
+            Event::MappingEnd,
+            Event::MappingEnd,
+            Event::SequenceEnd,
+            Event::MappingEnd,
+            Event::DocumentEnd,
+            Event::StreamEnd
+        ]
     );
 }
