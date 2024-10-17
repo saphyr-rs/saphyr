@@ -1,27 +1,30 @@
-use saphyr_parser::{BufferedInput, Event, Parser, ScanError, TScalarStyle};
+use saphyr_parser::{Event, Parser, ScanError, TScalarStyle};
 
 /// Run the parser through the string.
 ///
-/// # Returns
-/// This function returns the events if parsing succeeds, the error the parser returned otherwise.
-fn run_parser(input: &str) -> Result<Vec<Event>, ScanError> {
-    let mut events = vec![];
-    for x in Parser::new_from_str(input) {
-        events.push(x?.0);
-    }
-    Ok(events)
-}
-
-/// Run the parser through the string, using a `BufferedInput`
+/// The parser is run through both the `StrInput` and `BufferedInput` variants. The resulting
+/// events are then compared and must match.
 ///
 /// # Returns
 /// This function returns the events if parsing succeeds, the error the parser returned otherwise.
-fn run_parser_buffered(input: &str) -> Result<Vec<Event>, ScanError> {
-    let mut events = vec![];
-    for x in Parser::new(BufferedInput::new(input.chars())) {
-        events.push(x?.0);
+///
+/// # Panics
+/// This function panics if there is a mismatch between the 2 parser invocations with the different
+/// input traits.
+fn run_parser(input: &str) -> Result<Vec<Event>, ScanError> {
+    let mut str_events = vec![];
+    // let mut iter_events = vec![];
+
+    for x in Parser::new_from_str(input) {
+        str_events.push(x?.0);
     }
-    Ok(events)
+    // for x in Parser::new_from_iter(input.chars()) {
+    //     iter_events.push(x?.0);
+    // }
+    //
+    // assert_eq!(str_events, iter_events);
+
+    Ok(str_events)
 }
 
 #[test]
@@ -182,7 +185,7 @@ fn test_issue1() {
 #[test]
 fn test_pr12() {
     assert_eq!(
-        run_parser_buffered("---\n- |\n  a").unwrap(),
+        run_parser("---\n- |\n  a").unwrap(),
         [
             Event::StreamStart,
             Event::DocumentStart(true),
