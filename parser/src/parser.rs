@@ -7,7 +7,7 @@
 use crate::{
     input::{str::StrInput, Input},
     scanner::{ScanError, Scanner, Span, TScalarStyle, Token, TokenType},
-    Marker,
+    BufferedInput, Marker,
 };
 
 use std::collections::HashMap;
@@ -241,6 +241,17 @@ impl<'a> Parser<StrInput<'a>> {
     #[must_use]
     pub fn new_from_str(value: &'a str) -> Self {
         Parser::new(StrInput::new(value))
+    }
+}
+
+impl<T> Parser<BufferedInput<T>>
+where
+    T: Iterator<Item = char>,
+{
+    /// Create a new instance of a parser from an iterator of `char`s.
+    #[must_use]
+    pub fn new_from_iter(iter: T) -> Self {
+        Parser::new(BufferedInput::new(iter))
     }
 }
 
