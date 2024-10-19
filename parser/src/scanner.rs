@@ -2249,7 +2249,7 @@ impl<T: Input> Scanner<T> {
             }
 
             // Process blank characters.
-            self.input.lookahead(1);
+            self.input.lookahead(2);
             while self.input.next_is_blank_or_break() {
                 if self.input.next_is_blank() {
                     if !self.leading_whitespace {
@@ -2280,7 +2280,7 @@ impl<T: Input> Scanner<T> {
                         self.leading_whitespace = true;
                     }
                 }
-                self.input.lookahead(1);
+                self.input.lookahead(2);
             }
 
             // check indentation level
