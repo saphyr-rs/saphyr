@@ -2177,7 +2177,7 @@ impl<T: Input> Scanner<T> {
         loop {
             self.input.lookahead(4);
             if self.input.next_is_document_end()
-                || (self.input.next_is_document_start() && self.leading_whitespace)
+                || (self.leading_whitespace && self.input.next_is_document_start())
                 || self.input.peek() == '#'
             {
                 break;
@@ -2293,10 +2293,20 @@ impl<T: Input> Scanner<T> {
             self.allow_simple_key();
         }
 
-        Ok(Token(
-            Span::new(start_mark, end_mark),
-            TokenType::Scalar(TScalarStyle::Plain, string),
-        ))
+        if string.is_empty() {
+            // `fetch_plain_scalar` must absolutely consume at least one byte. Otherwise,
+            // `fetch_next_token` will never stop calling it. An empty plain scalar may happen with
+            // erroneous inputs such as "{...".
+            Err(ScanError::new_str(
+                start_mark,
+                "unexpected end of plain scalar",
+            ))
+        } else {
+            Ok(Token(
+                Span::new(start_mark, end_mark),
+                TokenType::Scalar(TScalarStyle::Plain, string),
+            ))
+        }
     }
 
     fn fetch_key(&mut self) -> ScanResult {

@@ -215,6 +215,17 @@ fn test_issue14() {
 }
 
 #[test]
+fn test_issue14_v2() {
+    let s = "{...";
+    let Err(error) = run_parser(s) else { panic!() };
+    assert_eq!(error.info(), "unexpected end of plain scalar");
+    assert_eq!(
+        error.to_string(),
+        "unexpected end of plain scalar at byte 1 line 1 column 2"
+    );
+}
+
+#[test]
 fn test_issue13() {
     // The following input creates an infinite loop.
     // https://github.com/saphyr-rs/saphyr/issues/13
