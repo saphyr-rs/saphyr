@@ -13,16 +13,16 @@ use saphyr_parser::{Event, Parser, ScanError, TScalarStyle};
 /// input traits.
 fn run_parser(input: &str) -> Result<Vec<Event>, ScanError> {
     let mut str_events = vec![];
-    // let mut iter_events = vec![];
+    let mut iter_events = vec![];
 
     for x in Parser::new_from_str(input) {
         str_events.push(x?.0);
     }
-    // for x in Parser::new_from_iter(input.chars()) {
-    //     iter_events.push(x?.0);
-    // }
-    //
-    // assert_eq!(str_events, iter_events);
+    for x in Parser::new_from_iter(input.chars()) {
+        iter_events.push(x?.0);
+    }
+
+    assert_eq!(str_events, iter_events);
 
     Ok(str_events)
 }
