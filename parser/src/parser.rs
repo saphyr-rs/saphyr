@@ -240,6 +240,7 @@ impl<'a> Parser<StrInput<'a>> {
     /// Create a new instance of a parser from a &str.
     #[must_use]
     pub fn new_from_str(value: &'a str) -> Self {
+        debug_print!("\x1B[;31m>>>>>>>>>> New parser from str\x1B[;0m");
         Parser::new(StrInput::new(value))
     }
 }
@@ -251,6 +252,7 @@ where
     /// Create a new instance of a parser from an iterator of `char`s.
     #[must_use]
     pub fn new_from_iter(iter: T) -> Self {
+        debug_print!("\x1B[;31m>>>>>>>>>> New parser from iter\x1B[;0m");
         Parser::new(BufferedInput::new(iter))
     }
 }
