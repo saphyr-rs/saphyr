@@ -5,3 +5,5 @@
 /parser/coverage.sh
 /target
 *.swp
+fuzz/artifacts
+fuzz/corpus

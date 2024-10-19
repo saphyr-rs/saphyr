@@ -11,3 +11,5 @@ before_commit:
   cargo build --release --package bench_compare --bin bench_compare --manifest-path bench/tools/bench_compare/Cargo.toml
   RUSTDOCFLAGS="-D warnings" cargo doc --all-features
 
+fuzz:
+  CARGO_PROFILE_RELEASE_LTO=false cargo +nightly fuzz run parse
