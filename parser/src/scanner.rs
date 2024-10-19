@@ -2386,7 +2386,8 @@ impl<T: Input> Scanner<T> {
     fn fetch_value(&mut self) -> ScanResult {
         let sk = self.simple_keys.last().unwrap().clone();
         let start_mark = self.mark;
-        let is_implicit_flow_mapping = self.flow_level > 0 && !self.flow_mapping_started;
+        let is_implicit_flow_mapping =
+            !self.implicit_flow_mapping_states.is_empty() && !self.flow_mapping_started;
         if is_implicit_flow_mapping {
             *self.implicit_flow_mapping_states.last_mut().unwrap() = ImplicitMappingState::Inside;
         }

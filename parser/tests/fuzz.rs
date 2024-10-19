@@ -40,3 +40,18 @@ fn fuzz_1() {
     let s = str::from_utf8(raw_input).unwrap();
     let _ = run_parser(s);
 }
+
+#[test]
+fn fuzz_2() {
+    // Crashing with an unwrap of a None value.
+    // There is an imbalance of implicit flow mapping contexts here between the opening `[`/`{` and
+    // closing `]`/`}`. We would test against flow-level when only `[` can create implicit flow
+    // mappings.
+    let raw_input: &[u8] = &[
+        91, 91, 32, 101, 58, 9, 123, 63, 32, 45, 106, 101, 58, 9, 123, 63, 32, 44, 117, 101, 58, 9,
+        123, 63, 32, 44, 9, 26, 58, 32, 126, 93, 8, 58, 32, 58, 10, 29, 58, 58, 58, 32, 58, 29, 63,
+        32, 44, 9, 26, 58, 32, 126, 93, 8, 58, 32, 58, 10, 78, 32,
+    ];
+    let s = str::from_utf8(raw_input).unwrap();
+    let _ = run_parser(s);
+}
