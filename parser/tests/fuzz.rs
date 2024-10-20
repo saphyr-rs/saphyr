@@ -15,18 +15,37 @@ use saphyr_parser::{Event, Parser, ScanError};
 /// input traits.
 fn run_parser(input: &str) -> Result<Vec<Event>, ScanError> {
     let mut str_events = vec![];
+    let mut str_error = None;
     let mut iter_events = vec![];
+    let mut iter_error = None;
 
     for x in Parser::new_from_str(input) {
-        str_events.push(x?.0);
+        match x {
+            Ok(event) => str_events.push(event),
+            Err(e) => {
+                str_error = Some(e);
+                break;
+            }
+        }
     }
     for x in Parser::new_from_iter(input.chars()) {
-        iter_events.push(x?.0);
+        match x {
+            Ok(event) => iter_events.push(event),
+            Err(e) => {
+                iter_error = Some(e);
+                break;
+            }
+        }
     }
 
     assert_eq!(str_events, iter_events);
+    assert_eq!(str_error, iter_error);
 
-    Ok(str_events)
+    if let Some(err) = str_error {
+        Err(err)
+    } else {
+        Ok(str_events.into_iter().map(|x| x.0).collect())
+    }
 }
 
 #[test]
