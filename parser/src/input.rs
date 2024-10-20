@@ -209,6 +209,7 @@ pub trait Input {
                     );
                 }
                 '#' => {
+                    self.skip(); // Skip over '#'
                     while !is_breakz(self.look_ch()) {
                         self.skip();
                         chars_consumed += 1;

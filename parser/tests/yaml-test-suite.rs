@@ -137,9 +137,25 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
 }
 
 fn parse_to_events(source: &str) -> Result<EventReporter, ScanError> {
-    let mut reporter = EventReporter::default();
+    // Parse as string
+    let mut str_events = vec![];
     for x in Parser::new_from_str(source) {
         let x = x?;
+        str_events.push(x);
+    }
+    // Parse as iter
+    let mut iter_events = vec![];
+    for x in Parser::new_from_iter(source.chars()) {
+        let x = x?;
+        iter_events.push(x);
+    }
+
+    // No matter the input, we should parse into the same events.
+    assert_eq!(str_events, iter_events);
+
+    // Put events into the reporter, for comparison with the test suite.
+    let mut reporter = EventReporter::default();
+    for x in str_events {
         reporter.on_event(x.0, x.1);
     }
     Ok(reporter)
