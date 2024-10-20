@@ -38,6 +38,15 @@ fn run_parser(input: &str) -> Result<Vec<Event>, ScanError> {
         }
     }
 
+    // eprintln!("str_events");
+    // for x in &str_events {
+    //     eprintln!("\t{x:?}");
+    // }
+    // eprintln!("iter_events");
+    // for x in &iter_events {
+    //     eprintln!("\t{x:?}");
+    // }
+
     assert_eq!(str_events, iter_events);
     assert_eq!(str_error, iter_error);
 

@@ -8,11 +8,47 @@ use saphyr_parser::{Event, Parser, ScanError, TScalarStyle};
 /// # Returns
 /// This functions returns the events if parsing succeeds, the error the parser returned otherwise.
 fn run_parser(input: &str) -> Result<Vec<Event>, ScanError> {
-    let mut events = vec![];
+    let mut str_events = vec![];
+    let mut str_error = None;
+    let mut iter_events = vec![];
+    let mut iter_error = None;
+
     for x in Parser::new_from_str(input) {
-        events.push(x?.0);
+        match x {
+            Ok(event) => str_events.push(event),
+            Err(e) => {
+                str_error = Some(e);
+                break;
+            }
+        }
     }
-    Ok(events)
+    for x in Parser::new_from_iter(input.chars()) {
+        match x {
+            Ok(event) => iter_events.push(event),
+            Err(e) => {
+                iter_error = Some(e);
+                break;
+            }
+        }
+    }
+
+    // eprintln!("str_events");
+    // for x in &str_events {
+    //     eprintln!("\t{x:?}");
+    // }
+    // eprintln!("iter_events");
+    // for x in &iter_events {
+    //     eprintln!("\t{x:?}");
+    // }
+
+    assert_eq!(str_events, iter_events);
+    assert_eq!(str_error, iter_error);
+
+    if let Some(err) = str_error {
+        Err(err)
+    } else {
+        Ok(str_events.into_iter().map(|x| x.0).collect())
+    }
 }
 
 #[test]

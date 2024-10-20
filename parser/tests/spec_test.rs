@@ -47,9 +47,47 @@ impl EventReceiver for YamlChecker {
 }
 
 fn str_to_test_events(docs: &str) -> Vec<TestEvent> {
+    let mut str_events = vec![];
+    let mut str_error = None;
+    let mut iter_events = vec![];
+    let mut iter_error = None;
+
+    for x in Parser::new_from_str(docs) {
+        match x {
+            Ok(event) => str_events.push(event),
+            Err(e) => {
+                str_error = Some(e);
+                break;
+            }
+        }
+    }
+    for x in Parser::new_from_iter(docs.chars()) {
+        match x {
+            Ok(event) => iter_events.push(event),
+            Err(e) => {
+                iter_error = Some(e);
+                break;
+            }
+        }
+    }
+
+    // eprintln!("str_events");
+    // for x in &str_events {
+    //     eprintln!("\t{x:?}");
+    // }
+    // eprintln!("iter_events");
+    // for x in &iter_events {
+    //     eprintln!("\t{x:?}");
+    // }
+
+    assert_eq!(str_events, iter_events);
+    assert_eq!(str_error, None);
+    assert_eq!(iter_error, None);
+
     let mut p = YamlChecker { evs: Vec::new() };
-    let mut parser = Parser::new_from_str(docs);
-    parser.load(&mut p, true).unwrap();
+    for event in str_events.into_iter().map(|x| x.0) {
+        p.on_event(event);
+    }
     p.evs
 }
 
@@ -67,19 +105,3 @@ macro_rules! assert_next {
 // auto generated from handler_spec_test.cpp
 include!("specexamples.rs.inc");
 include!("spec_test.rs.inc");
-
-mod with_buffered_input {
-    use super::{Parser, TestEvent, YamlChecker};
-
-    fn str_to_test_events(docs: &str) -> Vec<TestEvent> {
-        use saphyr_parser::BufferedInput;
-
-        let mut p = YamlChecker { evs: Vec::new() };
-        let input = BufferedInput::new(docs.chars());
-        let mut parser = Parser::new(input);
-        parser.load(&mut p, true).unwrap();
-        p.evs
-    }
-    include!("specexamples.rs.inc");
-    include!("spec_test.rs.inc");
-}
