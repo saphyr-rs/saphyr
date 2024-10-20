@@ -124,7 +124,7 @@ fn escape_str(wr: &mut dyn fmt::Write, v: &str) -> Result<(), fmt::Error> {
 
 impl<'a> YamlEmitter<'a> {
     /// Create a new emitter serializing into `writer`.
-    pub fn new(writer: &'a mut dyn fmt::Write) -> YamlEmitter {
+    pub fn new(writer: &'a mut dyn fmt::Write) -> Self {
         YamlEmitter {
             writer,
             best_indent: 2,
