@@ -9,7 +9,7 @@ use std::fmt::{self, Display};
 use std::hash::{Hash, Hasher};
 use std::mem;
 
-/// A YAML mapping in which the keys and values are both `serde_yaml::Value`.
+/// A YAML mapping in which the keys and values are both `saphyr_serde::Value`.
 #[derive(Clone, Default, Eq, PartialEq)]
 pub struct Mapping {
     map: IndexMap<Value, Value>,
@@ -236,11 +236,11 @@ impl Mapping {
     }
 }
 
-/// A type that can be used to index into a `serde_yaml::Mapping`. See the
+/// A type that can be used to index into a `saphyr_serde::Mapping`. See the
 /// methods `get`, `get_mut`, `contains_key`, and `remove` of `Value`.
 ///
 /// This trait is sealed and cannot be implemented for types outside of
-/// `serde_yaml`.
+/// `saphyr_serde`.
 pub trait Index: private::Sealed {
     #[doc(hidden)]
     fn is_key_into(&self, v: &Mapping) -> bool;
@@ -547,7 +547,7 @@ macro_rules! delegate_iterator {
     }
 }
 
-/// Iterator over `&serde_yaml::Mapping`.
+/// Iterator over `&saphyr_serde::Mapping`.
 pub struct Iter<'a> {
     iter: indexmap::map::Iter<'a, Value, Value>,
 }
@@ -565,7 +565,7 @@ impl<'a> IntoIterator for &'a Mapping {
     }
 }
 
-/// Iterator over `&mut serde_yaml::Mapping`.
+/// Iterator over `&mut saphyr_serde::Mapping`.
 pub struct IterMut<'a> {
     iter: indexmap::map::IterMut<'a, Value, Value>,
 }
@@ -583,7 +583,7 @@ impl<'a> IntoIterator for &'a mut Mapping {
     }
 }
 
-/// Iterator over `serde_yaml::Mapping` by value.
+/// Iterator over `saphyr_serde::Mapping` by value.
 pub struct IntoIter {
     iter: indexmap::map::IntoIter<Value, Value>,
 }
@@ -601,35 +601,35 @@ impl IntoIterator for Mapping {
     }
 }
 
-/// Iterator of the keys of a `&serde_yaml::Mapping`.
+/// Iterator of the keys of a `&saphyr_serde::Mapping`.
 pub struct Keys<'a> {
     iter: indexmap::map::Keys<'a, Value, Value>,
 }
 
 delegate_iterator!((Keys<'a>) => &'a Value);
 
-/// Iterator of the keys of a `serde_yaml::Mapping`.
+/// Iterator of the keys of a `saphyr_serde::Mapping`.
 pub struct IntoKeys {
     iter: indexmap::map::IntoKeys<Value, Value>,
 }
 
 delegate_iterator!((IntoKeys) => Value);
 
-/// Iterator of the values of a `&serde_yaml::Mapping`.
+/// Iterator of the values of a `&saphyr_serde::Mapping`.
 pub struct Values<'a> {
     iter: indexmap::map::Values<'a, Value, Value>,
 }
 
 delegate_iterator!((Values<'a>) => &'a Value);
 
-/// Iterator of the values of a `&mut serde_yaml::Mapping`.
+/// Iterator of the values of a `&mut saphyr_serde::Mapping`.
 pub struct ValuesMut<'a> {
     iter: indexmap::map::ValuesMut<'a, Value, Value>,
 }
 
 delegate_iterator!((ValuesMut<'a>) => &'a mut Value);
 
-/// Iterator of the values of a `serde_yaml::Mapping`.
+/// Iterator of the values of a `saphyr_serde::Mapping`.
 pub struct IntoValues {
     iter: indexmap::map::IntoValues<Value, Value>,
 }

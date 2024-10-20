@@ -3,8 +3,8 @@ name = "saphyr-parser"
 readme = "README.md"
 authors = { workspace = true }
 categories = { workspace = true }
-description = { workspace = true }
-documentation = { workspace = true }
+description = "A fully YAML 1.2 compliant YAML parser"
+documentation = "https://docs.rs/saphyr-parser"
 edition = { workspace = true }
 keywords = { workspace = true }
 license = { workspace = true }

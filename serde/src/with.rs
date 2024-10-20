@@ -6,7 +6,6 @@
 /// # Example
 ///
 /// ```
-/// # use serde_derive::{Deserialize, Serialize};
 /// use serde::{Deserialize, Serialize};
 ///
 /// #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -19,30 +18,28 @@
 ///
 /// #[derive(Serialize, Deserialize, PartialEq, Debug)]
 /// struct Struct {
-///     #[serde(with = "serde_yaml::with::singleton_map")]
+///     #[serde(with = "saphyr_serde::with::singleton_map")]
 ///     w: Enum,
-///     #[serde(with = "serde_yaml::with::singleton_map")]
+///     #[serde(with = "saphyr_serde::with::singleton_map")]
 ///     x: Enum,
-///     #[serde(with = "serde_yaml::with::singleton_map")]
+///     #[serde(with = "saphyr_serde::with::singleton_map")]
 ///     y: Enum,
-///     #[serde(with = "serde_yaml::with::singleton_map")]
+///     #[serde(with = "saphyr_serde::with::singleton_map")]
 ///     z: Enum,
 /// }
 ///
-/// fn main() {
-///     let object = Struct {
-///         w: Enum::Unit,
-///         x: Enum::Newtype(1),
-///         y: Enum::Tuple(1, 1),
-///         z: Enum::Struct { value: 1 },
-///     };
+/// let object = Struct {
+///     w: Enum::Unit,
+///     x: Enum::Newtype(1),
+///     y: Enum::Tuple(1, 1),
+///     z: Enum::Struct { value: 1 },
+/// };
 ///
-///     let yaml = serde_yaml::to_string(&object).unwrap();
-///     print!("{}", yaml);
+/// let yaml = saphyr_serde::to_string(&object).unwrap();
+/// print!("{}", yaml);
 ///
-///     let deserialized: Struct = serde_yaml::from_str(&yaml).unwrap();
-///     assert_eq!(object, deserialized);
-/// }
+/// let deserialized: Struct = saphyr_serde::from_str(&yaml).unwrap();
+/// assert_eq!(object, deserialized);
 /// ```
 ///
 /// The representation using `singleton_map` on all the fields is:
@@ -840,7 +837,6 @@ pub mod singleton_map {
 /// # Example
 ///
 /// ```
-/// # use serde_derive::{Deserialize, Serialize};
 /// use serde::{Deserialize, Serialize};
 ///
 /// #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -858,28 +854,26 @@ pub mod singleton_map {
 /// struct Outer {
 ///     tagged_style: Inner,
 ///
-///     #[serde(with = "serde_yaml::with::singleton_map_recursive")]
+///     #[serde(with = "saphyr_serde::with::singleton_map_recursive")]
 ///     singleton_map_style: Inner,
 /// }
 ///
-/// fn main() {
-///     let object = Outer {
-///         tagged_style: Inner {
-///             a: Enum::Int(0),
-///             bs: vec![Enum::Int(1)],
-///         },
-///         singleton_map_style: Inner {
-///             a: Enum::Int(2),
-///             bs: vec![Enum::Int(3)],
-///         },
-///     };
+/// let object = Outer {
+///     tagged_style: Inner {
+///         a: Enum::Int(0),
+///         bs: vec![Enum::Int(1)],
+///     },
+///     singleton_map_style: Inner {
+///         a: Enum::Int(2),
+///         bs: vec![Enum::Int(3)],
+///     },
+/// };
 ///
-///     let yaml = serde_yaml::to_string(&object).unwrap();
-///     print!("{}", yaml);
+/// let yaml = saphyr_serde::to_string(&object).unwrap();
+/// print!("{}", yaml);
 ///
-///     let deserialized: Outer = serde_yaml::from_str(&yaml).unwrap();
-///     assert_eq!(object, deserialized);
-/// }
+/// let deserialized: Outer = saphyr_serde::from_str(&yaml).unwrap();
+/// assert_eq!(object, deserialized);
 /// ```
 ///
 /// The serialized output is:
@@ -900,7 +894,6 @@ pub mod singleton_map {
 /// call, without `serde(with = …)`, as follows.
 ///
 /// ```
-/// # use serde_derive::{Deserialize, Serialize};
 /// # use serde::{Deserialize, Serialize};
 /// #
 /// # #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -923,12 +916,12 @@ pub mod singleton_map {
 ///     };
 ///
 ///     let mut buf = Vec::new();
-///     let mut serializer = serde_yaml::Serializer::new(&mut buf);
-///     serde_yaml::with::singleton_map_recursive::serialize(&object, &mut serializer).unwrap();
+///     let mut serializer = saphyr_serde::Serializer::new(&mut buf);
+///     saphyr_serde::with::singleton_map_recursive::serialize(&object, &mut serializer).unwrap();
 ///     io::stdout().write_all(&buf).unwrap();
 ///
-///     let deserializer = serde_yaml::Deserializer::from_slice(&buf);
-///     let deserialized: Inner = serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+///     let deserializer = saphyr_serde::Deserializer::from_slice(&buf);
+///     let deserialized: Inner = saphyr_serde::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 ///     assert_eq!(object, deserialized);
 /// }
 /// ```

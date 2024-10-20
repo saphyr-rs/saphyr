@@ -6,9 +6,9 @@
 )]
 
 use indoc::indoc;
+use saphyr_serde::{Mapping, Number, Value};
 use serde::ser::SerializeMap;
-use serde_derive::{Deserialize, Serialize};
-use serde_yaml::{Mapping, Number, Value};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::iter;
@@ -17,24 +17,24 @@ fn test_serde<T>(thing: &T, yaml: &str)
 where
     T: serde::Serialize + serde::de::DeserializeOwned + PartialEq + Debug,
 {
-    let serialized = serde_yaml::to_string(&thing).unwrap();
+    let serialized = saphyr_serde::to_string(&thing).unwrap();
     assert_eq!(yaml, serialized);
 
-    let value = serde_yaml::to_value(thing).unwrap();
-    let serialized = serde_yaml::to_string(&value).unwrap();
+    let value = saphyr_serde::to_value(thing).unwrap();
+    let serialized = saphyr_serde::to_string(&value).unwrap();
     assert_eq!(yaml, serialized);
 
-    let deserialized: T = serde_yaml::from_str(yaml).unwrap();
+    let deserialized: T = saphyr_serde::from_str(yaml).unwrap();
     assert_eq!(*thing, deserialized);
 
-    let value: Value = serde_yaml::from_str(yaml).unwrap();
+    let value: Value = saphyr_serde::from_str(yaml).unwrap();
     let deserialized = T::deserialize(&value).unwrap();
     assert_eq!(*thing, deserialized);
 
-    let deserialized: T = serde_yaml::from_value(value).unwrap();
+    let deserialized: T = saphyr_serde::from_value(value).unwrap();
     assert_eq!(*thing, deserialized);
 
-    serde_yaml::from_str::<serde::de::IgnoredAny>(yaml).unwrap();
+    saphyr_serde::from_str::<serde::de::IgnoredAny>(yaml).unwrap();
 }
 
 #[test]
@@ -122,7 +122,7 @@ fn test_float() {
     "};
     test_serde(&thing, yaml);
 
-    let float: f64 = serde_yaml::from_str(indoc! {"
+    let float: f64 = saphyr_serde::from_str(indoc! {"
         .nan
     "})
     .unwrap();
@@ -149,7 +149,7 @@ fn test_float32() {
     "};
     test_serde(&thing, yaml);
 
-    let single_float: f32 = serde_yaml::from_str(indoc! {"
+    let single_float: f32 = saphyr_serde::from_str(indoc! {"
         .nan
     "})
     .unwrap();
@@ -162,19 +162,19 @@ fn test_char() {
     let yaml = indoc! {"
         '.'
     "};
-    assert_eq!(yaml, serde_yaml::to_string(&ch).unwrap());
+    assert_eq!(yaml, saphyr_serde::to_string(&ch).unwrap());
 
     let ch = '#';
     let yaml = indoc! {"
         '#'
     "};
-    assert_eq!(yaml, serde_yaml::to_string(&ch).unwrap());
+    assert_eq!(yaml, saphyr_serde::to_string(&ch).unwrap());
 
     let ch = '-';
     let yaml = indoc! {"
         '-'
     "};
-    assert_eq!(yaml, serde_yaml::to_string(&ch).unwrap());
+    assert_eq!(yaml, saphyr_serde::to_string(&ch).unwrap());
 }
 
 #[test]
@@ -220,7 +220,7 @@ fn test_map_key_value() {
     let yaml = indoc! {"
         k: v
     "};
-    assert_eq!(yaml, serde_yaml::to_string(&Map).unwrap());
+    assert_eq!(yaml, saphyr_serde::to_string(&Map).unwrap());
 }
 
 #[test]

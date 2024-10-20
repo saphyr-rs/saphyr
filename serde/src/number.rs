@@ -26,16 +26,16 @@ enum N {
 }
 
 impl Number {
-    /// Returns true if the `Number` is an integer between `i64::MIN` and
+    /// Returns true if the `Number` is an integer between [`i64::MIN` and
     /// `i64::MAX`.
     ///
     /// For any Number on which `is_i64` returns true, `as_i64` is guaranteed to
     /// return the integer value.
     ///
     /// ```
-    /// # fn main() -> serde_yaml::Result<()> {
+    /// # fn main() -> saphyr_serde::Result<()> {
     /// let big = i64::MAX as u64 + 10;
-    /// let v: serde_yaml::Value = serde_yaml::from_str(r#"
+    /// let v: saphyr_serde::Value = saphyr_serde::from_str(r#"
     /// a: 64
     /// b: 9223372036854775817
     /// c: 256.0
@@ -55,7 +55,7 @@ impl Number {
     #[allow(clippy::cast_sign_loss)]
     pub fn is_i64(&self) -> bool {
         match self.n {
-            N::PosInt(v) => v <= i64::max_value() as u64,
+            N::PosInt(v) => v <= i64::MAX as u64,
             N::NegInt(_) => true,
             N::Float(_) => false,
         }
@@ -67,8 +67,8 @@ impl Number {
     /// return the integer value.
     ///
     /// ```
-    /// # fn main() -> serde_yaml::Result<()> {
-    /// let v: serde_yaml::Value = serde_yaml::from_str(r#"
+    /// # fn main() -> saphyr_serde::Result<()> {
+    /// let v: saphyr_serde::Value = saphyr_serde::from_str(r#"
     /// a: 64
     /// b: -64
     /// c: 256.0
@@ -101,8 +101,8 @@ impl Number {
     /// `is_u64` return false but this is not a guarantee in the future.
     ///
     /// ```
-    /// # fn main() -> serde_yaml::Result<()> {
-    /// let v: serde_yaml::Value = serde_yaml::from_str(r#"
+    /// # fn main() -> saphyr_serde::Result<()> {
+    /// let v: saphyr_serde::Value = saphyr_serde::from_str(r#"
     /// a: 256.0
     /// b: 64
     /// c: -64
@@ -128,9 +128,9 @@ impl Number {
     /// None otherwise.
     ///
     /// ```
-    /// # fn main() -> serde_yaml::Result<()> {
+    /// # fn main() -> saphyr_serde::Result<()> {
     /// let big = i64::MAX as u64 + 10;
-    /// let v: serde_yaml::Value = serde_yaml::from_str(r#"
+    /// let v: saphyr_serde::Value = saphyr_serde::from_str(r#"
     /// a: 64
     /// b: 9223372036854775817
     /// c: 256.0
@@ -146,7 +146,7 @@ impl Number {
     pub fn as_i64(&self) -> Option<i64> {
         match self.n {
             N::PosInt(n) => {
-                if n <= i64::max_value() as u64 {
+                if n <= i64::MAX as u64 {
                     Some(n as i64)
                 } else {
                     None
@@ -161,8 +161,8 @@ impl Number {
     /// None otherwise.
     ///
     /// ```
-    /// # fn main() -> serde_yaml::Result<()> {
-    /// let v: serde_yaml::Value = serde_yaml::from_str(r#"
+    /// # fn main() -> saphyr_serde::Result<()> {
+    /// let v: saphyr_serde::Value = saphyr_serde::from_str(r#"
     /// a: 64
     /// b: -64
     /// c: 256.0
@@ -185,8 +185,8 @@ impl Number {
     /// Represents the number as f64 if possible. Returns None otherwise.
     ///
     /// ```
-    /// # fn main() -> serde_yaml::Result<()> {
-    /// let v: serde_yaml::Value = serde_yaml::from_str(r#"
+    /// # fn main() -> saphyr_serde::Result<()> {
+    /// let v: saphyr_serde::Value = saphyr_serde::from_str(r#"
     /// a: 256.0
     /// b: 64
     /// c: -64
@@ -200,14 +200,14 @@ impl Number {
     /// ```
     ///
     /// ```
-    /// # fn main() -> serde_yaml::Result<()> {
-    /// let v: serde_yaml::Value = serde_yaml::from_str(".inf")?;
+    /// # fn main() -> saphyr_serde::Result<()> {
+    /// let v: saphyr_serde::Value = saphyr_serde::from_str(".inf")?;
     /// assert_eq!(v.as_f64(), Some(f64::INFINITY));
     ///
-    /// let v: serde_yaml::Value = serde_yaml::from_str("-.inf")?;
+    /// let v: saphyr_serde::Value = saphyr_serde::from_str("-.inf")?;
     /// assert_eq!(v.as_f64(), Some(f64::NEG_INFINITY));
     ///
-    /// let v: serde_yaml::Value = serde_yaml::from_str(".nan")?;
+    /// let v: saphyr_serde::Value = saphyr_serde::from_str(".nan")?;
     /// assert!(v.as_f64().unwrap().is_nan());
     /// # Ok(())
     /// # }
@@ -224,7 +224,7 @@ impl Number {
     /// Returns true if this value is NaN and false otherwise.
     ///
     /// ```
-    /// # use serde_yaml::Number;
+    /// # use saphyr_serde::Number;
     /// #
     /// assert!(!Number::from(256.0).is_nan());
     ///
@@ -248,7 +248,7 @@ impl Number {
     /// false otherwise.
     ///
     /// ```
-    /// # use serde_yaml::Number;
+    /// # use saphyr_serde::Number;
     /// #
     /// assert!(!Number::from(256.0).is_infinite());
     ///
@@ -271,7 +271,7 @@ impl Number {
     /// Returns true if this number is neither infinite nor NaN.
     ///
     /// ```
-    /// # use serde_yaml::Number;
+    /// # use saphyr_serde::Number;
     /// #
     /// assert!(Number::from(256.0).is_finite());
     ///

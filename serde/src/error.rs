@@ -11,7 +11,7 @@ use std::sync::Arc;
 /// An error that happened serializing or deserializing YAML data.
 pub struct Error(Box<ErrorImpl>);
 
-/// Alias for a `Result` with the error type `serde_yaml::Error`.
+/// Alias for a `Result` with the error type `saphyr_serde::Error`.
 pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
@@ -89,10 +89,10 @@ impl Error {
     /// # Examples
     ///
     /// ```
-    /// # use serde_yaml::{Value, Error};
+    /// # use saphyr_serde::{Value, Error};
     /// #
     /// // The `@` character as the first character makes this invalid yaml
-    /// let invalid_yaml: Result<Value, Error> = serde_yaml::from_str("@invalid_yaml");
+    /// let invalid_yaml: Result<Value, Error> = saphyr_serde::from_str("@invalid_yaml");
     ///
     /// let location = invalid_yaml.unwrap_err().location().unwrap();
     ///

@@ -33,10 +33,10 @@ pub enum Value {
     /// Represents a YAML string.
     String(String),
     /// Represents a YAML sequence in which the elements are
-    /// `serde_yaml::Value`.
+    /// `saphyr_serde::Value`.
     Sequence(Sequence),
     /// Represents a YAML mapping in which the keys and values are both
-    /// `serde_yaml::Value`.
+    /// `saphyr_serde::Value`.
     Mapping(Mapping),
     /// A representation of YAML's `!Tag` syntax, used for enums.
     Tagged(Box<TaggedValue>),
@@ -49,9 +49,8 @@ pub enum Value {
 /// # Examples
 ///
 /// ```
-/// # use serde_derive::Deserialize;
 /// use serde::Deserialize;
-/// use serde_yaml::Value;
+/// use saphyr_serde::Value;
 ///
 /// #[derive(Deserialize)]
 /// struct Settings {
@@ -60,9 +59,9 @@ pub enum Value {
 ///     extras: Value,
 /// }
 ///
-/// # fn try_main() -> Result<(), serde_yaml::Error> {
+/// # fn try_main() -> Result<(), saphyr_serde::Error> {
 /// let data = r#" { "level": 42 } "#;
-/// let s: Settings = serde_yaml::from_str(data)?;
+/// let s: Settings = saphyr_serde::from_str(data)?;
 ///
 /// assert_eq!(s.level, 42);
 /// assert_eq!(s.extras, Value::Null);
@@ -78,18 +77,18 @@ impl Default for Value {
     }
 }
 
-/// A YAML sequence in which the elements are `serde_yaml::Value`.
+/// A YAML sequence in which the elements are `saphyr_serde::Value`.
 pub type Sequence = Vec<Value>;
 
-/// Convert a `T` into `serde_yaml::Value` which is an enum that can represent
+/// Convert a `T` into `saphyr_serde::Value` which is an enum that can represent
 /// any valid YAML data.
 ///
 /// This conversion can fail if `T`'s implementation of `Serialize` decides to
 /// return an error.
 ///
 /// ```
-/// # use serde_yaml::Value;
-/// let val = serde_yaml::to_value("s").unwrap();
+/// # use saphyr_serde::Value;
+/// let val = saphyr_serde::to_value("s").unwrap();
 /// assert_eq!(val, Value::String("s".to_owned()));
 /// ```
 pub fn to_value<T>(value: T) -> Result<Value, Error>
@@ -99,7 +98,7 @@ where
     value.serialize(Serializer)
 }
 
-/// Interpret a `serde_yaml::Value` as an instance of type `T`.
+/// Interpret a `saphyr_serde::Value` as an instance of type `T`.
 ///
 /// This conversion can fail if the structure of the Value does not match the
 /// structure expected by `T`, for example if `T` is a struct type but the Value
@@ -110,9 +109,9 @@ where
 /// type.
 ///
 /// ```
-/// # use serde_yaml::Value;
+/// # use saphyr_serde::Value;
 /// let val = Value::String("foo".to_owned());
-/// let s: String = serde_yaml::from_value(val).unwrap();
+/// let s: String = saphyr_serde::from_value(val).unwrap();
 /// assert_eq!("foo", s);
 /// ```
 pub fn from_value<T>(value: Value) -> Result<T, Error>
@@ -133,14 +132,14 @@ impl Value {
     /// or the given index is not within the bounds of the sequence.
     ///
     /// ```
-    /// # fn main() -> serde_yaml::Result<()> {
-    /// use serde_yaml::Value;
+    /// # fn main() -> saphyr_serde::Result<()> {
+    /// use saphyr_serde::Value;
     ///
-    /// let object: Value = serde_yaml::from_str(r#"{ A: 65, B: 66, C: 67 }"#)?;
+    /// let object: Value = saphyr_serde::from_str(r#"{ A: 65, B: 66, C: 67 }"#)?;
     /// let x = object.get("A").unwrap();
     /// assert_eq!(x, 65);
     ///
-    /// let sequence: Value = serde_yaml::from_str(r#"[ "A", "B", "C" ]"#)?;
+    /// let sequence: Value = saphyr_serde::from_str(r#"[ "A", "B", "C" ]"#)?;
     /// let x = sequence.get(2).unwrap();
     /// assert_eq!(x, &Value::String("C".into()));
     ///
@@ -154,10 +153,10 @@ impl Value {
     /// `None`.
     ///
     /// ```
-    /// # use serde_yaml::Value;
+    /// # use saphyr_serde::Value;
     /// #
-    /// # fn main() -> serde_yaml::Result<()> {
-    /// let object: Value = serde_yaml::from_str(r#"
+    /// # fn main() -> saphyr_serde::Result<()> {
+    /// let object: Value = saphyr_serde::from_str(r#"
     /// A: [a, á, à]
     /// B: [b, b́]
     /// C: [c, ć, ć̣, ḉ]
@@ -195,14 +194,14 @@ impl Value {
     /// to return `Some(())`.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("null").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("null").unwrap();
     /// assert!(v.is_null());
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("false").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("false").unwrap();
     /// assert!(!v.is_null());
     /// ```
     pub fn is_null(&self) -> bool {
@@ -216,14 +215,14 @@ impl Value {
     /// If the `Value` is a Null, returns (). Returns None otherwise.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("null").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("null").unwrap();
     /// assert_eq!(v.as_null(), Some(()));
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("false").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("false").unwrap();
     /// assert_eq!(v.as_null(), None);
     /// ```
     pub fn as_null(&self) -> Option<()> {
@@ -239,14 +238,14 @@ impl Value {
     /// guaranteed to return the boolean value.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("true").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("true").unwrap();
     /// assert!(v.is_bool());
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("42").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("42").unwrap();
     /// assert!(!v.is_bool());
     /// ```
     pub fn is_bool(&self) -> bool {
@@ -257,14 +256,14 @@ impl Value {
     /// otherwise.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("true").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("true").unwrap();
     /// assert_eq!(v.as_bool(), Some(true));
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("42").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("42").unwrap();
     /// assert_eq!(v.as_bool(), None);
     /// ```
     pub fn as_bool(&self) -> Option<bool> {
@@ -277,14 +276,14 @@ impl Value {
     /// Returns true if the `Value` is a Number. Returns false otherwise.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("5").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("5").unwrap();
     /// assert!(v.is_number());
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("true").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("true").unwrap();
     /// assert!(!v.is_number());
     /// ```
     pub fn is_number(&self) -> bool {
@@ -301,14 +300,14 @@ impl Value {
     /// return the integer value.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("1337").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("1337").unwrap();
     /// assert!(v.is_i64());
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("null").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("null").unwrap();
     /// assert!(!v.is_i64());
     /// ```
     pub fn is_i64(&self) -> bool {
@@ -319,14 +318,14 @@ impl Value {
     /// None otherwise.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("1337").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("1337").unwrap();
     /// assert_eq!(v.as_i64(), Some(1337));
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("false").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("false").unwrap();
     /// assert_eq!(v.as_i64(), None);
     /// ```
     pub fn as_i64(&self) -> Option<i64> {
@@ -343,14 +342,14 @@ impl Value {
     /// return the integer value.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("1337").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("1337").unwrap();
     /// assert!(v.is_u64());
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("null").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("null").unwrap();
     /// assert!(!v.is_u64());
     /// ```
     pub fn is_u64(&self) -> bool {
@@ -361,14 +360,14 @@ impl Value {
     /// None otherwise.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("1337").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("1337").unwrap();
     /// assert_eq!(v.as_u64(), Some(1337));
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("false").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("false").unwrap();
     /// assert_eq!(v.as_u64(), None);
     /// ```
     pub fn as_u64(&self) -> Option<u64> {
@@ -387,14 +386,14 @@ impl Value {
     /// `is_u64` return false but this is not a guarantee in the future.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("256.01").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("256.01").unwrap();
     /// assert!(v.is_f64());
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("true").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("true").unwrap();
     /// assert!(!v.is_f64());
     /// ```
     pub fn is_f64(&self) -> bool {
@@ -408,14 +407,14 @@ impl Value {
     /// None otherwise.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("13.37").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("13.37").unwrap();
     /// assert_eq!(v.as_f64(), Some(13.37));
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("false").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("false").unwrap();
     /// assert_eq!(v.as_f64(), None);
     /// ```
     pub fn as_f64(&self) -> Option<f64> {
@@ -431,14 +430,14 @@ impl Value {
     /// to return the string slice.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("'lorem ipsum'").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("'lorem ipsum'").unwrap();
     /// assert!(v.is_string());
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("42").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("42").unwrap();
     /// assert!(!v.is_string());
     /// ```
     pub fn is_string(&self) -> bool {
@@ -449,14 +448,14 @@ impl Value {
     /// otherwise.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("'lorem ipsum'").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("'lorem ipsum'").unwrap();
     /// assert_eq!(v.as_str(), Some("lorem ipsum"));
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("false").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("false").unwrap();
     /// assert_eq!(v.as_str(), None);
     /// ```
     pub fn as_str(&self) -> Option<&str> {
@@ -469,14 +468,14 @@ impl Value {
     /// Returns true if the `Value` is a sequence. Returns false otherwise.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("[1, 2, 3]").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("[1, 2, 3]").unwrap();
     /// assert!(v.is_sequence());
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("true").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("true").unwrap();
     /// assert!(!v.is_sequence());
     /// ```
     pub fn is_sequence(&self) -> bool {
@@ -487,14 +486,14 @@ impl Value {
     /// Returns None otherwise.
     ///
     /// ```
-    /// # use serde_yaml::{Value, Number};
-    /// let v: Value = serde_yaml::from_str("[1, 2]").unwrap();
+    /// # use saphyr_serde::{Value, Number};
+    /// let v: Value = saphyr_serde::from_str("[1, 2]").unwrap();
     /// assert_eq!(v.as_sequence(), Some(&vec![Value::Number(Number::from(1)), Value::Number(Number::from(2))]));
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("false").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("false").unwrap();
     /// assert_eq!(v.as_sequence(), None);
     /// ```
     pub fn as_sequence(&self) -> Option<&Sequence> {
@@ -508,16 +507,16 @@ impl Value {
     /// possible. Returns None otherwise.
     ///
     /// ```
-    /// # use serde_yaml::{Value, Number};
-    /// let mut v: Value = serde_yaml::from_str("[1]").unwrap();
+    /// # use saphyr_serde::{Value, Number};
+    /// let mut v: Value = saphyr_serde::from_str("[1]").unwrap();
     /// let s = v.as_sequence_mut().unwrap();
     /// s.push(Value::Number(Number::from(2)));
     /// assert_eq!(s, &vec![Value::Number(Number::from(1)), Value::Number(Number::from(2))]);
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let mut v: Value = serde_yaml::from_str("false").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let mut v: Value = saphyr_serde::from_str("false").unwrap();
     /// assert_eq!(v.as_sequence_mut(), None);
     /// ```
     pub fn as_sequence_mut(&mut self) -> Option<&mut Sequence> {
@@ -530,14 +529,14 @@ impl Value {
     /// Returns true if the `Value` is a mapping. Returns false otherwise.
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("a: 42").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("a: 42").unwrap();
     /// assert!(v.is_mapping());
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("true").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("true").unwrap();
     /// assert!(!v.is_mapping());
     /// ```
     pub fn is_mapping(&self) -> bool {
@@ -548,8 +547,8 @@ impl Value {
     /// Returns None otherwise.
     ///
     /// ```
-    /// # use serde_yaml::{Value, Mapping, Number};
-    /// let v: Value = serde_yaml::from_str("a: 42").unwrap();
+    /// # use saphyr_serde::{Value, Mapping, Number};
+    /// let v: Value = saphyr_serde::from_str("a: 42").unwrap();
     ///
     /// let mut expected = Mapping::new();
     /// expected.insert(Value::String("a".into()),Value::Number(Number::from(42)));
@@ -558,8 +557,8 @@ impl Value {
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::Value;
-    /// let v: Value = serde_yaml::from_str("false").unwrap();
+    /// # use saphyr_serde::Value;
+    /// let v: Value = saphyr_serde::from_str("false").unwrap();
     /// assert_eq!(v.as_mapping(), None);
     /// ```
     pub fn as_mapping(&self) -> Option<&Mapping> {
@@ -573,8 +572,8 @@ impl Value {
     /// Returns None otherwise.
     ///
     /// ```
-    /// # use serde_yaml::{Value, Mapping, Number};
-    /// let mut v: Value = serde_yaml::from_str("a: 42").unwrap();
+    /// # use saphyr_serde::{Value, Mapping, Number};
+    /// let mut v: Value = saphyr_serde::from_str("a: 42").unwrap();
     /// let m = v.as_mapping_mut().unwrap();
     /// m.insert(Value::String("b".into()), Value::Number(Number::from(21)));
     ///
@@ -586,8 +585,8 @@ impl Value {
     /// ```
     ///
     /// ```
-    /// # use serde_yaml::{Value, Mapping};
-    /// let mut v: Value = serde_yaml::from_str("false").unwrap();
+    /// # use saphyr_serde::{Value, Mapping};
+    /// let mut v: Value = saphyr_serde::from_str("false").unwrap();
     /// assert_eq!(v.as_mapping_mut(), None);
     /// ```
     pub fn as_mapping_mut(&mut self) -> Option<&mut Mapping> {
@@ -603,7 +602,7 @@ impl Value {
     /// <https://yaml.org/type/merge.html>.
     ///
     /// ```
-    /// use serde_yaml::Value;
+    /// use saphyr_serde::Value;
     ///
     /// let config = "\
     /// tasks:
@@ -617,7 +616,7 @@ impl Value {
     ///     args: start
     /// ";
     ///
-    /// let mut value: Value = serde_yaml::from_str(config).unwrap();
+    /// let mut value: Value = saphyr_serde::from_str(config).unwrap();
     /// value.apply_merge().unwrap();
     ///
     /// assert_eq!(value["tasks"]["start"]["command"], "webpack");

@@ -9,6 +9,8 @@ members = [
     "bench/tools/gen_large_yaml",
     "bench/tools/bench_compare",
     "fuzz",
+    "serde",
+    "serde/fuzz",
 ]
 resolver = "2"
 

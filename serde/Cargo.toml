@@ -1,15 +1,20 @@
 [package]
-name = "serde_yaml"
-version = "0.9.34+deprecated"
-authors = ["David Tolnay <dtolnay@gmail.com>"]
+name = "saphyr-serde"
+readme = "README.md"
+authors = [
+  "David Tolnay <dtolnay@gmail.com>",
+  "Ethiraric <ethiraric@gmail.com>",
+  "David Aguilar <davvid@gmail.com>",
+]
 categories = ["encoding", "parser-implementations"]
 description = "YAML data format for Serde"
-documentation = "https://docs.rs/serde_yaml/"
-edition = "2021"
+documentation = "https://docs.rs/saphyr-serde/"
+edition = { workspace = true }
 keywords = ["yaml", "serde", "serialization"]
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/dtolnay/serde-yaml"
+license = { workspace = true }
+repository = { workspace = true }
 rust-version = "1.64"
+version = { workspace = true }
 
 [dependencies]
 indexmap = "2.2.1"
@@ -21,7 +26,7 @@ unsafe-libyaml = "0.2.11"
 [dev-dependencies]
 anyhow = "1.0.79"
 indoc = "2.0"
-serde_derive = "1.0.195"
+serde = { version = "1.0.195", features = ["derive"] }
 
 [lib]
 doc-scrape-examples = false

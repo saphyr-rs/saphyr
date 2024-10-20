@@ -28,7 +28,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 ///
 /// fn main() -> Result<()> {
 ///     let mut buffer = Vec::new();
-///     let mut ser = serde_yaml::Serializer::new(&mut buffer);
+///     let mut ser = saphyr_serde::Serializer::new(&mut buffer);
 ///
 ///     let mut object = BTreeMap::new();
 ///     object.insert("k", 107);

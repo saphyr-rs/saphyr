@@ -1,5 +1,5 @@
 [package]
-name = "serde_yaml-fuzz"
+name = "saphyr_serde-fuzz"
 version = "0.0.0"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 edition = "2021"
@@ -10,12 +10,10 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-serde_yaml = { path = ".." }
+saphyr-serde = { path = ".." }
 
 [[bin]]
 name = "fuzz_from_slice"
 path = "fuzz_targets/fuzz_from_slice.rs"
 test = false
 doc = false
-
-[workspace]
