@@ -74,3 +74,14 @@ fn fuzz_2() {
     let s = str::from_utf8(raw_input).unwrap();
     let _ = run_parser(s);
 }
+
+#[test]
+fn fuzz_3() {
+    // Span mismatch when parsing with `StrInput` and `BufferedInput`.
+    // In block scalars, there was a section in which we took the byte count rather than the char
+    // count to update the index. The issue didn't happen with `StrInput` as the buffer was always
+    // full and the offending code was never executed.
+    let raw_input: &[u8] = &[124, 13, 32, 210, 180, 65];
+    let s = str::from_utf8(raw_input).unwrap();
+    let _ = run_parser(s);
+}

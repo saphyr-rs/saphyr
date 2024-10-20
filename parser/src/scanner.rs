@@ -1775,8 +1775,9 @@ impl<T: Input> Scanner<T> {
             }
 
             // We need to manually update our position; we haven't called a `skip` function.
-            self.mark.col += line_buffer.len();
-            self.mark.index += line_buffer.len();
+            let n_chars = line_buffer.chars().count();
+            self.mark.col += n_chars;
+            self.mark.index += n_chars;
 
             // We can now append our bytes to our `string`.
             string.reserve(line_buffer.as_bytes().len());
