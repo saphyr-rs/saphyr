@@ -1,4 +1,4 @@
-/Cargo.lock
+**Cargo.lock
 /bench/perf.*
 /bench/coverage.sh
 /parser/perf.*
