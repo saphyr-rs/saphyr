@@ -3,6 +3,7 @@
 ## Upcoming
 
 **Breaking Changes**:
+
 - Move `load_from_*` methods out of the `YamlLoader`. Now, `YamlLoader` gained
   a generic parameter. Moving those functions out of it spares having to
   manually specify the generic in `YamlLoader::<Yaml>::load_from_str`.
@@ -38,6 +39,10 @@
   stream of the start of the node.
 
   This feature is extensible and should allow (later) to add comments.
+
+**Fixes**:
+
+- 1fc4692: Fix trailing newlines when emitting multiline strings.
 
 ## v0.8.0
 
