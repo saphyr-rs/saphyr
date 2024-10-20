@@ -10,6 +10,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 saphyr.workspace = true
+saphyr-parser.workspace = true
 
 [[bin]]
 name = "parse"
