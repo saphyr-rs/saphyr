@@ -81,8 +81,8 @@ fn test_quoted() {
         [("foo", "foo"), ("bar", r#""bar""#),]
     );
     assert_eq!(
-        deref_pairs(&run_parser_and_deref_scalar_spans(r#"foo: 'bar'"#).unwrap()),
-        [("foo", "foo"), ("bar", r#"'bar'"#),]
+        deref_pairs(&run_parser_and_deref_scalar_spans(r"foo: 'bar'").unwrap()),
+        [("foo", "foo"), ("bar", r"'bar'"),]
     );
 
     assert_eq!(
@@ -132,5 +132,35 @@ fn test_seq() {
     assert_eq!(
         run_parser_and_deref_seq_spans("foo:\n  - a\n  - bar:\n    - b\n    - c").unwrap(),
         ["b\n    - c", "- a\n  - bar:\n    - b\n    - c"]
+    );
+}
+
+#[test]
+fn test_literal_utf8() {
+    assert_eq!(
+        deref_pairs(&run_parser_and_deref_scalar_spans("foo: |\n  你好").unwrap()),
+        [("foo", "foo"), ("你好\n", "你好"),]
+    );
+    assert_eq!(
+        deref_pairs(&run_parser_and_deref_scalar_spans("foo: |\n  one:你好\n  two:你好").unwrap()),
+        [
+            ("foo", "foo"),
+            ("one:你好\ntwo:你好\n", "one:你好\n  two:你好"),
+        ]
+    );
+}
+
+#[test]
+fn test_block_utf8() {
+    assert_eq!(
+        deref_pairs(&run_parser_and_deref_scalar_spans("foo: >\n  你好").unwrap()),
+        [("foo", "foo"), ("你好\n", "你好")],
+    );
+    assert_eq!(
+        deref_pairs(&run_parser_and_deref_scalar_spans("foo: >\n  one:你好\n  two:你好").unwrap()),
+        [
+            ("foo", "foo"),
+            ("one:你好 two:你好\n", "one:你好\n  two:你好")
+        ],
     );
 }
