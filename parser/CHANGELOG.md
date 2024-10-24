@@ -2,6 +2,8 @@
 
 ## Upcoming
 
+## v0.0.3
+
 **Breaking Changes**:
 
 - 926fdfb: Events now use spans rather than markers, allowing for tracking both
@@ -26,7 +28,7 @@
   characters.
 - 95fe3fe: Fix parse errors when `---` appeared in the middle of plain scalars.
 - 3358629: Fix infinite loop with `...` in plain scalars in flow contexts.
-- Fix panics on other various erroneous inputs found while fuzzing
+- Fix panics on other various erroneous inputs found while fuzzing.
 
 **Internal changes**:
 

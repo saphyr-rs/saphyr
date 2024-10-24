@@ -18,7 +18,7 @@ authors = [
   "David Aguilar <davvid@gmail.com>",
   "Yuheng Chen <yuhengchen@sensetime.com>"
 ]
-version = "0.0.2"
+version = "0.0.3"
 documentation = "https://docs.rs/saphyr"
 keywords = [ "yaml", "parser" ]
 categories = [ "encoding", "parser-implementations" ]

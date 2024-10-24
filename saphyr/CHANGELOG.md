@@ -2,6 +2,11 @@
 
 ## Upcoming
 
+## v0.0.3
+
+Skipping version `v0.0.2` to align this crate's version with that of
+`saphyr-parser`.
+
 **Breaking Changes**:
 
 - Move `load_from_*` methods out of the `YamlLoader`. Now, `YamlLoader` gained
@@ -44,6 +49,7 @@
 
 - 1fc4692: Fix trailing newlines when emitting multiline strings.
 
+# Older `yaml-rust2` changelgos
 ## v0.8.0
 
 **Breaking Changes**:
