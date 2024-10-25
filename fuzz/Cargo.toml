@@ -1,0 +1,21 @@
+[package]
+name = "serde_yaml-fuzz"
+version = "0.0.0"
+authors = ["David Tolnay <dtolnay@gmail.com>"]
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_yaml = { path = ".." }
+
+[[bin]]
+name = "fuzz_from_slice"
+path = "fuzz_targets/fuzz_from_slice.rs"
+test = false
+doc = false
+
+[workspace]
