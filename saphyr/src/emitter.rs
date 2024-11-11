@@ -1,10 +1,15 @@
 //! YAML serialization helpers.
 
-use crate::char_traits;
-use crate::yaml::{Hash, Yaml};
-use std::convert::From;
-use std::error::Error;
-use std::fmt::{self, Display};
+use std::{
+    convert::From,
+    error::Error,
+    fmt::{self, Display},
+};
+
+use crate::{
+    char_traits,
+    yaml::{Hash, Yaml},
+};
 
 /// An error when emitting YAML.
 #[derive(Copy, Clone, Debug)]
@@ -49,16 +54,24 @@ impl From<fmt::Error> for EmitError {
 /// ```
 #[allow(clippy::module_name_repetitions)]
 pub struct YamlEmitter<'a> {
+    /// The output stream in which we output YAML.
     writer: &'a mut dyn fmt::Write,
-    best_indent: usize,
+    /// Whether compact in-line notation is on or off.
+    ///
+    /// See [`Self::compact`].
     compact: bool,
+    /// The current non-flow nesting level.
     level: isize,
+    /// Whether we render multiline strings in literal style.
+    ///
+    /// See [`Self::multiline_strings`].
     multiline_strings: bool,
 }
 
 /// A convenience alias for emitter functions that may fail without returning a value.
 pub type EmitResult = Result<(), EmitError>;
 
+/// Write the escaped double-quoted string into the given writer.
 // from serialize::json
 fn escape_str(wr: &mut dyn fmt::Write, v: &str) -> Result<(), fmt::Error> {
     wr.write_str("\"")?;
@@ -127,14 +140,13 @@ impl<'a> YamlEmitter<'a> {
     pub fn new(writer: &'a mut dyn fmt::Write) -> Self {
         YamlEmitter {
             writer,
-            best_indent: 2,
             compact: true,
             level: -1,
             multiline_strings: false,
         }
     }
 
-    /// Set 'compact inline notation' on or off, as described for block
+    /// Set 'compact in-line notation' on or off, as described for block
     /// [sequences](http://www.yaml.org/spec/1.2/spec.html#id2797382)
     /// and
     /// [mappings](http://www.yaml.org/spec/1.2/spec.html#id2798057).
@@ -148,7 +160,9 @@ impl<'a> YamlEmitter<'a> {
         self.compact = compact;
     }
 
-    /// Determine if this emitter is using 'compact inline notation'.
+    /// Determine if this emitter is using 'compact in-line notation'.
+    ///
+    /// See [`Self::compact`].
     #[must_use]
     pub fn is_compact(&self) -> bool {
         self.compact
@@ -159,11 +173,10 @@ impl<'a> YamlEmitter<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// use saphyr::{Yaml, YamlEmitter};
-    ///
-    /// let input = r#"{foo: "bar!\nbar!", baz: 42}"#;
+    /// # use saphyr::{Yaml, YamlEmitter};
+    /// #
+    /// let input = r#"{foo: "bar\nbar", baz: 42}"#;
     /// let parsed = Yaml::load_from_str(input).unwrap();
-    /// eprintln!("{:?}", parsed);
     ///
     /// let mut output = String::new();
     /// let mut emitter = YamlEmitter::new(&mut output);
@@ -172,8 +185,8 @@ impl<'a> YamlEmitter<'a> {
     /// assert_eq!(output.as_str(), "\
     /// ---
     /// foo: |-
-    ///   bar!
-    ///   bar!
+    ///   bar
+    ///   bar
     /// baz: 42");
     /// ```
     ///
@@ -183,14 +196,17 @@ impl<'a> YamlEmitter<'a> {
     }
 
     /// Determine if this emitter will emit multiline strings when appropriate.
+    ///
+    /// See [`Self::multiline_strings`].
     #[must_use]
     pub fn is_multiline_strings(&self) -> bool {
         self.multiline_strings
     }
 
     /// Dump Yaml to an output stream.
+    ///
     /// # Errors
-    /// Returns `EmitError` when an error occurs.
+    /// Returns [`EmitError`] when an error occurs.
     pub fn dump(&mut self, doc: &Yaml) -> EmitResult {
         // write DocumentStart
         writeln!(self.writer, "---")?;
@@ -203,9 +219,7 @@ impl<'a> YamlEmitter<'a> {
             return Ok(());
         }
         for _ in 0..self.level {
-            for _ in 0..self.best_indent {
-                write!(self.writer, " ")?;
-            }
+            write!(self.writer, "  ")?;
         }
         Ok(())
     }
