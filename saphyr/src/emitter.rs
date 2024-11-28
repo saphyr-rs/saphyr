@@ -6,10 +6,15 @@ use std::{
     fmt::{self, Display},
 };
 
+use saphyr_parser::TScalarStyle;
+
 use crate::{
     char_traits,
+    emitter::event::{EmitterEvent, EventYamlEmitter},
     yaml::{Hash, Yaml},
 };
+
+pub(crate) mod event;
 
 /// The YAML serializer.
 ///
@@ -27,29 +32,17 @@ use crate::{
 /// ```
 #[allow(clippy::module_name_repetitions)]
 pub struct YamlEmitter<'a> {
-    /// The output stream in which we output YAML.
-    writer: &'a mut dyn fmt::Write,
-    /// Whether compact in-line notation is on or off.
-    ///
-    /// See [`Self::compact`].
-    compact: bool,
-    /// The current non-flow nesting level.
-    level: isize,
-    /// Whether we render multiline strings in literal style.
-    ///
-    /// See [`Self::multiline_strings`].
-    multiline_strings: bool,
+    /// The inner emitter, using the lower-level event API.
+    event_emitter: EventYamlEmitter<'a>,
 }
 
 impl<'a> YamlEmitter<'a> {
     /// Create a new emitter serializing into `writer`.
     pub fn new(writer: &'a mut dyn fmt::Write) -> Self {
         YamlEmitter {
-            writer,
-            compact: true,
-            level: -1,
-            multiline_strings: false,
+            event_emitter: EventYamlEmitter::new(writer),
         }
+        // While we could emit the `StreamStart` event, the `EventYamlEmitter` ignores it.
     }
 
     /// Set 'compact in-line notation' on or off, as described for block
@@ -57,221 +50,101 @@ impl<'a> YamlEmitter<'a> {
     /// and
     /// [mappings](http://www.yaml.org/spec/1.2/spec.html#id2798057).
     ///
-    /// In this form, blocks cannot have any properties (such as anchors
-    /// or tags), which should be OK, because this emitter doesn't
-    /// (currently) emit those anyways.
-    ///
-    /// TODO(ethiraric, 2024/04/02): We can support those now.
+    /// See [`EventYamlEmitter::compact`].
     pub fn compact(&mut self, compact: bool) {
-        self.compact = compact;
+        self.event_emitter.compact(compact);
     }
 
     /// Determine if this emitter is using 'compact in-line notation'.
     ///
-    /// See [`Self::compact`].
+    /// See [`EventYamlEmitter::compact`].
     #[must_use]
     pub fn is_compact(&self) -> bool {
-        self.compact
+        self.event_emitter.is_compact()
     }
 
     /// Render strings containing multiple lines in [literal style].
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use saphyr::{Yaml, YamlEmitter};
-    /// #
-    /// let input = r#"{foo: "bar\nbar", baz: 42}"#;
-    /// let parsed = Yaml::load_from_str(input).unwrap();
-    ///
-    /// let mut output = String::new();
-    /// let mut emitter = YamlEmitter::new(&mut output);
-    /// emitter.multiline_strings(true);
-    /// emitter.dump(&parsed[0]).unwrap();
-    /// assert_eq!(output.as_str(), "\
-    /// ---
-    /// foo: |-
-    ///   bar
-    ///   bar
-    /// baz: 42");
-    /// ```
-    ///
-    /// [literal style]: https://yaml.org/spec/1.2/spec.html#id2795688
+    /// See [`EventYamlEmitter::multiline_strings`].
     pub fn multiline_strings(&mut self, multiline_strings: bool) {
-        self.multiline_strings = multiline_strings;
+        self.event_emitter.multiline_strings(multiline_strings);
     }
 
     /// Determine if this emitter will emit multiline strings when appropriate.
     ///
-    /// See [`Self::multiline_strings`].
+    /// See [`EventYamlEmitter::multiline_strings`].
     #[must_use]
     pub fn is_multiline_strings(&self) -> bool {
-        self.multiline_strings
+        self.event_emitter.is_multiline_strings()
     }
 
-    /// Dump Yaml to an output stream.
+    /// Dump the given YAML node as a single document to the inner output stream.
     ///
     /// # Errors
     /// Returns [`EmitError`] when an error occurs.
     pub fn dump(&mut self, doc: &Yaml) -> EmitResult {
-        // write DocumentStart
-        writeln!(self.writer, "---")?;
-        self.level = -1;
-        self.emit_node(doc)
+        self.event_emitter.on_document_start(true)?;
+        self.emit_node(doc)?;
+        self.event_emitter.on_document_end(false)
     }
 
-    fn write_indent(&mut self) -> EmitResult {
-        if self.level <= 0 {
-            return Ok(());
-        }
-        for _ in 0..self.level {
-            write!(self.writer, "  ")?;
-        }
-        Ok(())
-    }
-
+    /// Emit a YAML node.
     fn emit_node(&mut self, node: &Yaml) -> EmitResult {
         match *node {
             Yaml::Array(ref v) => self.emit_array(v),
             Yaml::Hash(ref h) => self.emit_hash(h),
             Yaml::String(ref v) => {
-                if self.multiline_strings
+                let style = if self.event_emitter.is_multiline_strings()
                     && v.contains('\n')
                     && char_traits::is_valid_literal_block_scalar(v)
                 {
-                    self.emit_literal_block(v)?;
-                } else if need_quotes(v) {
-                    escape_str(self.writer, v)?;
+                    TScalarStyle::Literal
+                } else if needs_quotes(v) {
+                    TScalarStyle::DoubleQuoted
                 } else {
-                    write!(self.writer, "{v}")?;
-                }
-                Ok(())
+                    TScalarStyle::Plain
+                };
+                self.event_emitter.on_scalar(v, style)
             }
             Yaml::Boolean(v) => {
-                if v {
-                    self.writer.write_str("true")?;
-                } else {
-                    self.writer.write_str("false")?;
-                }
-                Ok(())
+                let repr = if v { "true" } else { "false" };
+                self.event_emitter.on_scalar(repr, TScalarStyle::Plain)
             }
             Yaml::Integer(v) => {
-                write!(self.writer, "{v}")?;
-                Ok(())
+                let repr = v.to_string();
+                self.event_emitter.on_scalar(&repr, TScalarStyle::Plain)
             }
             Yaml::Real(ref v) => {
-                write!(self.writer, "{v}")?;
-                Ok(())
+                let repr = v.to_string();
+                self.event_emitter.on_scalar(&repr, TScalarStyle::Plain)
             }
-            Yaml::Null | Yaml::BadValue => {
-                write!(self.writer, "~")?;
-                Ok(())
-            }
+            Yaml::Null | Yaml::BadValue => self.event_emitter.on_scalar("~", TScalarStyle::Plain),
             // XXX(chenyh) Alias
             Yaml::Alias(_) => Ok(()),
         }
     }
 
-    fn emit_literal_block(&mut self, v: &str) -> EmitResult {
-        let ends_with_newline = v.ends_with('\n');
-        if ends_with_newline {
-            self.writer.write_str("|")?;
-        } else {
-            self.writer.write_str("|-")?;
+    /// Emit a YAML sequence.
+    fn emit_array(&mut self, sequence: &[Yaml]) -> EmitResult {
+        self.event_emitter
+            .on_event(EmitterEvent::SequenceStart(None))?;
+        for node in sequence {
+            self.emit_node(node)?;
         }
-
-        self.level += 1;
-        // lines() will omit the last line if it is empty.
-        for line in v.lines() {
-            writeln!(self.writer)?;
-            self.write_indent()?;
-            // It's literal text, so don't escape special chars.
-            self.writer.write_str(line)?;
-        }
-        self.level -= 1;
+        self.event_emitter.on_event(EmitterEvent::SequenceEnd)?;
         Ok(())
     }
 
-    fn emit_array(&mut self, v: &[Yaml]) -> EmitResult {
-        if v.is_empty() {
-            write!(self.writer, "[]")?;
-        } else {
-            self.level += 1;
-            for (cnt, x) in v.iter().enumerate() {
-                if cnt > 0 {
-                    writeln!(self.writer)?;
-                    self.write_indent()?;
-                }
-                write!(self.writer, "-")?;
-                self.emit_val(true, x)?;
-            }
-            self.level -= 1;
+    /// Emit a YAML mapping.
+    fn emit_hash(&mut self, mapping: &Hash) -> EmitResult {
+        self.event_emitter
+            .on_event(EmitterEvent::MappingStart(None))?;
+        for (key, value) in mapping {
+            self.emit_node(key)?;
+            self.emit_node(value)?;
         }
+        self.event_emitter.on_event(EmitterEvent::MappingEnd)?;
         Ok(())
-    }
-
-    fn emit_hash(&mut self, h: &Hash) -> EmitResult {
-        if h.is_empty() {
-            self.writer.write_str("{}")?;
-        } else {
-            self.level += 1;
-            for (cnt, (k, v)) in h.iter().enumerate() {
-                let complex_key = matches!(*k, Yaml::Hash(_) | Yaml::Array(_));
-                if cnt > 0 {
-                    writeln!(self.writer)?;
-                    self.write_indent()?;
-                }
-                if complex_key {
-                    write!(self.writer, "?")?;
-                    self.emit_val(true, k)?;
-                    writeln!(self.writer)?;
-                    self.write_indent()?;
-                    write!(self.writer, ":")?;
-                    self.emit_val(true, v)?;
-                } else {
-                    self.emit_node(k)?;
-                    write!(self.writer, ":")?;
-                    self.emit_val(false, v)?;
-                }
-            }
-            self.level -= 1;
-        }
-        Ok(())
-    }
-
-    /// Emit a yaml as a hash or array value: i.e., which should appear
-    /// following a ":" or "-", either after a space, or on a new line.
-    /// If `inline` is true, then the preceding characters are distinct
-    /// and short enough to respect the compact flag.
-    fn emit_val(&mut self, inline: bool, val: &Yaml) -> EmitResult {
-        match *val {
-            Yaml::Array(ref v) => {
-                if (inline && self.compact) || v.is_empty() {
-                    write!(self.writer, " ")?;
-                } else {
-                    writeln!(self.writer)?;
-                    self.level += 1;
-                    self.write_indent()?;
-                    self.level -= 1;
-                }
-                self.emit_array(v)
-            }
-            Yaml::Hash(ref h) => {
-                if (inline && self.compact) || h.is_empty() {
-                    write!(self.writer, " ")?;
-                } else {
-                    writeln!(self.writer)?;
-                    self.level += 1;
-                    self.write_indent()?;
-                    self.level -= 1;
-                }
-                self.emit_hash(h)
-            }
-            _ => {
-                write!(self.writer, " ")?;
-                self.emit_node(val)
-            }
-        }
     }
 }
 
@@ -283,6 +156,8 @@ pub type EmitResult = Result<(), EmitError>;
 pub enum EmitError {
     /// A formatting error.
     FmtError(fmt::Error),
+    /// An error in the sequence of event the emitter received.
+    EventError(&'static str),
 }
 
 impl Error for EmitError {
@@ -295,6 +170,7 @@ impl Display for EmitError {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             EmitError::FmtError(ref err) => Display::fmt(err, formatter),
+            EmitError::EventError(msg) => Display::fmt(msg, formatter),
         }
     }
 }
@@ -306,6 +182,7 @@ impl From<fmt::Error> for EmitError {
 }
 
 /// Check if the string requires quoting.
+///
 /// Strings starting with any of the following characters must be quoted.
 /// :, &, *, ?, |, -, <, >, =, !, %, @
 /// Strings containing any of the following characters must be quoted.
@@ -320,19 +197,15 @@ impl From<fmt::Error> for EmitError {
 /// * When the string looks like a number, such as integers (e.g. 2, 14, etc.), floats (e.g. 2.6, 14.9) and exponential numbers (e.g. 12e7, etc.) (otherwise, it would be treated as a numeric value);
 /// * When the string looks like a date (e.g. 2014-12-31) (otherwise it would be automatically converted into a Unix timestamp).
 #[allow(clippy::doc_markdown)]
-fn need_quotes(string: &str) -> bool {
-    fn need_quotes_spaces(string: &str) -> bool {
-        string.starts_with(' ') || string.ends_with(' ')
-    }
-
+fn needs_quotes(string: &str) -> bool {
     string.is_empty()
-        || need_quotes_spaces(string)
         || string.starts_with(|character: char| {
             matches!(
                 character,
-                '&' | '*' | '?' | '|' | '-' | '<' | '>' | '=' | '!' | '%' | '@'
+                ' ' | '&' | '*' | '?' | '|' | '-' | '<' | '>' | '=' | '!' | '%' | '@'
             )
         })
+        || string.ends_with(' ') // `starts_with(' ')`tested above
         || string.contains(|character: char| {
             matches!(character, ':'
             | '{'
@@ -367,85 +240,4 @@ fn need_quotes(string: &str) -> bool {
         || string.starts_with("0x")
         || string.parse::<i64>().is_ok()
         || string.parse::<f64>().is_ok()
-}
-
-/// Write the escaped double-quoted string into the given writer.
-// from serialize::json
-fn escape_str(wr: &mut dyn fmt::Write, v: &str) -> Result<(), fmt::Error> {
-    wr.write_str("\"")?;
-
-    let mut start = 0;
-
-    for (i, byte) in v.bytes().enumerate() {
-        let escaped = match byte {
-            b'"' => "\\\"",
-            b'\\' => "\\\\",
-            b'\x00' => "\\u0000",
-            b'\x01' => "\\u0001",
-            b'\x02' => "\\u0002",
-            b'\x03' => "\\u0003",
-            b'\x04' => "\\u0004",
-            b'\x05' => "\\u0005",
-            b'\x06' => "\\u0006",
-            b'\x07' => "\\u0007",
-            b'\x08' => "\\b",
-            b'\t' => "\\t",
-            b'\n' => "\\n",
-            b'\x0b' => "\\u000b",
-            b'\x0c' => "\\f",
-            b'\r' => "\\r",
-            b'\x0e' => "\\u000e",
-            b'\x0f' => "\\u000f",
-            b'\x10' => "\\u0010",
-            b'\x11' => "\\u0011",
-            b'\x12' => "\\u0012",
-            b'\x13' => "\\u0013",
-            b'\x14' => "\\u0014",
-            b'\x15' => "\\u0015",
-            b'\x16' => "\\u0016",
-            b'\x17' => "\\u0017",
-            b'\x18' => "\\u0018",
-            b'\x19' => "\\u0019",
-            b'\x1a' => "\\u001a",
-            b'\x1b' => "\\u001b",
-            b'\x1c' => "\\u001c",
-            b'\x1d' => "\\u001d",
-            b'\x1e' => "\\u001e",
-            b'\x1f' => "\\u001f",
-            b'\x7f' => "\\u007f",
-            _ => continue,
-        };
-
-        if start < i {
-            wr.write_str(&v[start..i])?;
-        }
-
-        wr.write_str(escaped)?;
-
-        start = i + 1;
-    }
-
-    if start != v.len() {
-        wr.write_str(&v[start..])?;
-    }
-
-    wr.write_str("\"")?;
-    Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use crate::Yaml;
-
-    use super::YamlEmitter;
-
-    #[test]
-    fn test_multiline_string() {
-        let input = r#"{foo: "bar!\nbar!", baz: 42}"#;
-        let parsed = Yaml::load_from_str(input).unwrap();
-        let mut output = String::new();
-        let mut emitter = YamlEmitter::new(&mut output);
-        emitter.multiline_strings(true);
-        emitter.dump(&parsed[0]).unwrap();
-    }
 }

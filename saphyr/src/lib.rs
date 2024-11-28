@@ -55,7 +55,10 @@ mod yaml;
 pub use crate::annotated::{
     marked_yaml::MarkedYaml, AnnotatedArray, AnnotatedHash, AnnotatedYamlIter, YamlData,
 };
-pub use crate::emitter::YamlEmitter;
+pub use crate::emitter::{
+    event::{EmitterEvent, EventYamlEmitter},
+    YamlEmitter,
+};
 pub use crate::loader::{LoadableYamlNode, YamlLoader};
 pub use crate::yaml::{Array, Hash, Yaml, YamlIter};
 
@@ -69,3 +72,5 @@ pub use crate::encoding::{YAMLDecodingTrap, YAMLDecodingTrapFn, YamlDecoder};
 pub use saphyr_parser::ScanError;
 // Re-export [`Marker`] which is used for annotated YAMLs.
 pub use saphyr_parser::Marker;
+// Re-export [`TScalarStyle`] which is used for the event emitter.
+pub use saphyr_parser::TScalarStyle;

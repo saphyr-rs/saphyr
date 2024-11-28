@@ -2,6 +2,10 @@
 
 ## Upcoming
 
+- Add `EventYamlEmitter` and its types for a lower-level YAML serializing API.
+  This API is now a building block used in the `YamlEmitter`. It allows
+  emitting YAML without the need to build a `Yaml` object.
+
 ## v0.0.3
 
 Skipping version `v0.0.2` to align this crate's version with that of

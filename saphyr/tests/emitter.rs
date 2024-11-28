@@ -1,5 +1,57 @@
 use saphyr::{Yaml, YamlEmitter};
 
+/// Test in sequence the parser, emitter and parser with the given input.
+///
+/// 1. Pass the input through the loader and build a YAML object from it.
+/// 2. Pass the newly created YAML object through the emitter.
+/// 3. Pass the emitted string through the loader and build another YAML object from it.
+/// 4. Assert that the YAML objects from 1. and 3. are the same.
+/// 5. Return the string from 3. so the caller can ensure its formatting.
+///
+/// The assertion done in this function is purely on the contents of the YAML objects and not on
+/// its presentation.
+///
+/// This function additionally prints to stdout the input string and the resulting string from 2..
+///
+/// The configuration function `config` allows the caller to potentially change some settings in
+/// the emitter prior to emitting.
+fn raw_roundtrip<Config: FnOnce(&mut YamlEmitter)>(input: &str, config: Config) -> String {
+    let original_docs = Yaml::load_from_str(input).unwrap();
+    let original_doc = &original_docs[0];
+    let mut emitted_string = String::new();
+    {
+        let mut emitter = YamlEmitter::new(&mut emitted_string);
+        config(&mut emitter);
+        emitter.dump(original_doc).unwrap();
+    }
+    println!("original:\n{input}");
+    println!("emitted:\n{emitted_string}");
+
+    let emitted_docs = Yaml::load_from_str(&emitted_string).unwrap();
+    assert_eq!(original_docs, emitted_docs);
+
+    emitted_string
+}
+
+/// [`raw_roundtrip`] with default configuration
+fn roundtrip(input: &str) -> String {
+    raw_roundtrip(input, |_| {})
+}
+
+/// Like [`roundtrip`] but with the [compact flag] disabled.
+///
+/// [compact flag]: `YamlEmitter::compact`
+fn roundtrip_not_compact(input: &str) -> String {
+    raw_roundtrip(input, |emitter| emitter.compact(false))
+}
+
+/// Like [`roundtrip`] but with the [multiline strings flag] enabled.
+///
+/// [multiline strings flag]: `YamlEmitter::multiline_strings`
+fn roundtrip_multiline(input: &str) -> String {
+    raw_roundtrip(input, |emitter| emitter.multiline_strings(true))
+}
+
 #[allow(clippy::similar_names)]
 #[test]
 fn test_emit_simple() {
@@ -16,22 +68,7 @@ a4:
     - 2
 ";
 
-    let docs = Yaml::load_from_str(s).unwrap();
-    let doc = &docs[0];
-    let mut writer = String::new();
-    {
-        let mut emitter = YamlEmitter::new(&mut writer);
-        emitter.dump(doc).unwrap();
-    }
-    println!("original:\n{s}");
-    println!("emitted:\n{writer}");
-    let docs_new = match Yaml::load_from_str(&writer) {
-        Ok(y) => y,
-        Err(e) => panic!("{}", e),
-    };
-    let doc_new = &docs_new[0];
-
-    assert_eq!(doc, doc_new);
+    roundtrip(s);
 }
 
 #[test]
@@ -55,19 +92,8 @@ products:
   {}:
     empty hash key
             ";
-    let docs = Yaml::load_from_str(s).unwrap();
-    let doc = &docs[0];
-    let mut writer = String::new();
-    {
-        let mut emitter = YamlEmitter::new(&mut writer);
-        emitter.dump(doc).unwrap();
-    }
-    let docs_new = match Yaml::load_from_str(&writer) {
-        Ok(y) => y,
-        Err(e) => panic!("{}", e),
-    };
-    let new_doc = &docs_new[0];
-    assert_eq!(doc, new_doc);
+
+    roundtrip(s);
 }
 
 #[test]
@@ -106,15 +132,7 @@ x: test
 y: avoid quoting here
 z: string with spaces"#;
 
-    let docs = Yaml::load_from_str(s).unwrap();
-    let doc = &docs[0];
-    let mut writer = String::new();
-    {
-        let mut emitter = YamlEmitter::new(&mut writer);
-        emitter.dump(doc).unwrap();
-    }
-
-    assert_eq!(s, writer, "actual:\n\n{writer}\n");
+    assert_eq!(roundtrip(s), s);
 }
 
 #[test]
@@ -164,43 +182,12 @@ null0: ~
 bool0: true
 bool1: false"#;
 
-    let docs = Yaml::load_from_str(input).unwrap();
-    let doc = &docs[0];
-    let mut writer = String::new();
-    {
-        let mut emitter = YamlEmitter::new(&mut writer);
-        emitter.dump(doc).unwrap();
-    }
-
-    assert_eq!(
-        expected, writer,
-        "expected:\n{expected}\nactual:\n{writer}\n",
-    );
+    assert_eq!(roundtrip(input), expected);
 }
 
 #[test]
-fn test_empty_and_nested() {
-    test_empty_and_nested_flag(false);
-}
-
-#[test]
-fn test_empty_and_nested_compact() {
-    test_empty_and_nested_flag(true);
-}
-
-fn test_empty_and_nested_flag(compact: bool) {
-    let s = if compact {
-        r"---
-a:
-  b:
-    c: hello
-  d: {}
-e:
-  - f
-  - g
-  - h: []"
-    } else {
-        r"---
+fn test_empty_and_nested_not_compact() {
+    let s = r"---
 a:
   b:
     c: hello
@@ -209,19 +196,31 @@ e:
   - f
   - g
   -
-    h: []"
-    };
+    h: []";
+    assert_eq!(roundtrip_not_compact(s), s);
+}
 
-    let docs = Yaml::load_from_str(s).unwrap();
-    let doc = &docs[0];
-    let mut writer = String::new();
-    {
-        let mut emitter = YamlEmitter::new(&mut writer);
-        emitter.compact(compact);
-        emitter.dump(doc).unwrap();
-    }
+#[test]
+fn test_empty_and_nested_compact() {
+    let s = r"---
+a:
+  b:
+    c: hello
+  d: {}
+e:
+  - f
+  - g
+  - h: []";
+    assert_eq!(roundtrip(s), s);
+}
 
-    assert_eq!(s, writer);
+#[test]
+fn test_interleaved_mappings_and_sequences() {
+    let input = r"---
+a:
+  - b:
+      - c: d";
+    assert_eq!(roundtrip(input), input);
 }
 
 #[test]
@@ -233,18 +232,7 @@ a:
     - d
     - - e
       - f";
-
-    let docs = Yaml::load_from_str(s).unwrap();
-    let doc = &docs[0];
-    let mut writer = String::new();
-    {
-        let mut emitter = YamlEmitter::new(&mut writer);
-        emitter.dump(doc).unwrap();
-    }
-    println!("original:\n{s}");
-    println!("emitted:\n{writer}");
-
-    assert_eq!(s, writer);
+    assert_eq!(roundtrip(s), s);
 }
 
 #[test]
@@ -257,18 +245,7 @@ a:
     - - e
       - - f
       - - e";
-
-    let docs = Yaml::load_from_str(s).unwrap();
-    let doc = &docs[0];
-    let mut writer = String::new();
-    {
-        let mut emitter = YamlEmitter::new(&mut writer);
-        emitter.dump(doc).unwrap();
-    }
-    println!("original:\n{s}");
-    println!("emitted:\n{writer}");
-
-    assert_eq!(s, writer);
+    assert_eq!(roundtrip(s), s);
 }
 
 #[test]
@@ -279,16 +256,44 @@ a:
     c:
       d:
         e: f";
+    assert_eq!(roundtrip(s), s);
+}
 
-    let docs = Yaml::load_from_str(s).unwrap();
-    let doc = &docs[0];
-    let mut writer = String::new();
-    {
-        let mut emitter = YamlEmitter::new(&mut writer);
-        emitter.dump(doc).unwrap();
-    }
-    println!("original:\n{s}");
-    println!("emitted:\n{writer}");
+#[test]
+fn test_empty_sequence() {
+    let s = r"---
+[]";
+    assert_eq!(roundtrip(s), s);
+}
 
-    assert_eq!(s, writer);
+#[test]
+fn test_empty_mapping() {
+    let s = r"---
+{}";
+    assert_eq!(roundtrip(s), s);
+}
+
+#[test]
+fn test_root_sequence() {
+    let s = r"---
+- a";
+    assert_eq!(roundtrip(s), s);
+}
+
+#[test]
+fn test_root_mapping() {
+    let s = r"---
+a: b";
+    assert_eq!(roundtrip(s), s);
+}
+
+#[test]
+fn test_multiline_string() {
+    let input = r#"{foo: "bar!\nbar!", baz: 42}"#;
+    let expected = r"---
+foo: |-
+  bar!
+  bar!
+baz: 42";
+    assert_eq!(roundtrip_multiline(input), expected);
 }
