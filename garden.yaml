@@ -42,6 +42,7 @@ trees:
     variables:
       workspace: "--workspace"
     remotes:
+      mkniewallner: https://github.com/mkniewallner/saphyr
       yaml-test-suite: https://github.com/yaml/yaml-test-suite
   saphyr:
     description: |
