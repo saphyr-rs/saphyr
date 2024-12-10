@@ -1,0 +1,59 @@
+# Use "cargo install garden-tools" to install garden https://gitlab.com/garden-rs/garden
+#
+# usage:
+#   garden build
+#   garden test
+#   garden check
+#   garden fmt
+#   garden fix
+
+commands:
+    bench: cargo bench "$@"
+    build: cargo build --all-targets ${workspace} ${release} "$@"
+    check>:
+        - check/clippy
+        - check/fmt
+        - build
+        - test
+        - doc
+    check/clippy: cargo clippy --all-targets ${workspace} ${release} -- -D warnings
+    check/fmt: cargo fmt --check
+    doc: cargo doc ${workspace} --all-features
+    fix: cargo clippy --all-targets ${workspace} --fix "$@" -- -D warnings
+    fmt: cargo fmt
+    test: |
+      cargo test ${release}
+      cargo test ${release} --doc
+    watch: cargo watch --shell "garden check"
+
+variables:
+  workspace: ""
+  # Debug build: garden build -D release=''
+  release: "--release"
+
+environment:
+  RUSTDOCFLAGS: "-D warnings"
+
+trees:
+  saphyr-workspace:
+    description: Saphyr tools and libraries
+    path: ${GARDEN_CONFIG_DIR}
+    url: "git@github.com:saphyr-rs/saphyr.git"
+    variables:
+      workspace: "--workspace"
+    remotes:
+      yaml-test-suite: https://github.com/yaml/yaml-test-suite
+  saphyr:
+    description: |
+      The high-level saphyr crate provides quick-and-easy YAML importing,
+      exporting and object manipulation.
+  parser:
+    description: Fully-compliant YAML 1.2 parser
+  bench:
+    description: Benchmarking utilities
+  bench/tools/gen_large_yaml:
+    description: Generate large YAML files
+  bench/tools/bench_compare:
+    description: Compare benchmarks
+  fuzz:
+    description: Fuzz testing tools
