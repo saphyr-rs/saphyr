@@ -28,7 +28,7 @@ impl<'a> StrInput<'a> {
     }
 }
 
-impl<'a> Input for StrInput<'a> {
+impl Input for StrInput<'_> {
     #[inline]
     fn lookahead(&mut self, x: usize) {
         // We already have all characters that we need.
