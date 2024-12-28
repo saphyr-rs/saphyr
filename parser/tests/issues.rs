@@ -246,11 +246,11 @@ fn test_issue14() {
 fn test_issue14_v2() {
     let s = "{...";
     let Err(error) = run_parser(s) else { panic!() };
-    assert_eq!(error.info(), "unexpected end of plain scalar");
     assert_eq!(
-        error.to_string(),
-        "unexpected end of plain scalar at byte 1 line 1 column 2"
+        error.info(),
+        "while parsing a flow mapping, did not find expected ',' or '}'"
     );
+    assert!(error.to_string().ends_with("at byte 4 line 2 column 1"));
 }
 
 #[test]
@@ -297,6 +297,26 @@ array:
             Event::MappingEnd,
             Event::MappingEnd,
             Event::SequenceEnd,
+            Event::MappingEnd,
+            Event::DocumentEnd,
+            Event::StreamEnd
+        ]
+    );
+}
+
+#[test]
+fn test_issue22() {
+    // The ellipsis is parsed as a document end.
+    // https://github.com/saphyr-rs/saphyr/issues/22
+    let s = "comment: hello ... world";
+    assert_eq!(
+        run_parser(s).unwrap(),
+        [
+            Event::StreamStart,
+            Event::DocumentStart(false),
+            Event::MappingStart(0, None),
+            Event::Scalar("comment".to_string(), TScalarStyle::Plain, 0, None),
+            Event::Scalar("hello ... world".to_string(), TScalarStyle::Plain, 0, None),
             Event::MappingEnd,
             Event::DocumentEnd,
             Event::StreamEnd
