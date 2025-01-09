@@ -10,7 +10,7 @@ use crate::{
     BufferedInput, Marker,
 };
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Clone, Copy, PartialEq, Debug, Eq)]
 enum State {
@@ -94,6 +94,12 @@ pub struct Tag {
     pub handle: String,
     /// The suffix of the tag.
     pub suffix: String,
+}
+
+impl Display for Tag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}!{}", self.handle, self.suffix)
+    }
 }
 
 impl Event {

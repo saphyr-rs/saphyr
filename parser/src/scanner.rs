@@ -37,8 +37,17 @@ pub enum TScalarStyle {
     DoubleQuoted,
 
     /// A YAML literal block (`|` block).
+    ///
+    /// See [8.1.2](https://yaml.org/spec/1.2.2/#812-literal-style).
+    /// In literal blocks, any indented character is content, including white space characters.
+    /// There is no way to escape characters, nor to break a long line.
     Literal,
     /// A YAML folded block (`>` block).
+    ///
+    /// See [8.1.3](https://yaml.org/spec/1.2.2/#813-folded-style).
+    /// In folded blocks, any indented character is content, including white space characters.
+    /// There is no way to escape characters. Content is subject to line folding, allowing breaking
+    /// long lines.
     Folded,
 }
 
