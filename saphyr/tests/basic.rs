@@ -206,18 +206,9 @@ c: ~
     let out = Yaml::load_from_str(s).unwrap();
     let first = out.into_iter().next().unwrap();
     let mut iter = first.into_hash().unwrap().into_iter();
-    assert_eq!(
-        Some((Yaml::String("b".to_owned()), Yaml::Null)),
-        iter.next()
-    );
-    assert_eq!(
-        Some((Yaml::String("a".to_owned()), Yaml::Null)),
-        iter.next()
-    );
-    assert_eq!(
-        Some((Yaml::String("c".to_owned()), Yaml::Null)),
-        iter.next()
-    );
+    assert_eq!(Some((Yaml::String("b".into()), Yaml::Null)), iter.next());
+    assert_eq!(Some((Yaml::String("a".into()), Yaml::Null)), iter.next());
+    assert_eq!(Some((Yaml::String("c".into()), Yaml::Null)), iter.next());
     assert_eq!(None, iter.next());
 }
 

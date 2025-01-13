@@ -9,7 +9,7 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::cast_sign_loss)]
 
-use std::{char, collections::VecDeque, error::Error, fmt};
+use std::{borrow::Cow, char, collections::VecDeque, error::Error, fmt};
 
 use crate::{
     char_traits::{
@@ -178,7 +178,7 @@ impl fmt::Display for ScanError {
 
 /// The contents of a scanner token.
 #[derive(Clone, PartialEq, Debug, Eq)]
-pub enum TokenType {
+pub enum TokenType<'input> {
     /// The start of the stream. Sent first, before even [`TokenType::DocumentStart`].
     StreamStart(TEncoding),
     /// The end of the stream, EOF.
@@ -193,9 +193,9 @@ pub enum TokenType {
     /// A YAML tag directive (e.g.: `!!str`, `!foo!bar`, ...).
     TagDirective(
         /// Handle
-        String,
+        Cow<'input, str>,
         /// Prefix
-        String,
+        Cow<'input, str>,
     ),
     /// The start of a YAML document (`---`).
     DocumentStart,
@@ -228,9 +228,9 @@ pub enum TokenType {
     /// A value in a mapping.
     Value,
     /// A reference to an anchor.
-    Alias(String),
+    Alias(Cow<'input, str>),
     /// A YAML anchor (`&`/`*`).
-    Anchor(String),
+    Anchor(Cow<'input, str>),
     /// A YAML tag (starting with bangs `!`).
     Tag(
         /// The handle of the tag.
@@ -239,12 +239,12 @@ pub enum TokenType {
         String,
     ),
     /// A regular YAML scalar.
-    Scalar(TScalarStyle, String),
+    Scalar(TScalarStyle, Cow<'input, str>),
 }
 
 /// A scanner token.
 #[derive(Clone, PartialEq, Debug, Eq)]
-pub struct Token(pub Span, pub TokenType);
+pub struct Token<'input>(pub Span, pub TokenType<'input>);
 
 /// A scalar that was parsed and may correspond to a simple key.
 ///
@@ -395,7 +395,7 @@ enum ImplicitMappingState {
 /// YAML documents.
 #[derive(Debug)]
 #[allow(clippy::struct_excessive_bools)]
-pub struct Scanner<T> {
+pub struct Scanner<'input, T> {
     /// The input source.
     ///
     /// This must implement [`Input`].
@@ -408,7 +408,7 @@ pub struct Scanner<T> {
     /// instance, if we just read a scalar, it can be a value or a key if an implicit mapping
     /// follows. In this case, the token stays in the `VecDeque` but cannot be returned from
     /// [`Self::next`] until we have more context.
-    tokens: VecDeque<Token>,
+    tokens: VecDeque<Token<'input>>,
     /// The last error that happened.
     error: Option<ScanError>,
 
@@ -467,9 +467,10 @@ pub struct Scanner<T> {
     buf_whitespaces: String,
 }
 
-impl<T: Input> Iterator for Scanner<T> {
-    type Item = Token;
-    fn next(&mut self) -> Option<Token> {
+impl<'input, T: Input> Iterator for Scanner<'input, T> {
+    type Item = Token<'input>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if self.error.is_some() {
             return None;
         }
@@ -494,9 +495,9 @@ impl<T: Input> Iterator for Scanner<T> {
 /// A convenience alias for scanner functions that may fail without returning a value.
 pub type ScanResult = Result<(), ScanError>;
 
-impl<T: Input> Scanner<T> {
+impl<'input, T: Input> Scanner<'input, T> {
     /// Creates the YAML tokenizer.
-    pub fn new(input: T) -> Scanner<T> {
+    pub fn new(input: T) -> Self {
         Scanner {
             input,
             mark: Marker::new(0, 1, 0),
@@ -631,7 +632,7 @@ impl<T: Input> Scanner<T> {
     }
 
     /// Insert a token at the given position.
-    fn insert_token(&mut self, pos: usize, tok: Token) {
+    fn insert_token(&mut self, pos: usize, tok: Token<'input>) {
         let old_len = self.tokens.len();
         assert!(pos <= old_len);
         self.tokens.insert(pos, tok);
@@ -741,7 +742,7 @@ impl<T: Input> Scanner<T> {
     /// Return the next token in the stream.
     /// # Errors
     /// Returns `ScanError` when scanning fails to find an expected next token.
-    pub fn next_token(&mut self) -> Result<Option<Token>, ScanError> {
+    pub fn next_token(&mut self) -> Result<Option<Token<'input>>, ScanError> {
         if self.stream_end_produced {
             return Ok(None);
         }
@@ -958,7 +959,7 @@ impl<T: Input> Scanner<T> {
         Ok(())
     }
 
-    fn scan_directive(&mut self) -> Result<Token, ScanError> {
+    fn scan_directive(&mut self) -> Result<Token<'input>, ScanError> {
         let start_mark = self.mark;
         self.skip_non_blank();
 
@@ -975,7 +976,7 @@ impl<T: Input> Scanner<T> {
                 // XXX return an empty TagDirective token
                 Token(
                     Span::new(start_mark, self.mark),
-                    TokenType::TagDirective(String::new(), String::new()),
+                    TokenType::TagDirective(Cow::default(), Cow::default()),
                 )
                 // return Err(ScanError::new_str(start_mark,
                 //     "while scanning a directive, found unknown directive name"))
@@ -996,7 +997,7 @@ impl<T: Input> Scanner<T> {
         }
     }
 
-    fn scan_version_directive_value(&mut self, mark: &Marker) -> Result<Token, ScanError> {
+    fn scan_version_directive_value(&mut self, mark: &Marker) -> Result<Token<'input>, ScanError> {
         let n_blanks = self.input.skip_while_blank();
         self.mark.index += n_blanks;
         self.mark.col += n_blanks;
@@ -1069,7 +1070,7 @@ impl<T: Input> Scanner<T> {
         Ok(val)
     }
 
-    fn scan_tag_directive_value(&mut self, mark: &Marker) -> Result<Token, ScanError> {
+    fn scan_tag_directive_value(&mut self, mark: &Marker) -> Result<Token<'input>, ScanError> {
         let n_blanks = self.input.skip_while_blank();
         self.mark.index += n_blanks;
         self.mark.col += n_blanks;
@@ -1087,7 +1088,7 @@ impl<T: Input> Scanner<T> {
         if self.input.next_is_blank_or_breakz() {
             Ok(Token(
                 Span::new(*mark, self.mark),
-                TokenType::TagDirective(handle, prefix),
+                TokenType::TagDirective(handle.into(), prefix.into()),
             ))
         } else {
             Err(ScanError::new_str(
@@ -1106,7 +1107,7 @@ impl<T: Input> Scanner<T> {
         Ok(())
     }
 
-    fn scan_tag(&mut self) -> Result<Token, ScanError> {
+    fn scan_tag(&mut self) -> Result<Token<'input>, ScanError> {
         let start_mark = self.mark;
         let mut handle = String::new();
         let mut suffix;
@@ -1360,7 +1361,7 @@ impl<T: Input> Scanner<T> {
         Ok(())
     }
 
-    fn scan_anchor(&mut self, alias: bool) -> Result<Token, ScanError> {
+    fn scan_anchor(&mut self, alias: bool) -> Result<Token<'input>, ScanError> {
         let mut string = String::new();
         let start_mark = self.mark;
 
@@ -1375,14 +1376,14 @@ impl<T: Input> Scanner<T> {
         }
 
         let tok = if alias {
-            TokenType::Alias(string)
+            TokenType::Alias(string.into())
         } else {
-            TokenType::Anchor(string)
+            TokenType::Anchor(string.into())
         };
         Ok(Token(Span::new(start_mark, self.mark), tok))
     }
 
-    fn fetch_flow_collection_start(&mut self, tok: TokenType) -> ScanResult {
+    fn fetch_flow_collection_start(&mut self, tok: TokenType<'input>) -> ScanResult {
         // The indicators '[' and '{' may start a simple key.
         self.save_simple_key();
 
@@ -1408,7 +1409,7 @@ impl<T: Input> Scanner<T> {
         Ok(())
     }
 
-    fn fetch_flow_collection_end(&mut self, tok: TokenType) -> ScanResult {
+    fn fetch_flow_collection_end(&mut self, tok: TokenType<'input>) -> ScanResult {
         self.remove_simple_key()?;
         self.decrease_flow_level();
 
@@ -1534,7 +1535,7 @@ impl<T: Input> Scanner<T> {
         Ok(())
     }
 
-    fn fetch_document_indicator(&mut self, t: TokenType) -> ScanResult {
+    fn fetch_document_indicator(&mut self, t: TokenType<'input>) -> ScanResult {
         self.unroll_indent(-1);
         self.remove_simple_key()?;
         self.disallow_simple_key();
@@ -1557,7 +1558,7 @@ impl<T: Input> Scanner<T> {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn scan_block_scalar(&mut self, literal: bool) -> Result<Token, ScanError> {
+    fn scan_block_scalar(&mut self, literal: bool) -> Result<Token<'input>, ScanError> {
         let start_mark = self.mark;
         let mut chomping = Chomping::Clip;
         let mut increment: usize = 0;
@@ -1677,7 +1678,7 @@ impl<T: Input> Scanner<T> {
             };
             return Ok(Token(
                 Span::new(start_mark, self.mark),
-                TokenType::Scalar(style, contents),
+                TokenType::Scalar(style, contents.into()),
             ));
         }
 
@@ -1746,7 +1747,7 @@ impl<T: Input> Scanner<T> {
 
         Ok(Token(
             Span::new(start_mark, self.mark),
-            TokenType::Scalar(style, string),
+            TokenType::Scalar(style, string.into()),
         ))
     }
 
@@ -1892,7 +1893,7 @@ impl<T: Input> Scanner<T> {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn scan_flow_scalar(&mut self, single: bool) -> Result<Token, ScanError> {
+    fn scan_flow_scalar(&mut self, single: bool) -> Result<Token<'input>, ScanError> {
         let start_mark = self.mark;
 
         let mut string = String::new();
@@ -2024,7 +2025,7 @@ impl<T: Input> Scanner<T> {
         };
         Ok(Token(
             Span::new(start_mark, self.mark),
-            TokenType::Scalar(style, string),
+            TokenType::Scalar(style, string.into()),
         ))
     }
 
@@ -2166,7 +2167,7 @@ impl<T: Input> Scanner<T> {
     /// Plain scalars are the most readable but restricted style. They may span multiple lines in
     /// some contexts.
     #[allow(clippy::too_many_lines)]
-    fn scan_plain_scalar(&mut self) -> Result<Token, ScanError> {
+    fn scan_plain_scalar(&mut self) -> Result<Token<'input>, ScanError> {
         self.unroll_non_block_indents();
         let indent = self.indent + 1;
         let start_mark = self.mark;
@@ -2313,7 +2314,7 @@ impl<T: Input> Scanner<T> {
         } else {
             Ok(Token(
                 Span::new(start_mark, end_mark),
-                TokenType::Scalar(TScalarStyle::Plain, string),
+                TokenType::Scalar(TScalarStyle::Plain, string.into()),
             ))
         }
     }
@@ -2481,7 +2482,13 @@ impl<T: Input> Scanner<T> {
     /// An indentation level is added only if:
     ///   - We are not in a flow-style construct (which don't have indentation per-se).
     ///   - The current column is further indented than the last indent we have registered.
-    fn roll_indent(&mut self, col: usize, number: Option<usize>, tok: TokenType, mark: Marker) {
+    fn roll_indent(
+        &mut self,
+        col: usize,
+        number: Option<usize>,
+        tok: TokenType<'input>,
+        mark: Marker,
+    ) {
         if self.flow_level > 0 {
             return;
         }

@@ -2,6 +2,10 @@
 
 ## Upcoming
 
+**Breaking Changes**:
+
+- Allow events to borrow from the input.
+
 ## v0.0.3
 
 **Breaking Changes**:

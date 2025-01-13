@@ -10,7 +10,7 @@ use crate::{
     BufferedInput, Marker,
 };
 
-use std::{collections::HashMap, fmt::Display};
+use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
 #[derive(Clone, Copy, PartialEq, Debug, Eq)]
 enum State {
@@ -43,7 +43,7 @@ enum State {
 /// Events are used in the low-level event-based API (push parser). The API entrypoint is the
 /// [`EventReceiver`] trait.
 #[derive(Clone, PartialEq, Debug, Eq)]
-pub enum Event {
+pub enum Event<'input> {
     /// Reserved for internal use.
     Nothing,
     /// Event generated at the very beginning of parsing.
@@ -66,7 +66,7 @@ pub enum Event {
         usize,
     ),
     /// Value, style, `anchor_id`, tag
-    Scalar(String, TScalarStyle, usize, Option<Tag>),
+    Scalar(Cow<'input, str>, TScalarStyle, usize, Option<Tag>),
     /// The start of a YAML sequence (array).
     SequenceStart(
         /// The anchor ID of the start of the sequence.
@@ -102,24 +102,24 @@ impl Display for Tag {
     }
 }
 
-impl Event {
+impl<'input> Event<'input> {
     /// Create an empty scalar.
-    fn empty_scalar() -> Event {
+    fn empty_scalar() -> Self {
         // a null scalar
-        Event::Scalar("~".to_owned(), TScalarStyle::Plain, 0, None)
+        Event::Scalar("~".into(), TScalarStyle::Plain, 0, None)
     }
 
     /// Create an empty scalar with the given anchor.
-    fn empty_scalar_with_anchor(anchor: usize, tag: Option<Tag>) -> Event {
-        Event::Scalar(String::new(), TScalarStyle::Plain, anchor, tag)
+    fn empty_scalar_with_anchor(anchor: usize, tag: Option<Tag>) -> Self {
+        Event::Scalar(Cow::default(), TScalarStyle::Plain, anchor, tag)
     }
 }
 
 /// A YAML parser.
 #[derive(Debug)]
-pub struct Parser<T: Input> {
+pub struct Parser<'input, T: Input> {
     /// The underlying scanner from which we pull tokens.
-    scanner: Scanner<T>,
+    scanner: Scanner<'input, T>,
     /// The stack of _previous_ states we were in.
     ///
     /// States are pushed in the context of subobjects to this stack. The top-most element is the
@@ -128,11 +128,11 @@ pub struct Parser<T: Input> {
     /// The state in which we currently are.
     state: State,
     /// The next token from the scanner.
-    token: Option<Token>,
+    token: Option<Token<'input>>,
     /// The next YAML event to emit.
-    current: Option<(Event, Span)>,
+    current: Option<(Event<'input>, Span)>,
     /// Anchors that have been encountered in the YAML document.
-    anchors: HashMap<String, usize>,
+    anchors: HashMap<Cow<'input, str>, usize>,
     /// Next ID available for an anchor.
     ///
     /// Every anchor is given a unique ID. We use an incrementing ID and this is both the ID to
@@ -200,19 +200,19 @@ pub struct Parser<T: Input> {
 /// # use saphyr_parser::{Event, EventReceiver, Parser};
 /// #
 /// /// Sink of events. Collects them into an array.
-/// struct EventSink {
-///     events: Vec<Event>,
+/// struct EventSink<'input> {
+///     events: Vec<Event<'input>>,
 /// }
 ///
 /// /// Implement `on_event`, pushing into `self.events`.
-/// impl EventReceiver for EventSink {
-///     fn on_event(&mut self, ev: Event) {
+/// impl<'input> EventReceiver<'input> for EventSink<'input> {
+///     fn on_event(&mut self, ev: Event<'input>) {
 ///         self.events.push(ev);
 ///     }
 /// }
 ///
 /// /// Load events from a yaml string.
-/// fn str_to_events(yaml: &str) -> Vec<Event> {
+/// fn str_to_events(yaml: &str) -> Vec<Event<'_>> {
 ///     let mut sink = EventSink { events: Vec::new() };
 ///     let mut parser = Parser::new_from_str(yaml);
 ///     // Load events using our sink as the receiver.
@@ -220,40 +220,40 @@ pub struct Parser<T: Input> {
 ///     sink.events
 /// }
 /// ```
-pub trait EventReceiver {
+pub trait EventReceiver<'input> {
     /// Handler called for each YAML event that is emitted by the parser.
-    fn on_event(&mut self, ev: Event);
+    fn on_event(&mut self, ev: Event<'input>);
 }
 
 /// Trait to be implemented for using the low-level parsing API.
 ///
 /// Functionally similar to [`EventReceiver`], but receives a [`Span`] as well as the event.
-pub trait SpannedEventReceiver {
+pub trait SpannedEventReceiver<'input> {
     /// Handler called for each event that occurs.
-    fn on_event(&mut self, ev: Event, span: Span);
+    fn on_event(&mut self, ev: Event<'input>, span: Span);
 }
 
-impl<R: EventReceiver> SpannedEventReceiver for R {
-    fn on_event(&mut self, ev: Event, _span: Span) {
+impl<'input, R: EventReceiver<'input>> SpannedEventReceiver<'input> for R {
+    fn on_event(&mut self, ev: Event<'input>, _span: Span) {
         self.on_event(ev);
     }
 }
 
 /// A convenience alias for a `Result` of a parser event.
-pub type ParseResult = Result<(Event, Span), ScanError>;
+pub type ParseResult<'input> = Result<(Event<'input>, Span), ScanError>;
 
-impl<'a> Parser<StrInput<'a>> {
+impl<'input> Parser<'input, StrInput<'input>> {
     /// Create a new instance of a parser from a &str.
     #[must_use]
-    pub fn new_from_str(value: &'a str) -> Self {
+    pub fn new_from_str(value: &'input str) -> Self {
         debug_print!("\x1B[;31m>>>>>>>>>> New parser from str\x1B[;0m");
         Parser::new(StrInput::new(value))
     }
 }
 
-impl<T> Parser<BufferedInput<T>>
+impl<'input, T> Parser<'input, BufferedInput<T>>
 where
-    T: Iterator<Item = char>,
+    T: Iterator<Item = char> + 'input,
 {
     /// Create a new instance of a parser from an iterator of `char`s.
     #[must_use]
@@ -263,9 +263,9 @@ where
     }
 }
 
-impl<T: Input> Parser<T> {
+impl<'input, T: Input> Parser<'input, T> {
     /// Create a new instance of a parser from the given input of characters.
-    pub fn new(src: T) -> Parser<T> {
+    pub fn new(src: T) -> Self {
         Parser {
             scanner: Scanner::new(src),
             states: Vec::new(),
@@ -317,7 +317,7 @@ impl<T: Input> Parser<T> {
     ///
     /// # Errors
     /// Returns `ScanError` when loading the next event fails.
-    pub fn peek(&mut self) -> Option<Result<&(Event, Span), ScanError>> {
+    pub fn peek(&mut self) -> Option<Result<&(Event<'input>, Span), ScanError>> {
         if let Some(ref x) = self.current {
             Some(Ok(x))
         } else {
@@ -336,7 +336,7 @@ impl<T: Input> Parser<T> {
     ///
     /// # Errors
     /// Returns `ScanError` when loading the next event fails.
-    pub fn next_event(&mut self) -> Option<ParseResult> {
+    pub fn next_event(&mut self) -> Option<ParseResult<'input>> {
         if self.stream_end_emitted {
             return None;
         }
@@ -353,7 +353,10 @@ impl<T: Input> Parser<T> {
     /// [`Self::next_event`] should conform to the expectations of an [`Iterator`] and return an
     /// option. This burdens the parser code. This function is used internally when an option is
     /// undesirable.
-    fn next_event_impl(&mut self) -> ParseResult {
+    fn next_event_impl<'a>(&mut self) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         match self.current.take() {
             None => self.parse(),
             Some(v) => Ok(v),
@@ -374,7 +377,7 @@ impl<T: Input> Parser<T> {
     /// Extract and return the next token from the scanner.
     ///
     /// This function does _not_ make use of `self.token`.
-    fn scan_next_token(&mut self) -> Result<Token, ScanError> {
+    fn scan_next_token(&mut self) -> Result<Token<'input>, ScanError> {
         let token = self.scanner.next();
         match token {
             None => match self.scanner.get_error() {
@@ -385,7 +388,10 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn fetch_token(&mut self) -> Token {
+    fn fetch_token<'a>(&mut self) -> Token<'a>
+    where
+        'input: 'a,
+    {
         self.token
             .take()
             .expect("fetch_token needs to be preceded by peek_token")
@@ -404,7 +410,10 @@ impl<T: Input> Parser<T> {
         self.states.push(state);
     }
 
-    fn parse(&mut self) -> ParseResult {
+    fn parse<'a>(&mut self) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         if self.state == State::End {
             return Ok((Event::StreamEnd, Span::empty(self.scanner.mark())));
         }
@@ -424,7 +433,7 @@ impl<T: Input> Parser<T> {
     /// former is enough to call this function.
     /// # Errors
     /// Returns `ScanError` when loading fails.
-    pub fn load<R: SpannedEventReceiver>(
+    pub fn load<R: SpannedEventReceiver<'input>>(
         &mut self,
         recv: &mut R,
         multi: bool,
@@ -461,9 +470,9 @@ impl<T: Input> Parser<T> {
         Ok(())
     }
 
-    fn load_document<R: SpannedEventReceiver>(
+    fn load_document<R: SpannedEventReceiver<'input>>(
         &mut self,
-        first_ev: Event,
+        first_ev: Event<'input>,
         span: Span,
         recv: &mut R,
     ) -> Result<(), ScanError> {
@@ -486,9 +495,9 @@ impl<T: Input> Parser<T> {
         Ok(())
     }
 
-    fn load_node<R: SpannedEventReceiver>(
+    fn load_node<R: SpannedEventReceiver<'input>>(
         &mut self,
-        first_ev: Event,
+        first_ev: Event<'input>,
         span: Span,
         recv: &mut R,
     ) -> Result<(), ScanError> {
@@ -512,7 +521,10 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn load_mapping<R: SpannedEventReceiver>(&mut self, recv: &mut R) -> Result<(), ScanError> {
+    fn load_mapping<R: SpannedEventReceiver<'input>>(
+        &mut self,
+        recv: &mut R,
+    ) -> Result<(), ScanError> {
         let (mut key_ev, mut key_mark) = self.next_event_impl()?;
         while key_ev != Event::MappingEnd {
             // key
@@ -531,7 +543,10 @@ impl<T: Input> Parser<T> {
         Ok(())
     }
 
-    fn load_sequence<R: SpannedEventReceiver>(&mut self, recv: &mut R) -> Result<(), ScanError> {
+    fn load_sequence<R: SpannedEventReceiver<'input>>(
+        &mut self,
+        recv: &mut R,
+    ) -> Result<(), ScanError> {
         let (mut ev, mut mark) = self.next_event_impl()?;
         while ev != Event::SequenceEnd {
             self.load_node(ev, mark, recv)?;
@@ -545,7 +560,10 @@ impl<T: Input> Parser<T> {
         Ok(())
     }
 
-    fn state_machine(&mut self) -> ParseResult {
+    fn state_machine<'a>(&mut self) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         // let next_tok = self.peek_token().cloned()?;
         // println!("cur_state {:?}, next tok: {:?}", self.state, next_tok);
         debug_print!("\n\x1B[;33mParser state: {:?} \x1B[;0m", self.state);
@@ -587,7 +605,10 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn stream_start(&mut self) -> ParseResult {
+    fn stream_start<'a>(&mut self) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         match *self.peek_token()? {
             Token(span, TokenType::StreamStart(_)) => {
                 self.state = State::ImplicitDocumentStart;
@@ -601,7 +622,10 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn document_start(&mut self, implicit: bool) -> ParseResult {
+    fn document_start<'a>(&mut self, implicit: bool) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         while let TokenType::DocumentEnd = self.peek_token()?.1 {
             self.skip();
         }
@@ -654,7 +678,7 @@ impl<T: Input> Parser<T> {
                     version_directive_received = true;
                 }
                 Token(mark, TokenType::TagDirective(handle, prefix)) => {
-                    if tags.contains_key(handle) {
+                    if tags.contains_key(&**handle) {
                         return Err(ScanError::new_str(mark.start, "the TAG directive must only be given at most once per handle in the same document"));
                     }
                     tags.insert(handle.to_string(), prefix.to_string());
@@ -667,7 +691,10 @@ impl<T: Input> Parser<T> {
         Ok(())
     }
 
-    fn explicit_document_start(&mut self) -> ParseResult {
+    fn explicit_document_start<'a>(&mut self) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         self.parser_process_directives()?;
         match *self.peek_token()? {
             Token(mark, TokenType::DocumentStart) => {
@@ -683,7 +710,10 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn document_content(&mut self) -> ParseResult {
+    fn document_content<'a>(&mut self) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         match *self.peek_token()? {
             Token(
                 mark,
@@ -701,7 +731,10 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn document_end(&mut self) -> ParseResult {
+    fn document_end<'a>(&mut self) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         let mut explicit_end = false;
         let span: Span = match *self.peek_token()? {
             Token(span, TokenType::DocumentEnd) => {
@@ -732,7 +765,7 @@ impl<T: Input> Parser<T> {
         Ok((Event::DocumentEnd, span))
     }
 
-    fn register_anchor(&mut self, name: String, _: &Span) -> usize {
+    fn register_anchor(&mut self, name: Cow<'input, str>, _: &Span) -> usize {
         // anchors can be overridden/reused
         // if self.anchors.contains_key(name) {
         //     return Err(ScanError::new_str(*mark,
@@ -744,14 +777,17 @@ impl<T: Input> Parser<T> {
         new_id
     }
 
-    fn parse_node(&mut self, block: bool, indentless_sequence: bool) -> ParseResult {
+    fn parse_node<'a>(&mut self, block: bool, indentless_sequence: bool) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         let mut anchor_id = 0;
         let mut tag = None;
         match *self.peek_token()? {
             Token(_, TokenType::Alias(_)) => {
                 self.pop_state();
                 if let Token(span, TokenType::Alias(name)) = self.fetch_token() {
-                    match self.anchors.get(&name) {
+                    match self.anchors.get(&*name) {
                         None => {
                             return Err(ScanError::new_str(
                                 span.start,
@@ -834,7 +870,10 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn block_mapping_key(&mut self, first: bool) -> ParseResult {
+    fn block_mapping_key<'a>(&mut self, first: bool) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         // skip BlockMappingStart
         if first {
             let _ = self.peek_token()?;
@@ -872,7 +911,10 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn block_mapping_value(&mut self) -> ParseResult {
+    fn block_mapping_value<'a>(&mut self) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         match *self.peek_token()? {
             Token(_, TokenType::Value) => {
                 self.skip();
@@ -895,7 +937,10 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn flow_mapping_key(&mut self, first: bool) -> ParseResult {
+    fn flow_mapping_key<'a>(&mut self, first: bool) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         if first {
             let _ = self.peek_token()?;
             self.skip();
@@ -949,7 +994,10 @@ impl<T: Input> Parser<T> {
         Ok((Event::MappingEnd, span))
     }
 
-    fn flow_mapping_value(&mut self, empty: bool) -> ParseResult {
+    fn flow_mapping_value<'a>(&mut self, empty: bool) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         let span: Span = {
             if empty {
                 let Token(mark, _) = *self.peek_token()?;
@@ -976,7 +1024,10 @@ impl<T: Input> Parser<T> {
         Ok((Event::empty_scalar(), span))
     }
 
-    fn flow_sequence_entry(&mut self, first: bool) -> ParseResult {
+    fn flow_sequence_entry<'a>(&mut self, first: bool) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         // skip FlowMappingStart
         if first {
             let _ = self.peek_token()?;
@@ -1018,7 +1069,10 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn indentless_sequence_entry(&mut self) -> ParseResult {
+    fn indentless_sequence_entry<'a>(&mut self) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         match *self.peek_token()? {
             Token(_, TokenType::BlockEntry) => (),
             Token(mark, _) => {
@@ -1040,7 +1094,10 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn block_sequence_entry(&mut self, first: bool) -> ParseResult {
+    fn block_sequence_entry<'a>(&mut self, first: bool) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         // BLOCK-SEQUENCE-START
         if first {
             let _ = self.peek_token()?;
@@ -1072,7 +1129,10 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn flow_sequence_entry_mapping_key(&mut self) -> ParseResult {
+    fn flow_sequence_entry_mapping_key<'a>(&mut self) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         if let Token(mark, TokenType::Value | TokenType::FlowEntry | TokenType::FlowSequenceEnd) =
             *self.peek_token()?
         {
@@ -1085,7 +1145,10 @@ impl<T: Input> Parser<T> {
         }
     }
 
-    fn flow_sequence_entry_mapping_value(&mut self) -> ParseResult {
+    fn flow_sequence_entry_mapping_value<'a>(&mut self) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         match *self.peek_token()? {
             Token(_, TokenType::Value) => {
                 self.skip();
@@ -1107,7 +1170,10 @@ impl<T: Input> Parser<T> {
     }
 
     #[allow(clippy::unnecessary_wraps)]
-    fn flow_sequence_entry_mapping_end(&mut self, mark: Marker) -> ParseResult {
+    fn flow_sequence_entry_mapping_end<'a>(&mut self, mark: Marker) -> ParseResult<'a>
+    where
+        'input: 'a,
+    {
         self.state = State::FlowSequenceEntry;
         Ok((Event::MappingEnd, Span::empty(mark)))
     }
@@ -1162,8 +1228,8 @@ impl<T: Input> Parser<T> {
     }
 }
 
-impl<T: Input> Iterator for Parser<T> {
-    type Item = Result<(Event, Span), ScanError>;
+impl<'input, T: Input> Iterator for Parser<'input, T> {
+    type Item = Result<(Event<'input>, Span), ScanError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_event()

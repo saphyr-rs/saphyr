@@ -2,6 +2,10 @@
 
 ## Upcoming
 
+**Breaking Changes**:
+
+- Allow `Yaml` to borrow from the input.
+
 ## v0.0.3
 
 Skipping version `v0.0.2` to align this crate's version with that of

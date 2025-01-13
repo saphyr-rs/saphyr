@@ -23,7 +23,7 @@ struct YamlChecker {
     pub evs: Vec<TestEvent>,
 }
 
-impl EventReceiver for YamlChecker {
+impl EventReceiver<'_> for YamlChecker {
     fn on_event(&mut self, ev: Event) {
         let tev = match ev {
             Event::DocumentStart(_) => TestEvent::OnDocumentStart,

@@ -182,14 +182,14 @@ fn parse_to_events(source: &str) -> Result<EventReporter, ScanError> {
 
 #[derive(Default)]
 /// A [`SpannedEventReceiver`] checking for inconsistencies in event [`Spans`].
-pub struct EventReporter {
+pub struct EventReporter<'input> {
     pub events: Vec<String>,
-    last_span: Option<(Event, Span)>,
+    last_span: Option<(Event<'input>, Span)>,
     pub span_failures: Vec<(String, Span)>,
 }
 
-impl SpannedEventReceiver for EventReporter {
-    fn on_event(&mut self, ev: Event, span: Span) {
+impl<'input> SpannedEventReceiver<'input> for EventReporter<'input> {
+    fn on_event(&mut self, ev: Event<'input>, span: Span) {
         if let Some((last_ev, last_span)) = self.last_span.take() {
             if span.start.index() < last_span.start.index()
                 || span.end.index() < last_span.end.index()

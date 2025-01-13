@@ -2,7 +2,12 @@
 
 #![allow(clippy::module_name_repetitions)]
 
-use std::{convert::TryFrom, ops::Index, ops::IndexMut};
+use std::{
+    borrow::Cow,
+    convert::TryFrom,
+    hash::{BuildHasher, Hasher},
+    ops::{Index, IndexMut},
+};
 
 use hashlink::LinkedHashMap;
 use saphyr_parser::{BufferedInput, Input, Parser, ScanError};
@@ -26,22 +31,22 @@ use crate::{loader::parse_f64, YamlLoader};
 /// }
 /// ```
 #[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
-pub enum Yaml {
+pub enum Yaml<'input> {
     /// Float types are stored as String and parsed on demand.
     /// Note that `f64` does NOT implement Eq trait and can NOT be stored in `BTreeMap`.
-    Real(String),
+    Real(Cow<'input, str>),
     /// YAML int is stored as i64.
     Integer(i64),
     /// YAML scalar.
-    String(String),
+    String(Cow<'input, str>),
     /// YAML bool, e.g. `true` or `false`.
     Boolean(bool),
     /// YAML array, can be accessed as a `Vec`.
-    Array(Array),
+    Array(Array<'input>),
     /// YAML hash, can be accessed as a `LinkedHashMap`.
     ///
     /// Insertion order will match the order of insertion into the map.
-    Hash(Hash),
+    Hash(Hash<'input>),
     /// Alias, not fully supported yet.
     Alias(usize),
     /// YAML null, e.g. `null` or `~`.
@@ -53,11 +58,11 @@ pub enum Yaml {
 }
 
 /// The type contained in the `Yaml::Array` variant. This corresponds to YAML sequences.
-pub type Array = Vec<Yaml>;
+pub type Array<'input> = Vec<Yaml<'input>>;
 /// The type contained in the `Yaml::Hash` variant. This corresponds to YAML mappings.
-pub type Hash = LinkedHashMap<Yaml, Yaml>;
+pub type Hash<'input> = LinkedHashMap<Yaml<'input>, Yaml<'input>>;
 
-impl Yaml {
+impl<'input> Yaml<'input> {
     /// Load the given string as an array of YAML documents.
     ///
     /// The `source` is interpreted as YAML documents and is parsed. Parsing succeeds if and only
@@ -77,11 +82,11 @@ impl Yaml {
     /// "#).unwrap();
     /// let first_document = &docs[0]; // Select the first YAML document
     /// // The document is a string containing "First document".
-    /// assert_eq!(*first_document, Yaml::String("First document".to_owned()));
+    /// assert_eq!(*first_document, Yaml::String("First document".into()));
     ///
     /// let second_document = &docs[1]; // Select the second YAML document
     /// // The document is an array containing a single string, "Second document".
-    /// assert_eq!(second_document[0], Yaml::String("Second document".to_owned()));
+    /// assert_eq!(second_document[0], Yaml::String("Second document".into()));
     /// ```
     ///
     /// # Errors
@@ -96,7 +101,9 @@ impl Yaml {
     ///
     /// # Errors
     /// Returns `ScanError` when loading fails.
-    pub fn load_from_iter<I: Iterator<Item = char>>(source: I) -> Result<Vec<Yaml>, ScanError> {
+    pub fn load_from_iter<I: Iterator<Item = char>>(
+        source: I,
+    ) -> Result<Vec<Yaml<'input>>, ScanError> {
         let mut parser = Parser::new(BufferedInput::new(source));
         Self::load_from_parser(&mut parser)
     }
@@ -107,7 +114,9 @@ impl Yaml {
     ///
     /// # Errors
     /// Returns `ScanError` when loading fails.
-    pub fn load_from_parser<I: Input>(parser: &mut Parser<I>) -> Result<Vec<Yaml>, ScanError> {
+    pub fn load_from_parser<I: Input>(
+        parser: &mut Parser<'input, I>,
+    ) -> Result<Vec<Yaml<'input>>, ScanError> {
         let mut loader = YamlLoader::default();
         parser.load(&mut loader, true)?;
         Ok(loader.into_documents())
@@ -120,14 +129,13 @@ impl Yaml {
     define_as_ref!(as_str, &str, String);
     define_as_ref!(as_vec, &Array, Array);
 
-    define_as_mut_ref!(as_mut_hash, &mut Hash, Hash);
-    define_as_mut_ref!(as_mut_vec, &mut Array, Array);
+    define_as_mut_ref!(as_mut_hash, &mut Hash<'input>, Hash);
+    define_as_mut_ref!(as_mut_vec, &mut Array<'input>, Array);
 
     define_into!(into_bool, bool, Boolean);
-    define_into!(into_hash, Hash, Hash);
+    define_into!(into_hash, Hash<'input>, Hash);
     define_into!(into_i64, i64, Integer);
-    define_into!(into_string, String, String);
-    define_into!(into_vec, Array, Array);
+    define_into!(into_vec, Array<'input>, Array);
 
     define_is!(is_alias, Self::Alias(_));
     define_is!(is_array, Self::Array(_));
@@ -139,13 +147,27 @@ impl Yaml {
     define_is!(is_real, Self::Real(_));
     define_is!(is_string, Self::String(_));
 
+    /// Get the inner object in the YAML enum if it is a [`String`].
+    ///
+    /// # Return
+    /// If the variant of `self` is `Self::String`, return `Some(String)` with the `String`
+    /// contained. Otherwise, return `None`.
+    #[must_use]
+    pub fn into_string(self) -> Option<String> {
+        // We can't use the macro for this variant as we need to `.into_owned` the `Cow`.
+        match self {
+            Self::String(v) => Some(v.into_owned()),
+            _ => None,
+        }
+    }
+
     /// Return the `f64` value contained in this YAML node.
     ///
     /// If the node is not a [`Yaml::Real`] YAML node or its contents is not a valid `f64` string,
     /// `None` is returned.
     #[must_use]
     pub fn as_f64(&self) -> Option<f64> {
-        if let Yaml::Real(ref v) = self {
+        if let Self::Real(ref v) = self {
             parse_f64(v)
         } else {
             None
@@ -173,7 +195,7 @@ impl Yaml {
     #[must_use]
     pub fn or(self, other: Self) -> Self {
         match self {
-            Yaml::BadValue | Yaml::Null => other,
+            Self::BadValue | Self::Null => other,
             this => this,
         }
     }
@@ -191,7 +213,7 @@ impl Yaml {
 }
 
 #[allow(clippy::should_implement_trait)]
-impl Yaml {
+impl<'input> Yaml<'input> {
     /// Convert a string to a [`Yaml`] node.
     ///
     /// [`Yaml`] does not implement [`std::str::FromStr`] since conversion may not fail. This
@@ -210,7 +232,13 @@ impl Yaml {
     /// assert!(matches!(Yaml::from_str("foo"), Yaml::String(_)));
     /// ```
     #[must_use]
-    pub fn from_str(v: &str) -> Yaml {
+    pub fn from_str(v: &'input str) -> Yaml {
+        Self::from_cow(v.into())
+    }
+
+    /// Same as [`Self::from_str`] but uses a [`Cow`] instead.
+    #[must_use]
+    pub fn from_cow(v: Cow<'input, str>) -> Yaml {
         if let Some(number) = v.strip_prefix("0x") {
             if let Ok(i) = i64::from_str_radix(number, 16) {
                 return Yaml::Integer(i);
@@ -224,17 +252,17 @@ impl Yaml {
                 return Yaml::Integer(i);
             }
         }
-        match v {
+        match &*v {
             "~" | "null" => Yaml::Null,
             "true" => Yaml::Boolean(true),
             "false" => Yaml::Boolean(false),
             _ => {
                 if let Ok(integer) = v.parse::<i64>() {
                     Yaml::Integer(integer)
-                } else if parse_f64(v).is_some() {
-                    Yaml::Real(v.to_owned())
+                } else if parse_f64(&v).is_some() {
+                    Yaml::Real(v)
                 } else {
-                    Yaml::String(v.to_owned())
+                    Yaml::String(v)
                 }
             }
         }
@@ -242,50 +270,79 @@ impl Yaml {
 }
 
 static BAD_VALUE: Yaml = Yaml::BadValue;
-impl<'a> Index<&'a str> for Yaml {
-    type Output = Yaml;
+impl<'input, 'a> Index<&'a str> for Yaml<'input>
+where
+    'input: 'a,
+{
+    type Output = Yaml<'input>;
 
-    fn index(&self, idx: &'a str) -> &Yaml {
-        let key = Yaml::String(idx.to_owned());
-        match self.as_hash() {
-            Some(h) => h.get(&key).unwrap_or(&BAD_VALUE),
-            None => &BAD_VALUE,
+    fn index(&self, idx: &'a str) -> &Yaml<'input> {
+        match self {
+            Yaml::Hash(h) => {
+                let hash = hash_str_as_yaml_string(idx, h.hasher().build_hasher());
+                h.raw_entry()
+                    .from_hash(hash, |k| matches!(k, Yaml::String(v) if v == idx))
+                    .map_or(&BAD_VALUE, |(_, v)| v)
+            }
+            _ => &BAD_VALUE,
         }
     }
 }
 
-impl<'a> IndexMut<&'a str> for Yaml {
+impl<'input, 'a> IndexMut<&'a str> for Yaml<'input>
+where
+    'input: 'a,
+{
     /// Perform indexing if `self` is a mapping.
     ///
     /// # Panics
     /// This function panics if the key given does not exist within `self` (as per [`Index`]).
     ///
     /// This function also panics if `self` is not a [`Yaml::Hash`].
-    fn index_mut(&mut self, idx: &'a str) -> &mut Yaml {
-        let key = Yaml::String(idx.to_owned());
+    fn index_mut(&mut self, idx: &'a str) -> &mut Yaml<'input> {
+        use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
         match self.as_mut_hash() {
-            Some(h) => h.get_mut(&key).unwrap(),
+            Some(h) => {
+                let hash = hash_str_as_yaml_string(idx, h.hasher().build_hasher());
+                match h
+                    .raw_entry_mut()
+                    .from_hash(hash, |k| matches!(k, Yaml::String(v) if v == idx))
+                {
+                    Occupied(entry) => entry.into_mut(),
+                    Vacant(_) => panic!("Key '{idx}' not found in YAML hash"),
+                }
+            }
             None => panic!("Not a hash type"),
         }
     }
 }
 
-impl Index<usize> for Yaml {
-    type Output = Yaml;
+impl<'input> Index<usize> for Yaml<'input>
+where
+    Self: 'input,
+{
+    type Output = Yaml<'input>;
 
-    fn index(&self, idx: usize) -> &Yaml {
-        if let Some(v) = self.as_vec() {
-            v.get(idx).unwrap_or(&BAD_VALUE)
-        } else if let Some(v) = self.as_hash() {
-            let key = Yaml::Integer(i64::try_from(idx).unwrap());
-            v.get(&key).unwrap_or(&BAD_VALUE)
-        } else {
-            &BAD_VALUE
+    fn index(&self, idx: usize) -> &Self::Output {
+        match self {
+            Yaml::Array(sequence) => sequence.get(idx).unwrap_or(&BAD_VALUE),
+            Yaml::Hash(mapping) => {
+                if let Ok(idx) = i64::try_from(idx) {
+                    let hash = hash_i64_as_yaml_integer(idx, mapping.hasher().build_hasher());
+                    mapping
+                        .raw_entry()
+                        .from_hash(hash, |k| matches!(k, Yaml::Integer(v) if *v == idx))
+                        .map_or(&BAD_VALUE, |(_, v)| v)
+                } else {
+                    &BAD_VALUE
+                }
+            }
+            _ => &BAD_VALUE,
         }
     }
 }
 
-impl IndexMut<usize> for Yaml {
+impl<'input> IndexMut<usize> for Yaml<'input> {
     /// Perform indexing if `self` is a sequence or a mapping.
     ///
     /// # Panics
@@ -295,7 +352,7 @@ impl IndexMut<usize> for Yaml {
     /// contain [`Yaml::Integer`]`(idx)` as a key.
     ///
     /// This function also panics if `self` is not a [`Yaml::Array`] nor a [`Yaml::Hash`].
-    fn index_mut(&mut self, idx: usize) -> &mut Yaml {
+    fn index_mut(&mut self, idx: usize) -> &mut Yaml<'input> {
         match self {
             Yaml::Array(sequence) => sequence.index_mut(idx),
             Yaml::Hash(mapping) => {
@@ -307,9 +364,9 @@ impl IndexMut<usize> for Yaml {
     }
 }
 
-impl IntoIterator for Yaml {
-    type Item = Yaml;
-    type IntoIter = YamlIter;
+impl<'input> IntoIterator for Yaml<'input> {
+    type Item = Yaml<'input>;
+    type IntoIter = YamlIter<'input>;
 
     fn into_iter(self) -> Self::IntoIter {
         YamlIter {
@@ -319,14 +376,30 @@ impl IntoIterator for Yaml {
 }
 
 /// An iterator over a [`Yaml`] node.
-pub struct YamlIter {
-    yaml: std::vec::IntoIter<Yaml>,
+pub struct YamlIter<'input> {
+    yaml: std::vec::IntoIter<Yaml<'input>>,
 }
 
-impl Iterator for YamlIter {
-    type Item = Yaml;
+impl<'input> Iterator for YamlIter<'input> {
+    type Item = Yaml<'input>;
 
-    fn next(&mut self) -> Option<Yaml> {
+    fn next(&mut self) -> Option<Yaml<'input>> {
         self.yaml.next()
     }
+}
+
+/// Hash the given `str` as if it were a [`Yaml::String`] object.
+fn hash_str_as_yaml_string<H: Hasher>(key: &str, mut hasher: H) -> u64 {
+    use std::hash::Hash;
+    let key = Yaml::String(key.into());
+    key.hash(&mut hasher);
+    hasher.finish()
+}
+
+/// Hash the given `i64` as if it were a [`Yaml::Integer`] object.
+fn hash_i64_as_yaml_integer<H: Hasher>(key: i64, mut hasher: H) -> u64 {
+    use std::hash::Hash;
+    let key = Yaml::Integer(key);
+    key.hash(&mut hasher);
+    hasher.finish()
 }

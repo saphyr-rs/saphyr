@@ -67,5 +67,5 @@ pub use crate::encoding::{YAMLDecodingTrap, YAMLDecodingTrapFn, YamlDecoder};
 // Re-export `ScanError` as it is used as part of our public API and we want consumers to be able
 // to inspect it (e.g. perform a `match`). They wouldn't be able without it.
 pub use saphyr_parser::ScanError;
-// Re-export [`Marker`] which is used for annotated YAMLs.
+// Re-export `Marker` which is used for annotated YAMLs.
 pub use saphyr_parser::Marker;

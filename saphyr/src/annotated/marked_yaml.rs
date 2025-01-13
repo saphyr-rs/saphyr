@@ -12,17 +12,17 @@ use crate::{LoadableYamlNode, Yaml, YamlData, YamlLoader};
 /// This structure does not implement functions to operate on the YAML object. To access those,
 /// refer to the [`Self::data`] field.
 #[derive(Clone, Debug)]
-pub struct MarkedYaml {
+pub struct MarkedYaml<'input> {
     /// The span indicating where in the input stream the object is.
     ///
     /// The markers are relative to the start of the input stream that was given to the parser, not
     /// to the start of the document within the input stream.
     pub span: Span,
     /// The YAML contents of the node.
-    pub data: YamlData<MarkedYaml>,
+    pub data: YamlData<'input, MarkedYaml<'input>>,
 }
 
-impl MarkedYaml {
+impl<'input> MarkedYaml<'input> {
     /// Load the given string as an array of YAML documents.
     ///
     /// See the function [`load_from_str`] for more details.
@@ -56,30 +56,32 @@ impl MarkedYaml {
     /// Returns `ScanError` when loading fails.
     ///
     /// [`load_from_str`]: `Yaml::load_from_str`
-    pub fn load_from_parser<I: Input>(parser: &mut Parser<I>) -> Result<Vec<Self>, ScanError> {
+    pub fn load_from_parser<I: Input>(
+        parser: &mut Parser<'input, I>,
+    ) -> Result<Vec<Self>, ScanError> {
         let mut loader = YamlLoader::<Self>::default();
         parser.load(&mut loader, true)?;
         Ok(loader.into_documents())
     }
 }
 
-impl PartialEq for MarkedYaml {
+impl<'input> PartialEq for MarkedYaml<'input> {
     fn eq(&self, other: &Self) -> bool {
         self.data.eq(&other.data)
     }
 }
 
 // I don't know if it's okay to implement that, but we need it for the hashmap.
-impl Eq for MarkedYaml {}
+impl<'input> Eq for MarkedYaml<'input> {}
 
-impl std::hash::Hash for MarkedYaml {
+impl<'input> std::hash::Hash for MarkedYaml<'input> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.data.hash(state);
     }
 }
 
-impl From<YamlData<MarkedYaml>> for MarkedYaml {
-    fn from(value: YamlData<MarkedYaml>) -> Self {
+impl<'input> From<YamlData<'input, MarkedYaml<'input>>> for MarkedYaml<'input> {
+    fn from(value: YamlData<'input, MarkedYaml<'input>>) -> Self {
         Self {
             span: Span::default(),
             data: value,
@@ -87,8 +89,8 @@ impl From<YamlData<MarkedYaml>> for MarkedYaml {
     }
 }
 
-impl LoadableYamlNode for MarkedYaml {
-    fn from_bare_yaml(yaml: Yaml) -> Self {
+impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
+    fn from_bare_yaml(yaml: Yaml<'input>) -> Self {
         Self {
             span: Span::default(),
             data: match yaml {

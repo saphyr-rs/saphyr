@@ -2,7 +2,11 @@
 
 pub mod marked_yaml;
 
-use std::ops::{Index, IndexMut};
+use std::{
+    borrow::Cow,
+    marker::PhantomData,
+    ops::{Index, IndexMut},
+};
 
 use hashlink::LinkedHashMap;
 
@@ -39,17 +43,17 @@ use crate::loader::parse_f64;
 /// [`Yaml`]: crate::Yaml
 /// [`MarkedYaml`]: marked_yaml::MarkedYaml
 #[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
-pub enum YamlData<Node>
+pub enum YamlData<'input, Node>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<Self>,
 {
     /// Float types are stored as String and parsed on demand.
     /// Note that `f64` does NOT implement Eq trait and can NOT be stored in `BTreeMap`.
-    Real(String),
+    Real(Cow<'input, str>),
     /// YAML int is stored as i64.
     Integer(i64),
     /// YAML scalar.
-    String(String),
+    String(Cow<'input, str>),
     /// YAML bool, e.g. `true` or `false`.
     Boolean(bool),
     /// YAML array, can be accessed as a `Vec`.
@@ -75,7 +79,7 @@ pub type AnnotatedArray<Node> = Vec<Node>;
 #[allow(clippy::module_name_repetitions)]
 pub type AnnotatedHash<Node> = LinkedHashMap<Node, Node>;
 
-impl<Node> YamlData<Node>
+impl<'input, Node> YamlData<'input, Node>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<Self>,
 {
@@ -92,7 +96,6 @@ where
     define_into!(into_bool, bool, Boolean);
     define_into!(into_hash, AnnotatedHash<Node>, Hash);
     define_into!(into_i64, i64, Integer);
-    define_into!(into_string, String, String);
     define_into!(into_vec, AnnotatedArray<Node>, Array);
 
     define_is!(is_alias, Self::Alias(_));
@@ -104,6 +107,20 @@ where
     define_is!(is_null, Self::Null);
     define_is!(is_real, Self::Real(_));
     define_is!(is_string, Self::String(_));
+
+    /// Get the inner object in the YAML enum if it is a [`String`].
+    ///
+    /// # Return
+    /// If the variant of `self` is `Self::String`, return `Some(String)` with the `String`
+    /// contained. Otherwise, return `None`.
+    #[must_use]
+    pub fn into_string(self) -> Option<String> {
+        // We can't use the macro for this variant as we need to `.into_owned` the `Cow`.
+        match self {
+            Self::String(v) => Some(v.into_owned()),
+            _ => None,
+        }
+    }
 
     /// Return the `f64` value contained in this YAML node.
     ///
@@ -156,8 +173,9 @@ where
 // NOTE(ethiraric, 10/06/2024): We cannot create a "generic static" variable which would act as a
 // `BAD_VALUE`. This means that, unlike for `Yaml`, we have to make the indexing method panic.
 
-impl<'a, Node> Index<&'a str> for YamlData<Node>
+impl<'input, 'a, Node> Index<&'a str> for YamlData<'input, Node>
 where
+    'input: 'a,
     Node: std::hash::Hash + std::cmp::Eq + From<Self>,
 {
     type Output = Node;
@@ -169,17 +187,25 @@ where
     ///
     /// This function also panics if `self` is not a [`YamlData::Hash`].
     fn index(&self, idx: &'a str) -> &Node {
-        let key = Self::String(idx.to_owned());
-        match self.as_hash() {
-            Some(h) => h.get(&key.into()).unwrap(),
-            None => panic!("{idx}: key does not exist"),
+        match self {
+            YamlData::Hash(_h) => {
+                unimplemented!("Cannot get lifetimes to work");
+                // let hash = hash_str_as_yaml_string::<'a, Node, _>(idx, h.hasher().build_hasher());
+                // let expect = Node::from(YamlData::String(idx.into()));
+                // h.raw_entry()
+                //     .from_hash(hash, |k| *k == expect)
+                //     .map(|(_, v)| v)
+                //     .expect("key does not exist")
+            }
+            _ => panic!("trying to index a non-hash YamlData with string '{idx}'"),
         }
     }
 }
 
-impl<'a, Node> IndexMut<&'a str> for YamlData<Node>
+impl<'input, 'a, Node> IndexMut<&'a str> for YamlData<'input, Node>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<Self>,
+    'input: 'a,
 {
     /// Perform indexing if `self` is a mapping.
     ///
@@ -187,16 +213,15 @@ where
     /// This function panics if the key given does not exist within `self` (as per [`Index`]).
     ///
     /// This function also panics if `self` is not a [`YamlData::Hash`].
-    fn index_mut(&mut self, idx: &'a str) -> &mut Node {
-        let key = Self::String(idx.to_owned());
+    fn index_mut(&mut self, _idx: &'a str) -> &mut Node {
         match self.as_mut_hash() {
-            Some(h) => h.get_mut(&key.into()).unwrap(),
+            Some(_h) => unimplemented!("Cannot get lifetimes to work"),
             None => panic!("Not a hash type"),
         }
     }
 }
 
-impl<Node> Index<usize> for YamlData<Node>
+impl<'input, Node> Index<usize> for YamlData<'input, Node>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<Self>,
 {
@@ -223,7 +248,7 @@ where
     }
 }
 
-impl<Node> IndexMut<usize> for YamlData<Node>
+impl<'input, Node> IndexMut<usize> for YamlData<'input, Node>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<Self>,
 {
@@ -248,32 +273,34 @@ where
     }
 }
 
-impl<Node> IntoIterator for YamlData<Node>
+impl<'input, Node> IntoIterator for YamlData<'input, Node>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<Self>,
 {
     type Item = Node;
-    type IntoIter = AnnotatedYamlIter<Node>;
+    type IntoIter = AnnotatedYamlIter<'input, Node>;
 
     fn into_iter(self) -> Self::IntoIter {
         Self::IntoIter {
             yaml: self.into_vec().unwrap_or_default().into_iter(),
+            marker: PhantomData,
         }
     }
 }
 
 /// An iterator over a [`YamlData`] node.
 #[allow(clippy::module_name_repetitions)]
-pub struct AnnotatedYamlIter<Node>
+pub struct AnnotatedYamlIter<'input, Node>
 where
-    Node: std::hash::Hash + std::cmp::Eq + From<YamlData<Node>>,
+    Node: std::hash::Hash + std::cmp::Eq + From<YamlData<'input, Node>>,
 {
     yaml: std::vec::IntoIter<Node>,
+    marker: PhantomData<&'input u32>,
 }
 
-impl<Node> Iterator for AnnotatedYamlIter<Node>
+impl<'input, Node> Iterator for AnnotatedYamlIter<'input, Node>
 where
-    Node: std::hash::Hash + std::cmp::Eq + From<YamlData<Node>>,
+    Node: std::hash::Hash + std::cmp::Eq + From<YamlData<'input, Node>>,
 {
     type Item = Node;
 

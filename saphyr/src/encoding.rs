@@ -57,7 +57,8 @@ pub enum YAMLDecodingTrap {
 /// b: 2.2
 /// c: [1, 2]
 /// ";
-/// let out = YamlDecoder::read(string as &[u8])
+/// let mut decoder = YamlDecoder::read(string as &[u8]);
+/// let out = decoder
 ///     .encoding_trap(YAMLDecodingTrap::Ignore)
 ///     .decode()
 ///     .unwrap();
@@ -206,7 +207,8 @@ a: 1
 b: 2.2
 c: [1, 2]
 ";
-        let out = YamlDecoder::read(s as &[u8]).decode().unwrap();
+        let mut decoder = YamlDecoder::read(s as &[u8]);
+        let out = decoder.decode().unwrap();
         let doc = &out[0];
         assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
         assert!((doc["b"].as_f64().unwrap() - 2.2f64).abs() <= f64::EPSILON);
@@ -221,7 +223,8 @@ c: [1, 2]
 \x00b\x00:\x00 \x002\x00.\x002\x00
 \x00c\x00:\x00 \x00[\x001\x00,\x00 \x002\x00]\x00
 \x00";
-        let out = YamlDecoder::read(s as &[u8]).decode().unwrap();
+        let mut decoder = YamlDecoder::read(s as &[u8]);
+        let out = decoder.decode().unwrap();
         let doc = &out[0];
         println!("GOT: {doc:?}");
         assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
@@ -237,7 +240,8 @@ c: [1, 2]
 \x00b\x00:\x00 \x002\x00.\x002\x00
 \x00c\x00:\x00 \x00[\x001\x00,\x00 \x002\x00]\x00
 ";
-        let out = YamlDecoder::read(s as &[u8]).decode().unwrap();
+        let mut decoder = YamlDecoder::read(s as &[u8]);
+        let out = decoder.decode().unwrap();
         let doc = &out[0];
         println!("GOT: {doc:?}");
         assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
@@ -253,7 +257,8 @@ c: [1, 2]
 \x00b\x00:\x00 \x002\x00.\x002\x00
 \x00c\x00:\x00 \x00[\x001\x00,\x00 \x002\x00]\x00
 \x00";
-        let out = YamlDecoder::read(s as &[u8]).decode().unwrap();
+        let mut decoder = YamlDecoder::read(s as &[u8]);
+        let out = decoder.decode().unwrap();
         let doc = &out[0];
         println!("GOT: {doc:?}");
         assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
@@ -269,7 +274,8 @@ a\xa9: 1
 b: 2.2
 c: [1, 2]
 ";
-        let out = YamlDecoder::read(s as &[u8])
+        let mut decoder = YamlDecoder::read(s as &[u8]);
+        let out = decoder
             .encoding_trap(YAMLDecodingTrap::Ignore)
             .decode()
             .unwrap();

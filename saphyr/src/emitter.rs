@@ -296,7 +296,7 @@ impl<'a> YamlEmitter<'a> {
         } else {
             self.level += 1;
             for (cnt, (k, v)) in h.iter().enumerate() {
-                let complex_key = matches!(*k, Yaml::Hash(_) | Yaml::Array(_));
+                let complex_key = matches!(k, Yaml::Hash(_) | Yaml::Array(_));
                 if cnt > 0 {
                     writeln!(self.writer)?;
                     self.write_indent()?;

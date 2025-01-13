@@ -1,6 +1,6 @@
 //! The default loader.
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 
 use hashlink::LinkedHashMap;
 use saphyr_parser::{Event, ScanError, Span, SpannedEventReceiver, TScalarStyle, Tag};
@@ -15,9 +15,9 @@ use crate::{Hash, Yaml};
 /// Each node must implement [`LoadableYamlNode`]. The methods are required for the loader to
 /// manipulate and populate the `Node`.
 #[allow(clippy::module_name_repetitions)]
-pub struct YamlLoader<Node>
+pub struct YamlLoader<'input, Node>
 where
-    Node: LoadableYamlNode,
+    Node: LoadableYamlNode<'input>,
 {
     /// The different YAML documents that are loaded.
     docs: Vec<Node>,
@@ -26,12 +26,13 @@ where
     doc_stack: Vec<(Node, usize)>,
     key_stack: Vec<Node>,
     anchor_map: BTreeMap<usize, Node>,
+    marker: PhantomData<&'input u32>,
 }
 
 // For some reason, rustc wants `Node: Default` if I `#[derive(Default)]`.
-impl<Node> Default for YamlLoader<Node>
+impl<'input, Node> Default for YamlLoader<'input, Node>
 where
-    Node: LoadableYamlNode,
+    Node: LoadableYamlNode<'input>,
 {
     fn default() -> Self {
         Self {
@@ -39,15 +40,16 @@ where
             doc_stack: vec![],
             key_stack: vec![],
             anchor_map: BTreeMap::new(),
+            marker: PhantomData,
         }
     }
 }
 
-impl<Node> SpannedEventReceiver for YamlLoader<Node>
+impl<'input, Node> SpannedEventReceiver<'input> for YamlLoader<'input, Node>
 where
-    Node: LoadableYamlNode,
+    Node: LoadableYamlNode<'input>,
 {
-    fn on_event(&mut self, ev: Event, span: Span) {
+    fn on_event(&mut self, ev: Event<'input>, span: Span) {
         match ev {
             Event::DocumentStart(_) | Event::Nothing | Event::StreamStart | Event::StreamEnd => {
                 // do nothing
@@ -120,7 +122,7 @@ where
                     }
                 } else {
                     // Datatype is not specified, or unrecognized
-                    Yaml::from_str(&v)
+                    Yaml::from_cow(v)
                 };
                 self.insert_new_node((Node::from_bare_yaml(node).with_span(span), aid));
             }
@@ -135,9 +137,9 @@ where
     }
 }
 
-impl<Node> YamlLoader<Node>
+impl<'input, Node> YamlLoader<'input, Node>
 where
-    Node: LoadableYamlNode,
+    Node: LoadableYamlNode<'input>,
 {
     fn insert_new_node(&mut self, node: (Node, usize)) {
         // valid anchor id starts from 1
@@ -212,7 +214,7 @@ impl std::fmt::Display for LoadError {
 ///
 /// This trait must be implemented on YAML node types (i.e.: [`Yaml`] and annotated YAML nodes). It
 /// provides the necessary methods for [`YamlLoader`] to load data into the node.
-pub trait LoadableYamlNode: Clone + std::hash::Hash + Eq {
+pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
     /// Create an instance of `Self` from a [`Yaml`].
     ///
     /// Nodes must implement this to be built. The optional metadata that they contain will be
@@ -223,7 +225,7 @@ pub trait LoadableYamlNode: Clone + std::hash::Hash + Eq {
     ///
     /// [`Array`]: `Yaml::Array`
     /// [`Hash`]: `Yaml::Hash`
-    fn from_bare_yaml(yaml: Yaml) -> Self;
+    fn from_bare_yaml(yaml: Yaml<'input>) -> Self;
 
     /// Return whether the YAML node is an array.
     fn is_array(&self) -> bool;
@@ -258,8 +260,8 @@ pub trait LoadableYamlNode: Clone + std::hash::Hash + Eq {
     }
 }
 
-impl LoadableYamlNode for Yaml {
-    fn from_bare_yaml(yaml: Yaml) -> Self {
+impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
+    fn from_bare_yaml(yaml: Yaml<'input>) -> Self {
         yaml
     }
 
