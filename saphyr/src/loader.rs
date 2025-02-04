@@ -152,13 +152,13 @@ where
                 parent_node.array_mut().push(node.0);
             } else if parent_node.is_hash() {
                 let cur_key = self.key_stack.last_mut().unwrap();
-                // current node is a key
                 if cur_key.is_badvalue() {
+                    // current node is a key
                     *cur_key = node.0;
-                // current node is a value
                 } else {
+                    // current node is a value
                     let hash = parent_node.hash_mut();
-                    hash.insert(cur_key.take(), node.0);
+                    hash.insert(cur_key.take().into(), node.0);
                 }
             }
         } else {
@@ -215,6 +215,29 @@ impl std::fmt::Display for LoadError {
 /// This trait must be implemented on YAML node types (i.e.: [`Yaml`] and annotated YAML nodes). It
 /// provides the necessary methods for [`YamlLoader`] to load data into the node.
 pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
+    /// The type of the key for the hash variant of the YAML node.
+    ///
+    /// The `HashKey` must be [`Eq`] and [`Hash`] to satisfy the hash map requirements.
+    /// It must also be [`Borrow<Self>`] so the hash map can borrow the key to a node and compare
+    /// it with a node.
+    /// Furthermore, it must be [`From<Self>`] so we can create a key from a node.
+    /// Finally, if indexing mappings with `&str` is desired, it must also implement
+    /// [`PartialEq<Self>`].
+    /// These constraints are highlighted in [`AnnotatedNode`].
+    ///
+    /// This indirection is required to solve lifetime issues with the hash map. More details about
+    /// the issue and its workaround can be found
+    /// [here](https://github.com/rust-lang/rust/issues/124614#issuecomment-2090725842).
+    /// Without the ability to use a capsule for the key, we would have to require the keys for
+    /// indexing to outlive the input.
+    ///
+    /// [`Hash`]: std::hash::Hash
+    /// [`Borrow<Self>`]: std::borrow::Borrow
+    /// [`From<Self>`]: From
+    /// [`PartialEq<Self>`]: PartialEq
+    /// [`AnnotatedNode`]: crate::annotated::AnnotatedNode
+    type HashKey: Eq + std::hash::Hash + std::borrow::Borrow<Self> + From<Self>;
+
     /// Create an instance of `Self` from a [`Yaml`].
     ///
     /// Nodes must implement this to be built. The optional metadata that they contain will be
@@ -246,7 +269,7 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
     ///
     /// # Panics
     /// This function panics if `self` is not a hash.
-    fn hash_mut(&mut self) -> &mut LinkedHashMap<Self, Self>;
+    fn hash_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self>;
 
     /// Take the contained node out of `Self`, leaving a `BadValue` in its place.
     #[must_use]
@@ -261,6 +284,8 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
 }
 
 impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
+    type HashKey = Self;
+
     fn from_bare_yaml(yaml: Yaml<'input>) -> Self {
         yaml
     }
@@ -285,7 +310,7 @@ impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
         }
     }
 
-    fn hash_mut(&mut self) -> &mut LinkedHashMap<Self, Self> {
+    fn hash_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
         if let Yaml::Hash(x) = self {
             x
         } else {

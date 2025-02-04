@@ -11,6 +11,10 @@ use crate::{LoadableYamlNode, Yaml, YamlData, YamlLoader};
 ///
 /// This structure does not implement functions to operate on the YAML object. To access those,
 /// refer to the [`Self::data`] field.
+///
+/// # Warning
+/// In order to allow indexing by content in mappings, equality comparisons for this structure
+/// **ignore** the [`Span`].
 #[derive(Clone, Debug)]
 pub struct MarkedYaml<'input> {
     /// The span indicating where in the input stream the object is.
@@ -19,7 +23,75 @@ pub struct MarkedYaml<'input> {
     /// to the start of the document within the input stream.
     pub span: Span,
     /// The YAML contents of the node.
-    pub data: YamlData<'input, MarkedYaml<'input>>,
+    pub data: YamlData<'input, MarkedYaml<'input>, MarkedYamlCapsule<'input>>,
+}
+
+/// A capsule for [`MarkedYaml`].
+///
+/// See [`LoadableYamlNode::HashKey`] for details.
+#[allow(clippy::module_name_repetitions)]
+#[derive(Hash, PartialEq, Eq, Debug, Clone)]
+#[repr(transparent)]
+pub struct MarkedYamlCapsule<'lt> {
+    inner: MarkedYaml<'lt>,
+}
+
+impl<'input> super::AnnotatedNode for MarkedYaml<'input> {
+    type HashKey<'a> = MarkedYamlCapsule<'a>;
+
+    type HashValue<'b> = MarkedYaml<'b>;
+}
+
+impl<'input> super::AnnotatedNode for MarkedYamlCapsule<'input> {
+    type HashKey<'a> = MarkedYamlCapsule<'a>;
+
+    type HashValue<'b> = MarkedYaml<'b>;
+}
+
+impl<'a, 'b> core::borrow::Borrow<MarkedYaml<'a>> for MarkedYamlCapsule<'b>
+where
+    'b: 'a,
+{
+    fn borrow(&self) -> &MarkedYaml<'a> {
+        &self.inner
+    }
+}
+
+impl<'a> core::borrow::Borrow<YamlData<'a, MarkedYaml<'a>, MarkedYamlCapsule<'a>>>
+    for MarkedYamlCapsule<'a>
+{
+    fn borrow(&self) -> &YamlData<'a, MarkedYaml<'a>, MarkedYamlCapsule<'a>> {
+        &self.inner.data
+    }
+}
+
+impl<'a> From<MarkedYaml<'a>> for MarkedYamlCapsule<'a> {
+    fn from(value: MarkedYaml<'a>) -> Self {
+        Self { inner: value }
+    }
+}
+
+impl<'a> From<YamlData<'a, MarkedYaml<'a>, MarkedYamlCapsule<'a>>> for MarkedYamlCapsule<'a> {
+    fn from(value: YamlData<'a, MarkedYaml<'a>, MarkedYamlCapsule<'a>>) -> Self {
+        Self {
+            inner: MarkedYaml {
+                span: Span::default(),
+                data: value,
+            },
+        }
+    }
+}
+
+impl<'a, 'b> std::cmp::PartialEq<MarkedYaml<'a>> for MarkedYamlCapsule<'b> {
+    fn eq(&self, other: &MarkedYaml<'a>) -> bool {
+        self.inner.eq(other)
+    }
+}
+
+impl<'a> From<MarkedYamlCapsule<'a>> for MarkedYaml<'a> {
+    fn from(value: MarkedYamlCapsule<'a>) -> Self {
+        value.inner
+    }
 }
 
 impl<'input> MarkedYaml<'input> {
@@ -80,8 +152,10 @@ impl<'input> std::hash::Hash for MarkedYaml<'input> {
     }
 }
 
-impl<'input> From<YamlData<'input, MarkedYaml<'input>>> for MarkedYaml<'input> {
-    fn from(value: YamlData<'input, MarkedYaml<'input>>) -> Self {
+impl<'input> From<YamlData<'input, MarkedYaml<'input>, MarkedYamlCapsule<'input>>>
+    for MarkedYaml<'input>
+{
+    fn from(value: YamlData<'input, MarkedYaml<'input>, MarkedYamlCapsule<'input>>) -> Self {
         Self {
             span: Span::default(),
             data: value,
@@ -90,6 +164,8 @@ impl<'input> From<YamlData<'input, MarkedYaml<'input>>> for MarkedYaml<'input> {
 }
 
 impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
+    type HashKey = MarkedYamlCapsule<'input>;
+
     fn from_bare_yaml(yaml: Yaml<'input>) -> Self {
         Self {
             span: Span::default(),
@@ -128,7 +204,7 @@ impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
         }
     }
 
-    fn hash_mut(&mut self) -> &mut LinkedHashMap<Self, Self> {
+    fn hash_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
         if let YamlData::Hash(x) = &mut self.data {
             x
         } else {

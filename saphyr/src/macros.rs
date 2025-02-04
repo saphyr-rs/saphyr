@@ -76,7 +76,7 @@ macro_rules! define_is (
 /// Check whether the YAML enum contains the given variant.
 ///
 /// # Return
-/// If the variant of `self` is `Self::$variant`, return `true`. Otherwise, return `False`.
+/// If the variant of `self` is `Self::$variant`, return `true`. Otherwise, return `false`.
 #[must_use]
 pub fn $fn_name(&self) -> bool {
     matches!(self, $variant)
