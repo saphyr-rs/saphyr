@@ -82,15 +82,9 @@ where
 #[allow(clippy::module_name_repetitions)]
 pub trait AnnotatedNode: std::hash::Hash + std::cmp::Eq {
     /// The type used as the key in the [`YamlData::Hash`] variant.
-    type HashKey<'a>: From<YamlData<'a, Self::HashValue<'a>, Self::HashKey<'a>>>
-        + std::borrow::Borrow<Self::HashValue<'a>>
-        + From<Self::HashValue<'a>>
-        + for<'b> std::cmp::PartialEq<Self::HashValue<'b>>
+    type HashKey<'a>: From<YamlData<'a, Self::HashKey<'a>, Self::HashKey<'a>>>
+        + for<'b> std::cmp::PartialEq<Self::HashKey<'b>>
         + AnnotatedNode;
-    /// The type used as the value in the [`YamlData::Hash`] variant.
-    type HashValue<'b>: AnnotatedNode
-        + From<Self::HashKey<'b>>
-        + From<YamlData<'b, Self::HashValue<'b>, Self::HashKey<'b>>>;
 }
 
 /// The type contained in the [`YamlData::Array`] variant. This corresponds to YAML sequences.
@@ -203,7 +197,7 @@ where
         + std::hash::Hash
         + std::borrow::Borrow<Node>
         + From<Node>
-        + for<'b> PartialEq<Node::HashValue<'b>>,
+        + for<'b> PartialEq<Node::HashKey<'b>>,
 {
     type Output = Node;
 
@@ -218,7 +212,7 @@ where
             YamlData::Hash(h) => {
                 use std::hash::Hash;
 
-                let needle = Node::HashValue::<'a>::from(YamlData::String(idx.into()));
+                let needle = Node::HashKey::<'a>::from(YamlData::String(idx.into()));
 
                 // In order to work around `needle`'s lifetime being different from `h`'s, we need
                 // to manually compute the hash. Otherwise, we'd use `h.get()`, which complains the
@@ -245,7 +239,7 @@ where
         + std::hash::Hash
         + std::borrow::Borrow<Node>
         + From<Node>
-        + for<'b> PartialEq<Node::HashValue<'b>>,
+        + for<'b> PartialEq<Node::HashKey<'b>>,
 {
     /// Perform indexing if `self` is a mapping.
     ///
@@ -262,7 +256,7 @@ where
                 // In order to work around `needle`'s lifetime being different from `h`'s, we need
                 // to manually compute the hash. Otherwise, we'd use `h.get()`, which complains the
                 // needle's lifetime doesn't match that of the key in `h`.
-                let needle = Node::HashValue::<'a>::from(YamlData::String(idx.into()));
+                let needle = Node::HashKey::<'a>::from(YamlData::String(idx.into()));
                 let mut hasher = h.hasher().build_hasher();
                 needle.hash(&mut hasher);
                 let hash = hasher.finish();
