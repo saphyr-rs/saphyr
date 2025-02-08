@@ -97,10 +97,81 @@ define_yaml_object_impl!(
     < 'input, Node, HashKey>,
     where {
         Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
-        HashKey: Eq + std::hash::Hash + std::borrow::Borrow<Node> + From<Node> },
+        HashKey: Eq
+            + std::hash::Hash
+            + std::borrow::Borrow<Node>
+            + From<Node>
+            + for<'b> PartialEq<Node::HashKey<'b>>,
+    },
     hashtype = AnnotatedHash<'input, HashKey, Node>,
-    arraytype = AnnotatedArray<Node>
+    arraytype = AnnotatedArray<Node>,
+    nodetype = Node
 );
+
+impl<'input, Node, HashKey> YamlData<'input, Node, HashKey>
+where
+    Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
+    HashKey: Eq
+        + std::hash::Hash
+        + std::borrow::Borrow<Node>
+        + From<Node>
+        + for<'b> PartialEq<Node::HashKey<'b>>,
+{
+    /// Implementation detail for [`Self::as_mapping_get`], which is generated from a macro.
+    fn as_mapping_get_impl<'a>(&self, key: &'a str) -> Option<&Node>
+    where
+        'input: 'a,
+    {
+        use std::hash::Hash;
+
+        match self {
+            YamlData::Hash(mapping) => {
+                let needle = Node::HashKey::<'a>::from(YamlData::String(key.into()));
+
+                // In order to work around `needle`'s lifetime being different from `h`'s, we need
+                // to manually compute the hash. Otherwise, we'd use `h.get()`, which complains the
+                // needle's lifetime doesn't match that of the key in `h`.
+                let mut hasher = mapping.hasher().build_hasher();
+                needle.hash(&mut hasher);
+                let hash = hasher.finish();
+
+                mapping
+                    .raw_entry()
+                    .from_hash(hash, |candidate| *candidate == needle)
+                    .map(|(_, v)| v)
+            }
+            _ => None,
+        }
+    }
+
+    /// Implementation detail for [`Self::as_mapping_mut_get`], which is generated from a macro.
+    #[must_use]
+    fn as_mapping_get_mut_impl(&mut self, key: &str) -> Option<&mut Node> {
+        match self.as_mut_hash() {
+            Some(mapping) => {
+                use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
+                use std::hash::Hash;
+
+                // In order to work around `needle`'s lifetime being different from `h`'s, we need
+                // to manually compute the hash. Otherwise, we'd use `h.get()`, which complains the
+                // needle's lifetime doesn't match that of the key in `h`.
+                let needle = Node::HashKey::<'_>::from(YamlData::String(key.into()));
+                let mut hasher = mapping.hasher().build_hasher();
+                needle.hash(&mut hasher);
+                let hash = hasher.finish();
+
+                match mapping
+                    .raw_entry_mut()
+                    .from_hash(hash, |candidate| *candidate == needle)
+                {
+                    Occupied(entry) => Some(entry.into_mut()),
+                    Vacant(_) => None,
+                }
+            }
+            _ => None,
+        }
+    }
+}
 
 // NOTE(ethiraric, 10/06/2024): We cannot create a "generic static" variable which would act as a
 // `BAD_VALUE`. This means that, unlike for `Yaml`, we have to make the indexing method panic.
@@ -124,28 +195,15 @@ where
     ///
     /// This function also panics if `self` is not a [`YamlData::Hash`].
     fn index(&self, idx: &'a str) -> &Node {
-        match self {
-            YamlData::Hash(mapping) => {
-                use std::hash::Hash;
-
-                let needle = Node::HashKey::<'a>::from(YamlData::String(idx.into()));
-
-                // In order to work around `needle`'s lifetime being different from `h`'s, we need
-                // to manually compute the hash. Otherwise, we'd use `h.get()`, which complains the
-                // needle's lifetime doesn't match that of the key in `h`.
-                let mut hasher = mapping.hasher().build_hasher();
-                needle.hash(&mut hasher);
-                let hash = hasher.finish();
-
-                mapping
-                    .raw_entry()
-                    .from_hash(hash, |candidate| *candidate == needle)
-                    .map_or_else(
-                        || panic!("Key '{idx}' not found in YamlData mapping"),
-                        |(_, v)| v,
-                    )
+        match self.as_mapping_get_impl(idx) {
+            Some(value) => value,
+            None => {
+                if matches!(self, Self::Hash(_)) {
+                    panic!("Key '{idx}' not found in YamlData mapping")
+                } else {
+                    panic!("Attempt to index YamlData with '{idx}' but it's not a mapping")
+                }
             }
-            _ => panic!("Attempt to index YamlData with '{idx}' but it's not a mapping"),
         }
     }
 }
@@ -167,28 +225,15 @@ where
     ///
     /// This function also panics if `self` is not a [`YamlData::Hash`].
     fn index_mut(&mut self, idx: &'a str) -> &mut Node {
-        match self.as_mut_hash() {
-            Some(mapping) => {
-                use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
-                use std::hash::Hash;
-
-                // In order to work around `needle`'s lifetime being different from `h`'s, we need
-                // to manually compute the hash. Otherwise, we'd use `h.get()`, which complains the
-                // needle's lifetime doesn't match that of the key in `h`.
-                let needle = Node::HashKey::<'a>::from(YamlData::String(idx.into()));
-                let mut hasher = mapping.hasher().build_hasher();
-                needle.hash(&mut hasher);
-                let hash = hasher.finish();
-
-                match mapping
-                    .raw_entry_mut()
-                    .from_hash(hash, |candidate| *candidate == needle)
-                {
-                    Occupied(entry) => entry.into_mut(),
-                    Vacant(_) => panic!("Key '{idx}' not found in YamlData mapping"),
-                }
+        assert!(
+            matches!(self, Self::Hash(_)),
+            "Attempt to index YamlData with '{idx}' but it's not a mapping"
+        );
+        match self.as_mapping_get_mut_impl(idx) {
+            Some(value) => value,
+            None => {
+                panic!("Key '{idx}' not found in YamlData mapping")
             }
-            _ => panic!("Attempt to index YamlData with '{idx}' but it's not a mapping"),
         }
     }
 }
@@ -196,7 +241,11 @@ where
 impl<'input, Node, HashKey> Index<usize> for YamlData<'input, Node, HashKey>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
-    HashKey: Eq + std::hash::Hash + std::borrow::Borrow<Node> + From<Node>,
+    HashKey: Eq
+        + std::hash::Hash
+        + std::borrow::Borrow<Node>
+        + From<Node>
+        + for<'b> PartialEq<Node::HashKey<'b>>,
 {
     type Output = Node;
 
@@ -230,7 +279,11 @@ where
 impl<'input, Node, HashKey> IndexMut<usize> for YamlData<'input, Node, HashKey>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
-    HashKey: Eq + std::hash::Hash + std::borrow::Borrow<Node> + From<Node>,
+    HashKey: Eq
+        + std::hash::Hash
+        + std::borrow::Borrow<Node>
+        + From<Node>
+        + for<'b> PartialEq<Node::HashKey<'b>>,
 {
     /// Perform indexing if `self` is a sequence or a mapping.
     ///
@@ -264,7 +317,11 @@ where
 impl<'input, Node, HashKey> IntoIterator for YamlData<'input, Node, HashKey>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
-    HashKey: Eq + std::hash::Hash + std::borrow::Borrow<Node> + From<Node>,
+    HashKey: Eq
+        + std::hash::Hash
+        + std::borrow::Borrow<Node>
+        + From<Node>
+        + for<'b> PartialEq<Node::HashKey<'b>>,
 {
     type Item = Node;
     type IntoIter = AnnotatedYamlIter<'input, Node, HashKey>;
@@ -282,7 +339,11 @@ where
 pub struct AnnotatedYamlIter<'input, Node, HashKey>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<YamlData<'input, Node, HashKey>> + AnnotatedNode,
-    HashKey: Eq + std::hash::Hash + std::borrow::Borrow<Node> + From<Node>,
+    HashKey: Eq
+        + std::hash::Hash
+        + std::borrow::Borrow<Node>
+        + From<Node>
+        + for<'b> PartialEq<Node::HashKey<'b>>,
 {
     yaml: std::vec::IntoIter<Node>,
     marker: PhantomData<(&'input (), HashKey)>,
@@ -291,7 +352,11 @@ where
 impl<'input, Node, HashKey> Iterator for AnnotatedYamlIter<'input, Node, HashKey>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<YamlData<'input, Node, HashKey>> + AnnotatedNode,
-    HashKey: Eq + std::hash::Hash + std::borrow::Borrow<Node> + From<Node>,
+    HashKey: Eq
+        + std::hash::Hash
+        + std::borrow::Borrow<Node>
+        + From<Node>
+        + for<'b> PartialEq<Node::HashKey<'b>>,
 {
     type Item = Node;
 

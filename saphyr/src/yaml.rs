@@ -67,7 +67,8 @@ define_yaml_object_impl!(
     Yaml<'input>,
     <'input>,
     hashtype = Hash<'input>,
-    arraytype = Array<'input>
+    arraytype = Array<'input>,
+    nodetype = Self
 );
 
 impl<'input> Yaml<'input> {
@@ -128,6 +129,40 @@ impl<'input> Yaml<'input> {
         let mut loader = YamlLoader::default();
         parser.load(&mut loader, true)?;
         Ok(loader.into_documents())
+    }
+
+    /// Implementation detail for [`Self::as_mapping_get`], which is generated from a macro.
+    #[must_use]
+    fn as_mapping_get_impl(&self, key: &str) -> Option<&Self> {
+        match self.as_hash() {
+            Some(mapping) => {
+                let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
+                mapping
+                    .raw_entry()
+                    .from_hash(hash, |k| matches!(k, Yaml::String(v) if v == key))
+                    .map(|(_, v)| v)
+            }
+            _ => None,
+        }
+    }
+
+    /// Implementation detail for [`Self::as_mapping_mut_get`], which is generated from a macro.
+    #[must_use]
+    fn as_mapping_get_mut_impl(&mut self, key: &str) -> Option<&mut Self> {
+        use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
+        match self.as_mut_hash() {
+            Some(mapping) => {
+                let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
+                match mapping
+                    .raw_entry_mut()
+                    .from_hash(hash, |k| matches!(k, Yaml::String(v) if v == key))
+                {
+                    Occupied(entry) => Some(entry.into_mut()),
+                    Vacant(_) => None,
+                }
+            }
+            _ => None,
+        }
     }
 }
 
@@ -234,19 +269,16 @@ where
     /// This function panics if the key given does not exist within `self` (as per [`Index`]).
     ///
     /// This function also panics if `self` is not a [`Yaml::Hash`].
-    fn index(&self, idx: &'a str) -> &Yaml<'input> {
-        match self {
-            Yaml::Hash(mapping) => {
-                let hash = hash_str_as_yaml_string(idx, mapping.hasher().build_hasher());
-                mapping
-                    .raw_entry()
-                    .from_hash(hash, |k| matches!(k, Yaml::String(v) if v == idx))
-                    .map_or_else(
-                        || panic!("Key '{idx}' not found in YAML mapping"),
-                        |(_, v)| v,
-                    )
+    fn index(&self, idx: &'a str) -> &Self::Output {
+        match self.as_mapping_get_impl(idx) {
+            Some(value) => value,
+            None => {
+                if matches!(self, Self::Hash(_)) {
+                    panic!("Key '{idx}' not found in YAML mapping")
+                } else {
+                    panic!("Attempt to index YAML with '{idx}' but it's not a mapping")
+                }
             }
-            _ => panic!("Attempt to index YAML with '{idx}' but it's not a mapping"),
         }
     }
 }
@@ -262,19 +294,15 @@ where
     ///
     /// This function also panics if `self` is not a [`Yaml::Hash`].
     fn index_mut(&mut self, idx: &'a str) -> &mut Yaml<'input> {
-        use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
-        match self.as_mut_hash() {
-            Some(mapping) => {
-                let hash = hash_str_as_yaml_string(idx, mapping.hasher().build_hasher());
-                match mapping
-                    .raw_entry_mut()
-                    .from_hash(hash, |k| matches!(k, Yaml::String(v) if v == idx))
-                {
-                    Occupied(entry) => entry.into_mut(),
-                    Vacant(_) => panic!("Key '{idx}' not found in YAML mapping"),
-                }
+        assert!(
+            matches!(self, Self::Hash(_)),
+            "Attempt to index YAML with '{idx}' but it's not a mapping"
+        );
+        match self.as_mapping_get_mut_impl(idx) {
+            Some(value) => value,
+            None => {
+                panic!("Key '{idx}' not found in YAML mapping")
             }
-            None => panic!("Attempt to index YAML with '{idx}' but it's not a mapping"),
         }
     }
 }

@@ -9,6 +9,12 @@
   incorrect. This helps in making the behavior of `[]` more consistent across
   all operations.
 
+**Features**:
+- Add the following convenience methods to the YAML objects:
+  - `contains_mapping_key`
+  - `as_mapping_get`
+  - `as_mapping_get_mut`
+
 ## v0.0.3
 
 Skipping version `v0.0.2` to align this crate's version with that of
@@ -22,7 +28,6 @@ Skipping version `v0.0.2` to align this crate's version with that of
   Manipulating the `YamlLoader` directly was not common.
 - Make `LoadError` `Clone` by storing an `Arc<std::io::Error>` instead of the
   error directly.
-
 
 **Features**:
 

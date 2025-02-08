@@ -100,7 +100,8 @@ macro_rules! define_yaml_object_impl (
         < $( $generic:tt ),+ >,
         $( where { $($whereclause:tt)+ }, )?
         hashtype = $hashtype:ty,
-        arraytype = $arraytype:ty
+        arraytype = $arraytype:ty,
+        nodetype = $nodetype:ty
     ) => (
 impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     define_as!(as_bool, bool, Boolean);
@@ -190,6 +191,53 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
             Self::BadValue | Self::Null => other,
             this => this,
         }
+    }
+
+    /// Check whether `self` is a [`Self::Hash`] and that it contains the given key.
+    ///
+    /// This is equivalent to:
+    /// ```ignore
+    /// matches!(self, Self::Hash(ref x) if x.contains_key(&Yaml::<'_>::String(key.into())))
+    /// ```
+    ///
+    /// # Return
+    /// If the variant of `self` is `Self::Hash` and the mapping contains the key, returns `true`.
+    /// Otherwise, returns `false`.
+    #[must_use]
+    pub fn contains_mapping_key(&self, key: &str) -> bool {
+        self.as_mapping_get_impl(key).is_some()
+    }
+
+    /// Return the value associated to the given key if `self` is a [`Self::Hash`].
+    ///
+    /// This is equivalent to:
+    /// ```ignore
+    /// self.as_hash().flat_map(|mapping| mapping.get(key))
+    /// ```
+    ///
+    /// # Return
+    /// If the variant of `self` is `Self::Hash` and the mapping contains the key, returns the
+    /// value associated with it.
+    /// Otherwise, returns `None`.
+    #[must_use]
+    pub fn as_mapping_get(&self, key: &str) -> Option<&$nodetype> {
+        self.as_mapping_get_impl(key)
+    }
+
+    /// Return the value associated to the given key if `self` is a [`Self::Hash`].
+    ///
+    /// This is equivalent to:
+    /// ```ignore
+    /// self.as_hash_mut().flat_map(|mapping| mapping.get_mut(key))
+    /// ```
+    ///
+    /// # Return
+    /// If the variant of `self` is `Self::Hash` and the mapping contains the key, returns the
+    /// value associated with it.
+    /// Otherwise, returns `None`.
+    #[must_use]
+    pub fn as_mapping_get_mut(&mut self, key: &str) -> Option<&mut $nodetype> {
+        self.as_mapping_get_mut_impl(key)
     }
 }
     );
