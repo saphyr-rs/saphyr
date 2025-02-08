@@ -26,19 +26,6 @@ pub struct MarkedYaml<'input> {
     pub data: YamlData<'input, MarkedYaml<'input>, MarkedYaml<'input>>,
 }
 
-impl<'input> super::AnnotatedNode for MarkedYaml<'input> {
-    type HashKey<'a> = MarkedYaml<'a>;
-}
-
-impl<'a> From<YamlData<'a, MarkedYaml<'a>, MarkedYaml<'a>>> for MarkedYaml<'a> {
-    fn from(value: YamlData<'a, MarkedYaml<'a>, MarkedYaml<'a>>) -> Self {
-        Self {
-            span: Span::default(),
-            data: value,
-        }
-    }
-}
-
 impl<'input> MarkedYaml<'input> {
     /// Load the given string as an array of YAML documents.
     ///
@@ -79,6 +66,19 @@ impl<'input> MarkedYaml<'input> {
         let mut loader = YamlLoader::<Self>::default();
         parser.load(&mut loader, true)?;
         Ok(loader.into_documents())
+    }
+}
+
+impl<'input> super::AnnotatedNode for MarkedYaml<'input> {
+    type HashKey<'a> = MarkedYaml<'a>;
+}
+
+impl<'a> From<YamlData<'a, MarkedYaml<'a>, MarkedYaml<'a>>> for MarkedYaml<'a> {
+    fn from(value: YamlData<'a, MarkedYaml<'a>, MarkedYaml<'a>>) -> Self {
+        Self {
+            span: Span::default(),
+            data: value,
+        }
     }
 }
 

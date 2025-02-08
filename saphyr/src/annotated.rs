@@ -1,4 +1,21 @@
 //! Utilities for extracting YAML with certain metadata.
+//!
+//! This module contains [`YamlData`], an alternate [`Yaml`] object which is generic over its node
+//! and key (for mapping) types. Since annotated nodes look like:
+//!
+//! ```ignore
+//! struct AnnotatedYaml {
+//!   // metadata
+//!   object: /* YAML type */
+//! }
+//! ```
+//!
+//! it means that the `Hash` and `Array` variants must return `AnnotatedYaml`s instead of a
+//! [`Yaml`] node. [`YamlData`] is used to fill this need. It behaves very similarly to [`Yaml`]
+//! and has the same interface, with the only difference being the types it returns for nodes and
+//! hash keys.
+//!
+//! [`Yaml`]: crate::Yaml
 
 pub mod marked_yaml;
 
@@ -73,26 +90,6 @@ where
     /// returns `BadValue`.
     BadValue,
 }
-
-/// A trait allowing for introspection in the hash types of the [`YamlData::Hash`] variant.
-///
-/// See [`LoadableYamlNode::HashKey`] for more details.
-///
-/// [`LoadableYamlNode::HashKey`]: crate::loader::LoadableYamlNode::HashKey
-#[allow(clippy::module_name_repetitions)]
-pub trait AnnotatedNode: std::hash::Hash + std::cmp::Eq {
-    /// The type used as the key in the [`YamlData::Hash`] variant.
-    type HashKey<'a>: From<YamlData<'a, Self::HashKey<'a>, Self::HashKey<'a>>>
-        + for<'b> std::cmp::PartialEq<Self::HashKey<'b>>
-        + AnnotatedNode;
-}
-
-/// The type contained in the [`YamlData::Array`] variant. This corresponds to YAML sequences.
-#[allow(clippy::module_name_repetitions)]
-pub type AnnotatedArray<Node> = Vec<Node>;
-/// The type contained in the [`YamlData::Hash`] variant. This corresponds to YAML mappings.
-#[allow(clippy::module_name_repetitions)]
-pub type AnnotatedHash<'input, HashKey, Node> = LinkedHashMap<HashKey, Node>;
 
 impl<'input, Node, HashKey> YamlData<'input, Node, HashKey>
 where
@@ -365,4 +362,26 @@ where
     fn next(&mut self) -> Option<Node> {
         self.yaml.next()
     }
+}
+
+/// The type contained in the [`YamlData::Array`] variant. This corresponds to YAML sequences.
+#[allow(clippy::module_name_repetitions)]
+pub type AnnotatedArray<Node> = Vec<Node>;
+/// The type contained in the [`YamlData::Hash`] variant. This corresponds to YAML mappings.
+#[allow(clippy::module_name_repetitions)]
+pub type AnnotatedHash<'input, HashKey, Node> = LinkedHashMap<HashKey, Node>;
+
+/// A trait allowing for introspection in the hash types of the [`YamlData::Hash`] variant.
+///
+/// This trait must be implemented by annotated YAML objects.
+///
+/// See [`LoadableYamlNode::HashKey`] for more details.
+///
+/// [`LoadableYamlNode::HashKey`]: crate::loader::LoadableYamlNode::HashKey
+#[allow(clippy::module_name_repetitions)]
+pub trait AnnotatedNode: std::hash::Hash + std::cmp::Eq {
+    /// The type used as the key in the [`YamlData::Hash`] variant.
+    type HashKey<'a>: From<YamlData<'a, Self::HashKey<'a>, Self::HashKey<'a>>>
+        + for<'b> std::cmp::PartialEq<Self::HashKey<'b>>
+        + AnnotatedNode;
 }

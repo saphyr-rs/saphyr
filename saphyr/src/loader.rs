@@ -223,13 +223,12 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
     /// Furthermore, it must be [`From<Self>`] so we can create a key from a node.
     /// Finally, if indexing mappings with `&str` is desired, it must also implement
     /// [`PartialEq<Self>`].
-    /// These constraints are highlighted in [`AnnotatedNode`].
+    /// These constraints are also highlighted in [`AnnotatedNode`].
     ///
-    /// This indirection is required to solve lifetime issues with the hash map. More details about
-    /// the issue and its workaround can be found
-    /// [here](https://github.com/rust-lang/rust/issues/124614#issuecomment-2090725842).
-    /// Without the ability to use a capsule for the key, we would have to require the keys for
-    /// indexing to outlive the input.
+    /// This indirection is required to solve lifetime issues with the hash map in annotated YAMLs.
+    /// More details about the issue and possible workarounds can be found
+    /// [here](https://github.com/rust-lang/rust/issues/124614#issuecomment-2090725842). A previous
+    /// attempt at solving lifetimes used capsules, but [`AnnotatedNode`] is sufficient.
     ///
     /// [`Hash`]: std::hash::Hash
     /// [`Borrow<Self>`]: std::borrow::Borrow
