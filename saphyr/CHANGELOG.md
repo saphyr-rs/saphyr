@@ -5,6 +5,9 @@
 **Breaking Changes**:
 
 - Allow `Yaml` to borrow from the input.
+- All indexing traits now panic if the key is not found or the YAML variant is
+  incorrect. This helps in making the behavior of `[]` more consistent across
+  all operations.
 
 ## v0.0.3
 

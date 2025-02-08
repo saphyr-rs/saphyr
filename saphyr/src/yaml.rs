@@ -222,22 +222,31 @@ impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
     }
 }
 
-static BAD_VALUE: Yaml = Yaml::BadValue;
 impl<'input, 'a> Index<&'a str> for Yaml<'input>
 where
     'input: 'a,
 {
     type Output = Yaml<'input>;
 
+    /// Perform indexing if `self` is a mapping.
+    ///
+    /// # Panics
+    /// This function panics if the key given does not exist within `self` (as per [`Index`]).
+    ///
+    /// This function also panics if `self` is not a [`Yaml::Hash`].
     fn index(&self, idx: &'a str) -> &Yaml<'input> {
         match self {
-            Yaml::Hash(h) => {
-                let hash = hash_str_as_yaml_string(idx, h.hasher().build_hasher());
-                h.raw_entry()
+            Yaml::Hash(mapping) => {
+                let hash = hash_str_as_yaml_string(idx, mapping.hasher().build_hasher());
+                mapping
+                    .raw_entry()
                     .from_hash(hash, |k| matches!(k, Yaml::String(v) if v == idx))
-                    .map_or(&BAD_VALUE, |(_, v)| v)
+                    .map_or_else(
+                        || panic!("Key '{idx}' not found in YAML mapping"),
+                        |(_, v)| v,
+                    )
             }
-            _ => &BAD_VALUE,
+            _ => panic!("Attempt to index YAML with '{idx}' but it's not a mapping"),
         }
     }
 }
@@ -255,17 +264,17 @@ where
     fn index_mut(&mut self, idx: &'a str) -> &mut Yaml<'input> {
         use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
         match self.as_mut_hash() {
-            Some(h) => {
-                let hash = hash_str_as_yaml_string(idx, h.hasher().build_hasher());
-                match h
+            Some(mapping) => {
+                let hash = hash_str_as_yaml_string(idx, mapping.hasher().build_hasher());
+                match mapping
                     .raw_entry_mut()
                     .from_hash(hash, |k| matches!(k, Yaml::String(v) if v == idx))
                 {
                     Occupied(entry) => entry.into_mut(),
-                    Vacant(_) => panic!("Key '{idx}' not found in YAML hash"),
+                    Vacant(_) => panic!("Key '{idx}' not found in YAML mapping"),
                 }
             }
-            None => panic!("Not a hash type"),
+            None => panic!("Attempt to index YAML with '{idx}' but it's not a mapping"),
         }
     }
 }
@@ -276,21 +285,33 @@ where
 {
     type Output = Yaml<'input>;
 
+    /// Perform indexing if `self` is a sequence or a mapping.
+    ///
+    /// # Panics
+    /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
+    /// a [`Yaml::Array`], this is when the index is bigger or equal to the length of the
+    /// underlying `Vec`. If `self` is a [`Yaml::Hash`], this is when the mapping sequence does not
+    /// contain [`Yaml::Integer`]`(idx)` as a key.
+    ///
+    /// This function also panics if `self` is not a [`Yaml::Array`] nor a [`Yaml::Hash`].
     fn index(&self, idx: usize) -> &Self::Output {
         match self {
-            Yaml::Array(sequence) => sequence.get(idx).unwrap_or(&BAD_VALUE),
+            Yaml::Array(sequence) => sequence
+                .get(idx)
+                .unwrap_or_else(|| panic!("Index {idx} out of bounds in YAML sequence")),
             Yaml::Hash(mapping) => {
-                if let Ok(idx) = i64::try_from(idx) {
-                    let hash = hash_i64_as_yaml_integer(idx, mapping.hasher().build_hasher());
-                    mapping
-                        .raw_entry()
-                        .from_hash(hash, |k| matches!(k, Yaml::Integer(v) if *v == idx))
-                        .map_or(&BAD_VALUE, |(_, v)| v)
-                } else {
-                    &BAD_VALUE
-                }
+                let idx = i64::try_from(idx).unwrap_or_else(|_| {
+                    panic!("Attempt to index YAML sequence with overflowing index")
+                });
+                let hash = hash_i64_as_yaml_integer(idx, mapping.hasher().build_hasher());
+                mapping
+                    .raw_entry()
+                    .from_hash(hash, |k| matches!(k, Yaml::Integer(v) if *v == idx))
+                    .map_or_else(|| panic!("Key {idx} not found in YAML mapping"), |(_, v)| v)
             }
-            _ => &BAD_VALUE,
+            _ => {
+                panic!("Attempt to index YAML with {idx} but it's not a mapping nor a sequence")
+            }
         }
     }
 }
@@ -307,12 +328,18 @@ impl<'input> IndexMut<usize> for Yaml<'input> {
     /// This function also panics if `self` is not a [`Yaml::Array`] nor a [`Yaml::Hash`].
     fn index_mut(&mut self, idx: usize) -> &mut Yaml<'input> {
         match self {
-            Yaml::Array(sequence) => sequence.index_mut(idx),
+            Yaml::Array(sequence) => sequence
+                .get_mut(idx)
+                .unwrap_or_else(|| panic!("Index {idx} out of bounds in YAML sequence")),
             Yaml::Hash(mapping) => {
-                let key = Yaml::Integer(i64::try_from(idx).unwrap());
-                mapping.get_mut(&key).unwrap()
+                let idx = i64::try_from(idx).unwrap_or_else(|_| {
+                    panic!("Attempt to index YAML sequence with overflowing index")
+                });
+                mapping.get_mut(&Yaml::Integer(idx)).unwrap()
             }
-            _ => panic!("Attempting to index but `self` is not a sequence nor a mapping"),
+            _ => {
+                panic!("Attempt to index YAML with {idx} but it's not a mapping nor a sequence")
+            }
         }
     }
 }

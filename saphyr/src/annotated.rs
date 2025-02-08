@@ -125,7 +125,7 @@ where
     /// This function also panics if `self` is not a [`YamlData::Hash`].
     fn index(&self, idx: &'a str) -> &Node {
         match self {
-            YamlData::Hash(h) => {
+            YamlData::Hash(mapping) => {
                 use std::hash::Hash;
 
                 let needle = Node::HashKey::<'a>::from(YamlData::String(idx.into()));
@@ -133,16 +133,19 @@ where
                 // In order to work around `needle`'s lifetime being different from `h`'s, we need
                 // to manually compute the hash. Otherwise, we'd use `h.get()`, which complains the
                 // needle's lifetime doesn't match that of the key in `h`.
-                let mut hasher = h.hasher().build_hasher();
+                let mut hasher = mapping.hasher().build_hasher();
                 needle.hash(&mut hasher);
                 let hash = hasher.finish();
 
-                h.raw_entry()
+                mapping
+                    .raw_entry()
                     .from_hash(hash, |candidate| *candidate == needle)
-                    .map(|(_, v)| v)
-                    .expect("indexing yaml mapping with nonexistent key")
+                    .map_or_else(
+                        || panic!("Key '{idx}' not found in YamlData mapping"),
+                        |(_, v)| v,
+                    )
             }
-            _ => panic!("trying to index a non-hash YamlData with string '{idx}'"),
+            _ => panic!("Attempt to index YamlData with '{idx}' but it's not a mapping"),
         }
     }
 }
@@ -165,7 +168,7 @@ where
     /// This function also panics if `self` is not a [`YamlData::Hash`].
     fn index_mut(&mut self, idx: &'a str) -> &mut Node {
         match self.as_mut_hash() {
-            Some(h) => {
+            Some(mapping) => {
                 use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
                 use std::hash::Hash;
 
@@ -173,19 +176,19 @@ where
                 // to manually compute the hash. Otherwise, we'd use `h.get()`, which complains the
                 // needle's lifetime doesn't match that of the key in `h`.
                 let needle = Node::HashKey::<'a>::from(YamlData::String(idx.into()));
-                let mut hasher = h.hasher().build_hasher();
+                let mut hasher = mapping.hasher().build_hasher();
                 needle.hash(&mut hasher);
                 let hash = hasher.finish();
 
-                match h
+                match mapping
                     .raw_entry_mut()
                     .from_hash(hash, |candidate| *candidate == needle)
                 {
                     Occupied(entry) => entry.into_mut(),
-                    Vacant(_) => panic!("indexing yaml mapping with nonexistent key"),
+                    Vacant(_) => panic!("Key '{idx}' not found in YamlData mapping"),
                 }
             }
-            None => panic!("Not a hash type"),
+            _ => panic!("Attempt to index YamlData with '{idx}' but it's not a mapping"),
         }
     }
 }
@@ -207,13 +210,19 @@ where
     ///
     /// This function also panics if `self` is not a [`YamlData::Array`] nor a [`YamlData::Hash`].
     fn index(&self, idx: usize) -> &Node {
-        if let Some(v) = self.as_vec() {
-            v.get(idx).unwrap()
-        } else if let Some(v) = self.as_hash() {
-            let key = Self::Integer(i64::try_from(idx).unwrap());
-            v.get(&key.into()).unwrap()
+        if let Some(sequence) = self.as_vec() {
+            sequence
+                .get(idx)
+                .unwrap_or_else(|| panic!("Index {idx} out of bounds in YamlData sequence"))
+        } else if let Some(mapping) = self.as_hash() {
+            let key = i64::try_from(idx).unwrap_or_else(|_| {
+                panic!("Attempt to index YamlData mapping with overflowing index")
+            });
+            mapping
+                .get(&Self::Integer(key).into())
+                .unwrap_or_else(|| panic!("Key '{idx}' not found in YamlData mapping"))
         } else {
-            panic!("{idx}: Index out of bounds");
+            panic!("Attempt to index YamlData with {idx} but it's not a mapping nor a sequence");
         }
     }
 }
@@ -234,12 +243,20 @@ where
     /// This function also panics if `self` is not a [`YamlData::Array`] nor a [`YamlData::Hash`].
     fn index_mut(&mut self, idx: usize) -> &mut Node {
         match self {
-            Self::Array(sequence) => sequence.index_mut(idx),
+            Self::Array(sequence) => sequence
+                .get_mut(idx)
+                .unwrap_or_else(|| panic!("Index {idx} out of bounds in YamlData sequence")),
             Self::Hash(mapping) => {
-                let key = Self::Integer(i64::try_from(idx).unwrap());
-                mapping.get_mut(&key.into()).unwrap()
+                let key = i64::try_from(idx).unwrap_or_else(|_| {
+                    panic!("Attempt to index YamlData mapping with overflowing index")
+                });
+                mapping
+                    .get_mut(&Self::Integer(key).into())
+                    .unwrap_or_else(|| panic!("Key {idx} not found in YamlData mapping"))
             }
-            _ => panic!("Attempting to index but `self` is not a sequence nor a mapping"),
+            _ => {
+                panic!("Attempt to index YamlData with {idx} but it's not a mapping nor a sequence")
+            }
         }
     }
 }
