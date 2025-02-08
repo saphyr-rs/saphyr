@@ -62,6 +62,13 @@ pub type Array<'input> = Vec<Yaml<'input>>;
 /// The type contained in the `Yaml::Hash` variant. This corresponds to YAML mappings.
 pub type Hash<'input> = LinkedHashMap<Yaml<'input>, Yaml<'input>>;
 
+define_yaml_object_impl!(
+    Yaml<'input>,
+    <'input>,
+    hashtype = Hash<'input>,
+    arraytype = Array<'input>
+);
+
 impl<'input> Yaml<'input> {
     /// Load the given string as an array of YAML documents.
     ///
@@ -120,95 +127,6 @@ impl<'input> Yaml<'input> {
         let mut loader = YamlLoader::default();
         parser.load(&mut loader, true)?;
         Ok(loader.into_documents())
-    }
-
-    define_as!(as_bool, bool, Boolean);
-    define_as!(as_i64, i64, Integer);
-
-    define_as_ref!(as_hash, &Hash, Hash);
-    define_as_ref!(as_str, &str, String);
-    define_as_ref!(as_vec, &Array, Array);
-
-    define_as_mut_ref!(as_mut_hash, &mut Hash<'input>, Hash);
-    define_as_mut_ref!(as_mut_vec, &mut Array<'input>, Array);
-
-    define_into!(into_bool, bool, Boolean);
-    define_into!(into_hash, Hash<'input>, Hash);
-    define_into!(into_i64, i64, Integer);
-    define_into!(into_vec, Array<'input>, Array);
-
-    define_is!(is_alias, Self::Alias(_));
-    define_is!(is_array, Self::Array(_));
-    define_is!(is_badvalue, Self::BadValue);
-    define_is!(is_boolean, Self::Boolean(_));
-    define_is!(is_hash, Self::Hash(_));
-    define_is!(is_integer, Self::Integer(_));
-    define_is!(is_null, Self::Null);
-    define_is!(is_real, Self::Real(_));
-    define_is!(is_string, Self::String(_));
-
-    /// Get the inner object in the YAML enum if it is a [`String`].
-    ///
-    /// # Return
-    /// If the variant of `self` is `Self::String`, return `Some(String)` with the `String`
-    /// contained. Otherwise, return `None`.
-    #[must_use]
-    pub fn into_string(self) -> Option<String> {
-        // We can't use the macro for this variant as we need to `.into_owned` the `Cow`.
-        match self {
-            Self::String(v) => Some(v.into_owned()),
-            _ => None,
-        }
-    }
-
-    /// Return the `f64` value contained in this YAML node.
-    ///
-    /// If the node is not a [`Yaml::Real`] YAML node or its contents is not a valid `f64` string,
-    /// `None` is returned.
-    #[must_use]
-    pub fn as_f64(&self) -> Option<f64> {
-        if let Self::Real(ref v) = self {
-            parse_f64(v)
-        } else {
-            None
-        }
-    }
-
-    /// Return the `f64` value contained in this YAML node.
-    ///
-    /// If the node is not a [`Yaml::Real`] YAML node or its contents is not a valid `f64` string,
-    /// `None` is returned.
-    #[must_use]
-    pub fn into_f64(self) -> Option<f64> {
-        self.as_f64()
-    }
-
-    /// If a value is null or otherwise bad (see variants), consume it and
-    /// replace it with a given value `other`. Otherwise, return self unchanged.
-    ///
-    /// ```
-    /// use saphyr::Yaml;
-    ///
-    /// assert_eq!(Yaml::BadValue.or(Yaml::Integer(3)),  Yaml::Integer(3));
-    /// assert_eq!(Yaml::Integer(3).or(Yaml::BadValue),  Yaml::Integer(3));
-    /// ```
-    #[must_use]
-    pub fn or(self, other: Self) -> Self {
-        match self {
-            Self::BadValue | Self::Null => other,
-            this => this,
-        }
-    }
-
-    /// See [`Self::or`] for behavior.
-    ///
-    /// This performs the same operations, but with borrowed values for less linear pipelines.
-    #[must_use]
-    pub fn borrowed_or<'a>(&'a self, other: &'a Self) -> &'a Self {
-        match self {
-            Yaml::BadValue | Yaml::Null => other,
-            this => this,
-        }
     }
 }
 
