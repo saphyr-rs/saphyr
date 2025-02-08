@@ -116,7 +116,7 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
 
         let current_test = Yaml::Hash(current_test.clone()); // Much better indexing
 
-        if current_test["skip"] != Yaml::BadValue {
+        if current_test.contains_mapping_key("skip") {
             continue;
         }
 
@@ -129,7 +129,10 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
                 yaml_visual: current_test["yaml"].as_str().unwrap().to_string(),
                 yaml: visual_to_raw(current_test["yaml"].as_str().unwrap()),
                 expected_events: visual_to_raw(current_test["tree"].as_str().unwrap()),
-                expected_error: current_test["fail"].as_bool() == Some(true),
+                expected_error: current_test
+                    .as_mapping_get("fail")
+                    .map(|x| x.as_bool().unwrap_or(false))
+                    == Some(true),
             },
         });
     }

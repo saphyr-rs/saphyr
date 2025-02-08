@@ -55,7 +55,7 @@ c: [1, 2]
     assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
     assert_eq!(doc["b"].as_f64().unwrap(), 2.2f64);
     assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
-    assert!(doc["d"][0].is_badvalue());
+    assert!(!doc.contains_mapping_key("d"));
 }
 
 #[test]
