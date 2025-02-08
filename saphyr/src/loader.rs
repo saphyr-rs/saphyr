@@ -282,48 +282,6 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
     }
 }
 
-impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
-    type HashKey = Self;
-
-    fn from_bare_yaml(yaml: Yaml<'input>) -> Self {
-        yaml
-    }
-
-    fn is_array(&self) -> bool {
-        matches!(self, Yaml::Array(_))
-    }
-
-    fn is_hash(&self) -> bool {
-        matches!(self, Yaml::Hash(_))
-    }
-
-    fn is_badvalue(&self) -> bool {
-        matches!(self, Yaml::BadValue)
-    }
-
-    fn array_mut(&mut self) -> &mut Vec<Self> {
-        if let Yaml::Array(x) = self {
-            x
-        } else {
-            panic!("Called array_mut on a non-array");
-        }
-    }
-
-    fn hash_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
-        if let Yaml::Hash(x) = self {
-            x
-        } else {
-            panic!("Called hash_mut on a non-hash");
-        }
-    }
-
-    fn take(&mut self) -> Self {
-        let mut taken_out = Yaml::BadValue;
-        std::mem::swap(&mut taken_out, self);
-        taken_out
-    }
-}
-
 // parse f64 as Core schema
 // See: https://github.com/chyh1990/yaml-rust/issues/51
 pub(crate) fn parse_f64(v: &str) -> Option<f64> {

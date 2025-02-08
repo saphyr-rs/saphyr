@@ -12,7 +12,7 @@ use std::{
 use hashlink::LinkedHashMap;
 use saphyr_parser::{BufferedInput, Input, Parser, ScanError};
 
-use crate::{loader::parse_f64, YamlLoader};
+use crate::{loader::parse_f64, LoadableYamlNode, YamlLoader};
 
 /// A YAML node is stored as this `Yaml` enumeration, which provides an easy way to
 /// access your YAML document.
@@ -62,6 +62,7 @@ pub type Array<'input> = Vec<Yaml<'input>>;
 /// The type contained in the `Yaml::Hash` variant. This corresponds to YAML mappings.
 pub type Hash<'input> = LinkedHashMap<Yaml<'input>, Yaml<'input>>;
 
+// This defines most common operations on a YAML object. See macro definition for details.
 define_yaml_object_impl!(
     Yaml<'input>,
     <'input>,
@@ -184,6 +185,40 @@ impl<'input> Yaml<'input> {
                 }
             }
         }
+    }
+}
+
+impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
+    type HashKey = Self;
+
+    fn from_bare_yaml(yaml: Yaml<'input>) -> Self {
+        yaml
+    }
+
+    fn is_array(&self) -> bool {
+        self.is_array()
+    }
+
+    fn is_hash(&self) -> bool {
+        self.is_hash()
+    }
+
+    fn is_badvalue(&self) -> bool {
+        self.is_badvalue()
+    }
+
+    fn array_mut(&mut self) -> &mut Vec<Self> {
+        self.as_mut_vec().expect("Called array_mut on a non-array")
+    }
+
+    fn hash_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
+        self.as_mut_hash().expect("Called hash_mut on a non-hash")
+    }
+
+    fn take(&mut self) -> Self {
+        let mut taken_out = Yaml::BadValue;
+        std::mem::swap(&mut taken_out, self);
+        taken_out
     }
 }
 

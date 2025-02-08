@@ -29,24 +29,20 @@ pub struct MarkedYaml<'input> {
 impl<'input> MarkedYaml<'input> {
     /// Load the given string as an array of YAML documents.
     ///
-    /// See the function [`load_from_str`] for more details.
+    /// See [`Yaml::load_from_str`] for more details.
     ///
     /// # Errors
     /// Returns `ScanError` when loading fails.
-    ///
-    /// [`load_from_str`]: `Yaml::load_from_str`
     pub fn load_from_str(source: &str) -> Result<Vec<Self>, ScanError> {
         Self::load_from_iter(source.chars())
     }
 
     /// Load the contents of the given iterator as an array of YAML documents.
     ///
-    /// See the function [`load_from_str`] for more details.
+    /// See [`Yaml::load_from_iter`] for more details.
     ///
     /// # Errors
     /// Returns `ScanError` when loading fails.
-    ///
-    /// [`load_from_str`]: `Yaml::load_from_str`
     pub fn load_from_iter<I: Iterator<Item = char>>(source: I) -> Result<Vec<Self>, ScanError> {
         let mut parser = Parser::new(BufferedInput::new(source));
         Self::load_from_parser(&mut parser)
@@ -54,12 +50,10 @@ impl<'input> MarkedYaml<'input> {
 
     /// Load the contents from the specified [`Parser`] as an array of YAML documents.
     ///
-    /// See the function [`load_from_str`] for more details.
+    /// See [`Yaml::load_from_parser`] for more details.
     ///
     /// # Errors
     /// Returns `ScanError` when loading fails.
-    ///
-    /// [`load_from_str`]: `Yaml::load_from_str`
     pub fn load_from_parser<I: Input>(
         parser: &mut Parser<'input, I>,
     ) -> Result<Vec<Self>, ScanError> {
@@ -131,19 +125,15 @@ impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
     }
 
     fn array_mut(&mut self) -> &mut Vec<Self> {
-        if let YamlData::Array(x) = &mut self.data {
-            x
-        } else {
-            panic!("Called array_mut on a non-array");
-        }
+        self.data
+            .as_mut_vec()
+            .expect("Called array_mut on a non-array")
     }
 
     fn hash_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
-        if let YamlData::Hash(x) = &mut self.data {
-            x
-        } else {
-            panic!("Called array_mut on a non-array");
-        }
+        self.data
+            .as_mut_hash()
+            .expect("Called hash_mut on a non-hash")
     }
 
     fn take(&mut self) -> Self {
