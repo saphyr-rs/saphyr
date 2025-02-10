@@ -198,6 +198,8 @@ fn detect_utf16_endianness(b: &[u8]) -> &'static Encoding {
 
 #[cfg(test)]
 mod test {
+    use crate::Scalar;
+
     use super::{YAMLDecodingTrap, Yaml, YamlDecoder};
 
     #[test]
@@ -210,9 +212,9 @@ c: [1, 2]
         let mut decoder = YamlDecoder::read(s as &[u8]);
         let out = decoder.decode().unwrap();
         let doc = &out[0];
-        assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
-        assert!((doc["b"].as_f64().unwrap() - 2.2f64).abs() <= f64::EPSILON);
-        assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
+        assert_eq!(doc["a"].as_integer().unwrap(), 1i64);
+        assert!((doc["b"].as_floating_point().unwrap() - 2.2f64).abs() <= f64::EPSILON);
+        assert_eq!(doc["c"][1].as_integer().unwrap(), 2i64);
         assert!(!doc.contains_mapping_key("d"));
     }
 
@@ -227,9 +229,9 @@ c: [1, 2]
         let out = decoder.decode().unwrap();
         let doc = &out[0];
         println!("GOT: {doc:?}");
-        assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
-        assert!((doc["b"].as_f64().unwrap() - 2.2f64) <= f64::EPSILON);
-        assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
+        assert_eq!(doc["a"].as_integer().unwrap(), 1i64);
+        assert!((doc["b"].as_floating_point().unwrap() - 2.2f64) <= f64::EPSILON);
+        assert_eq!(doc["c"][1].as_integer().unwrap(), 2i64);
         assert!(!doc.contains_mapping_key("d"));
     }
 
@@ -244,9 +246,9 @@ c: [1, 2]
         let out = decoder.decode().unwrap();
         let doc = &out[0];
         println!("GOT: {doc:?}");
-        assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
-        assert!((doc["b"].as_f64().unwrap() - 2.2f64).abs() <= f64::EPSILON);
-        assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
+        assert_eq!(doc["a"].as_integer().unwrap(), 1i64);
+        assert!((doc["b"].as_floating_point().unwrap() - 2.2f64).abs() <= f64::EPSILON);
+        assert_eq!(doc["c"][1].as_integer().unwrap(), 2i64);
         assert!(!doc.contains_mapping_key("d"));
     }
 
@@ -261,9 +263,9 @@ c: [1, 2]
         let out = decoder.decode().unwrap();
         let doc = &out[0];
         println!("GOT: {doc:?}");
-        assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
-        assert!((doc["b"].as_f64().unwrap() - 2.2f64).abs() <= f64::EPSILON);
-        assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
+        assert_eq!(doc["a"].as_integer().unwrap(), 1i64);
+        assert!((doc["b"].as_floating_point().unwrap() - 2.2f64).abs() <= f64::EPSILON);
+        assert_eq!(doc["c"][1].as_integer().unwrap(), 2i64);
         assert!(!doc.contains_mapping_key("d"));
     }
 
@@ -281,15 +283,21 @@ c: [1, 2]
             .unwrap();
         let doc = &out[0];
         println!("GOT: {doc:?}");
-        assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
-        assert!((doc["b"].as_f64().unwrap() - 2.2f64).abs() <= f64::EPSILON);
-        assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
+        assert_eq!(doc["a"].as_integer().unwrap(), 1i64);
+        assert!((doc["b"].as_floating_point().unwrap() - 2.2f64).abs() <= f64::EPSILON);
+        assert_eq!(doc["c"][1].as_integer().unwrap(), 2i64);
         assert!(!doc.contains_mapping_key("d"));
     }
 
     #[test]
     fn test_or() {
-        assert_eq!(Yaml::Null.or(Yaml::Integer(3)), Yaml::Integer(3));
-        assert_eq!(Yaml::Integer(3).or(Yaml::Integer(7)), Yaml::Integer(3));
+        assert_eq!(
+            Yaml::Value(Scalar::Null).or(Yaml::Value(Scalar::Integer(3))),
+            Yaml::Value(Scalar::Integer(3))
+        );
+        assert_eq!(
+            Yaml::Value(Scalar::Integer(3)).or(Yaml::Value(Scalar::Integer(7))),
+            Yaml::Value(Scalar::Integer(3))
+        );
     }
 }

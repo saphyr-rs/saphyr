@@ -6,7 +6,7 @@ use ordered_float::OrderedFloat;
 ///
 /// Scalar nodes are any leaf nodes when parsing YAML. In the [10.1 Failsafe
 /// Schema](https://yaml.org/spec/1.2.2/#failsafe-schema), they would represent any `!!str` node.
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum Scalar<'input> {
     /// A null value ([10.2.1.1 Null](https://yaml.org/spec/1.2.2/#null)).
     Null,

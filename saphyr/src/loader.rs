@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 use hashlink::LinkedHashMap;
 use saphyr_parser::{Event, ScanError, Span, SpannedEventReceiver, TScalarStyle, Tag};
 
-use crate::{Mapping, Yaml};
+use crate::{Mapping, Scalar, Yaml};
 
 /// Main structure for parsing YAML.
 ///
@@ -88,7 +88,7 @@ where
             }
             Event::Scalar(v, style, aid, tag) => {
                 let node = if style != TScalarStyle::Plain {
-                    Yaml::String(v)
+                    Yaml::Value(Scalar::String(v))
                 } else if let Some(Tag {
                     ref handle,
                     ref suffix,
@@ -100,25 +100,25 @@ where
                                 // "true" or "false"
                                 match v.parse::<bool>() {
                                     Err(_) => Yaml::BadValue,
-                                    Ok(v) => Yaml::Boolean(v),
+                                    Ok(v) => Yaml::Value(Scalar::Boolean(v)),
                                 }
                             }
                             "int" => match v.parse::<i64>() {
                                 Err(_) => Yaml::BadValue,
-                                Ok(v) => Yaml::Integer(v),
+                                Ok(v) => Yaml::Value(Scalar::Integer(v)),
                             },
                             "float" => match parse_f64(&v) {
-                                Some(_) => Yaml::Real(v),
+                                Some(f) => Yaml::Value(Scalar::FloatingPoint(f.into())),
                                 None => Yaml::BadValue,
                             },
                             "null" => match v.as_ref() {
-                                "~" | "null" => Yaml::Null,
+                                "~" | "null" => Yaml::Value(Scalar::Null),
                                 _ => Yaml::BadValue,
                             },
-                            _ => Yaml::String(v),
+                            _ => Yaml::Value(Scalar::String(v)),
                         }
                     } else {
-                        Yaml::String(v)
+                        Yaml::Value(Scalar::String(v))
                     }
                 } else {
                     // Datatype is not specified, or unrecognized

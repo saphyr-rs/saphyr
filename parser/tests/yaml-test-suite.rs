@@ -2,7 +2,7 @@ use std::fs::{self, DirEntry};
 
 use libtest_mimic::{run_tests, Arguments, Outcome, Test};
 
-use saphyr::{Mapping, Yaml};
+use saphyr::{Mapping, Scalar, Yaml};
 use saphyr_parser::{
     Event, Marker, Parser, ScanError, Span, SpannedEventReceiver, TScalarStyle, Tag,
 };
@@ -109,7 +109,7 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
 
         // Test fields except `fail` are "inherited"
         let test_data = test_data.as_mapping().unwrap();
-        current_test.remove(&Yaml::String("fail".into()));
+        current_test.remove(&Yaml::Value(Scalar::String("fail".into())));
         for (key, value) in test_data.clone() {
             current_test.insert(key, value);
         }

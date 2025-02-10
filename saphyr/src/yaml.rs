@@ -12,7 +12,7 @@ use std::{
 use hashlink::LinkedHashMap;
 use saphyr_parser::{BufferedInput, Input, Parser, ScanError};
 
-use crate::{loader::parse_f64, LoadableYamlNode, YamlLoader};
+use crate::{loader::parse_f64, LoadableYamlNode, Scalar, YamlLoader};
 
 /// A YAML node is stored as this `Yaml` enumeration, which provides an easy way to
 /// access your YAML document.
@@ -20,27 +20,22 @@ use crate::{loader::parse_f64, LoadableYamlNode, YamlLoader};
 /// # Examples
 ///
 /// ```
-/// use saphyr::Yaml;
+/// use saphyr::{Scalar, Yaml};
 /// let foo = Yaml::from_str("-123"); // convert the string to the appropriate YAML type
-/// assert_eq!(foo.as_i64().unwrap(), -123);
+/// assert_eq!(foo.as_integer().unwrap(), -123);
 ///
 /// // iterate over an Sequence
-/// let vec = Yaml::Sequence(vec![Yaml::Integer(1), Yaml::Integer(2)]);
+/// let vec = Yaml::Sequence(vec![Yaml::Value(Scalar::Integer(1)), Yaml::Value(Scalar::Integer(2))]);
 /// for v in vec.as_vec().unwrap() {
-///     assert!(v.as_i64().is_some());
+///     assert!(v.is_integer());
 /// }
 /// ```
 #[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
 pub enum Yaml<'input> {
-    /// Float types are stored as String and parsed on demand.
-    /// Note that `f64` does NOT implement Eq trait and can NOT be stored in `BTreeMap`.
-    Real(Cow<'input, str>),
-    /// YAML int is stored as i64.
-    Integer(i64),
-    /// YAML scalar.
-    String(Cow<'input, str>),
-    /// YAML bool, e.g. `true` or `false`.
-    Boolean(bool),
+    /// The raw string from the input.
+    Representation(Cow<'input, str>),
+    /// The resolved value from the representation.
+    Value(Scalar<'input>),
     /// YAML sequence, can be accessed as a `Vec`.
     Sequence(Sequence<'input>),
     /// YAML mapping, can be accessed as a `LinkedHashMap`.
@@ -49,8 +44,6 @@ pub enum Yaml<'input> {
     Mapping(Mapping<'input>),
     /// Alias, not fully supported yet.
     Alias(usize),
-    /// YAML null, e.g. `null` or `~`.
-    Null,
     /// Accessing a nonexistent node via the Index trait returns `BadValue`. This
     /// simplifies error handling in the calling code. Invalid type conversion also
     /// returns `BadValue`.
@@ -82,7 +75,7 @@ impl<'input> Yaml<'input> {
     /// of the returned `Vec` will be used. Otherwise, each element in the `Vec` is a document:
     ///
     /// ```
-    /// use saphyr::Yaml;
+    /// use saphyr::{Scalar, Yaml};
     ///
     /// let docs = Yaml::load_from_str(r#"
     /// First document
@@ -91,11 +84,11 @@ impl<'input> Yaml<'input> {
     /// "#).unwrap();
     /// let first_document = &docs[0]; // Select the first YAML document
     /// // The document is a string containing "First document".
-    /// assert_eq!(*first_document, Yaml::String("First document".into()));
+    /// assert_eq!(*first_document, Yaml::Value(Scalar::String("First document".into())));
     ///
     /// let second_document = &docs[1]; // Select the second YAML document
     /// // The document is an array containing a single string, "Second document".
-    /// assert_eq!(second_document[0], Yaml::String("Second document".into()));
+    /// assert_eq!(second_document[0], Yaml::Value(Scalar::String("Second document".into())));
     /// ```
     ///
     /// # Errors
@@ -139,7 +132,7 @@ impl<'input> Yaml<'input> {
                 let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
                 mapping
                     .raw_entry()
-                    .from_hash(hash, |k| matches!(k, Yaml::String(v) if v == key))
+                    .from_hash(hash, |k| k.as_str().is_some_and(|s| s == key))
                     .map(|(_, v)| v)
             }
             _ => None,
@@ -150,12 +143,12 @@ impl<'input> Yaml<'input> {
     #[must_use]
     fn as_mapping_get_mut_impl(&mut self, key: &str) -> Option<&mut Self> {
         use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
-        match self.as_mut_mapping() {
+        match self.as_mapping_mut() {
             Some(mapping) => {
                 let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
                 match mapping
                     .raw_entry_mut()
-                    .from_hash(hash, |k| matches!(k, Yaml::String(v) if v == key))
+                    .from_hash(hash, |k| k.as_str().is_some_and(|s| s == key))
                 {
                     Occupied(entry) => Some(entry.into_mut()),
                     Vacant(_) => None,
@@ -170,23 +163,24 @@ impl<'input> Yaml<'input> {
 impl<'input> Yaml<'input> {
     /// Convert a string to a [`Yaml`] node.
     ///
-    /// [`Yaml`] does not implement [`std::str::FromStr`] since conversion may not fail. This
-    /// function falls back to [`Yaml::String`] if nothing else matches.
+    /// [`Yaml`] does not implement [`std::str::FromStr`] since the trait requires that conversion
+    /// does not fail. This function attempts to parse the given string as a scalar node, falling
+    /// back to a [`Scalar::String`].
     ///
     /// # Examples
     /// ```
-    /// # use saphyr::Yaml;
-    /// assert!(matches!(Yaml::from_str("42"), Yaml::Integer(42)));
-    /// assert!(matches!(Yaml::from_str("0x2A"), Yaml::Integer(42)));
-    /// assert!(matches!(Yaml::from_str("0o52"), Yaml::Integer(42)));
-    /// assert!(matches!(Yaml::from_str("~"), Yaml::Null));
-    /// assert!(matches!(Yaml::from_str("null"), Yaml::Null));
-    /// assert!(matches!(Yaml::from_str("true"), Yaml::Boolean(true)));
-    /// assert!(matches!(Yaml::from_str("3.14"), Yaml::Real(_)));
-    /// assert!(matches!(Yaml::from_str("foo"), Yaml::String(_)));
+    /// # use saphyr::{Scalar, Yaml};
+    /// assert!(matches!(Yaml::from_str("42"),   Yaml::Value(Scalar::Integer(42))));
+    /// assert!(matches!(Yaml::from_str("0x2A"), Yaml::Value(Scalar::Integer(42))));
+    /// assert!(matches!(Yaml::from_str("0o52"), Yaml::Value(Scalar::Integer(42))));
+    /// assert!(matches!(Yaml::from_str("~"),    Yaml::Value(Scalar::Null)));
+    /// assert!(matches!(Yaml::from_str("null"), Yaml::Value(Scalar::Null)));
+    /// assert!(matches!(Yaml::from_str("true"), Yaml::Value(Scalar::Boolean(true))));
+    /// assert!(matches!(Yaml::from_str("3.14"), Yaml::Value(Scalar::FloatingPoint(_))));
+    /// assert!(matches!(Yaml::from_str("foo"),  Yaml::Value(Scalar::String(_))));
     /// ```
     #[must_use]
-    pub fn from_str(v: &'input str) -> Yaml {
+    pub fn from_str(v: &'input str) -> Self {
         Self::from_cow(v.into())
     }
 
@@ -195,28 +189,28 @@ impl<'input> Yaml<'input> {
     pub fn from_cow(v: Cow<'input, str>) -> Yaml {
         if let Some(number) = v.strip_prefix("0x") {
             if let Ok(i) = i64::from_str_radix(number, 16) {
-                return Yaml::Integer(i);
+                return Yaml::Value(Scalar::Integer(i));
             }
         } else if let Some(number) = v.strip_prefix("0o") {
             if let Ok(i) = i64::from_str_radix(number, 8) {
-                return Yaml::Integer(i);
+                return Yaml::Value(Scalar::Integer(i));
             }
         } else if let Some(number) = v.strip_prefix('+') {
             if let Ok(i) = number.parse::<i64>() {
-                return Yaml::Integer(i);
+                return Yaml::Value(Scalar::Integer(i));
             }
         }
         match &*v {
-            "~" | "null" => Yaml::Null,
-            "true" => Yaml::Boolean(true),
-            "false" => Yaml::Boolean(false),
+            "~" | "null" => Yaml::Value(Scalar::Null),
+            "true" => Yaml::Value(Scalar::Boolean(true)),
+            "false" => Yaml::Value(Scalar::Boolean(false)),
             _ => {
                 if let Ok(integer) = v.parse::<i64>() {
-                    Yaml::Integer(integer)
-                } else if parse_f64(&v).is_some() {
-                    Yaml::Real(v)
+                    Yaml::Value(Scalar::Integer(integer))
+                } else if let Some(float) = parse_f64(&v) {
+                    Yaml::Value(Scalar::FloatingPoint(float.into()))
                 } else {
-                    Yaml::String(v)
+                    Yaml::Value(Scalar::String(v))
                 }
             }
         }
@@ -243,12 +237,12 @@ impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
     }
 
     fn sequence_mut(&mut self) -> &mut Vec<Self> {
-        self.as_mut_vec()
+        self.as_vec_mut()
             .expect("Called sequence_mut on a non-array")
     }
 
     fn mapping_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
-        self.as_mut_mapping()
+        self.as_mapping_mut()
             .expect("Called mapping_mut on a non-hash")
     }
 
@@ -321,7 +315,7 @@ where
     /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
     /// a [`Yaml::Sequence`], this is when the index is bigger or equal to the length of the
     /// underlying `Vec`. If `self` is a [`Yaml::Mapping`], this is when the mapping sequence does
-    /// not contain [`Yaml::Integer`]`(idx)` as a key.
+    /// not contain [`Scalar::Integer`]`(idx)` as a key.
     ///
     /// This function also panics if `self` is not a [`Yaml::Sequence`] nor a [`Yaml::Mapping`].
     fn index(&self, idx: usize) -> &Self::Output {
@@ -336,7 +330,7 @@ where
                 let hash = hash_i64_as_yaml_integer(idx, mapping.hasher().build_hasher());
                 mapping
                     .raw_entry()
-                    .from_hash(hash, |k| matches!(k, Yaml::Integer(v) if *v == idx))
+                    .from_hash(hash, |k| k.as_integer().is_some_and(|v| v == idx))
                     .map_or_else(|| panic!("Key {idx} not found in YAML mapping"), |(_, v)| v)
             }
             _ => {
@@ -353,7 +347,7 @@ impl<'input> IndexMut<usize> for Yaml<'input> {
     /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
     /// a [`Yaml::Sequence`], this is when the index is bigger or equal to the length of the
     /// underlying `Vec`. If `self` is a [`Yaml::Mapping`], this is when the mapping sequence does
-    /// not contain [`Yaml::Integer`]`(idx)` as a key.
+    /// not contain [`Scalar::Integer`]`(idx)` as a key.
     ///
     /// This function also panics if `self` is not a [`Yaml::Sequence`] nor a [`Yaml::Mapping`].
     fn index_mut(&mut self, idx: usize) -> &mut Yaml<'input> {
@@ -365,7 +359,7 @@ impl<'input> IndexMut<usize> for Yaml<'input> {
                 let idx = i64::try_from(idx).unwrap_or_else(|_| {
                     panic!("Attempt to index YAML sequence with overflowing index")
                 });
-                mapping.get_mut(&Yaml::Integer(idx)).unwrap()
+                mapping.get_mut(&Yaml::Value(Scalar::Integer(idx))).unwrap()
             }
             _ => {
                 panic!("Attempt to index YAML with {idx} but it's not a mapping nor a sequence")
@@ -398,18 +392,18 @@ impl<'input> Iterator for YamlIter<'input> {
     }
 }
 
-/// Hash the given `str` as if it were a [`Yaml::String`] object.
+/// Hash the given `str` as if it were a [`Scalar::String`] object.
 fn hash_str_as_yaml_string<H: Hasher>(key: &str, mut hasher: H) -> u64 {
     use std::hash::Hash;
-    let key = Yaml::String(key.into());
+    let key = Yaml::Value(Scalar::String(key.into()));
     key.hash(&mut hasher);
     hasher.finish()
 }
 
-/// Hash the given `i64` as if it were a [`Yaml::Integer`] object.
+/// Hash the given `i64` as if it were a [`Scalar::Integer`] object.
 fn hash_i64_as_yaml_integer<H: Hasher>(key: i64, mut hasher: H) -> u64 {
     use std::hash::Hash;
-    let key = Yaml::Integer(key);
+    let key = Yaml::Value(Scalar::Integer(key));
     key.hash(&mut hasher);
     hasher.finish()
 }

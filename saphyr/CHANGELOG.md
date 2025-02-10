@@ -12,12 +12,29 @@
 - Use `Sequence` instead of `Array` to refer to YAML sequences.
   Methods to access sequences using `vec` instead of `array` still exist.
   Another method using `sequence` has been added.
+- `as_f64` -> `as_floating_point`, `as_i64` -> `as_integer`
+- Reworked `Yaml` and `YamlData`
+  - They now have a `Value` and a `Representation` variants for scalars.
+    `Representation` holds the raw characters from the input (pre-parsing)
+    while `Value` holds the parsed value. In `foo: 3`, `Representation` would
+    hold `"foo"` and `"3"` (both as strings) while `Value` would hold `"foo"`
+    and `3`.
+  - The idea behind this is to allow lazy-parsing of scalar nodes and to give
+    more control about key duplication detection in mappings (e.g.: is `{ 0xB:
+    ~, 11: ~ }` considered a duplicate because `0xB == 11`?).
 
 **Features**:
 - Add the following convenience methods to the YAML objects:
   - `contains_mapping_key`
   - `as_mapping_get`
   - `as_mapping_get_mut`
+- Add many more conversion methods (`as_*`, `as_*_mut`, `into_*`, ...).
+- Use
+  [`ordered-float`](https://docs.rs/ordered-float/latest/ordered_float/struct.OrderedFloat.html)
+  to store floating point values in scalars. This allows using floating point
+  values in mappings, with the caveats listed in the crate description (#18).
+  The `OrderedFloat`s are kept within the `Scalar` object and conversion
+  methods do not expose them.
 
 ## v0.0.3
 

@@ -28,7 +28,7 @@ use std::{
 
 use hashlink::LinkedHashMap;
 
-use crate::loader::parse_f64;
+use crate::Scalar;
 
 /// YAML data for nodes that will contain annotations.
 ///
@@ -66,15 +66,10 @@ where
     Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
     HashKey: Eq + std::hash::Hash + std::borrow::Borrow<Node> + From<Node>,
 {
-    /// Float types are stored as String and parsed on demand.
-    /// Note that `f64` does NOT implement Eq trait and can NOT be stored in `BTreeMap`.
-    Real(Cow<'input, str>),
-    /// YAML int is stored as i64.
-    Integer(i64),
-    /// YAML scalar.
-    String(Cow<'input, str>),
-    /// YAML bool, e.g. `true` or `false`.
-    Boolean(bool),
+    /// The raw string from the input.
+    Representation(Cow<'input, str>),
+    /// The resolved value from the representation.
+    Value(Scalar<'input>),
     /// YAML sequence, can be accessed as a `Vec`.
     Sequence(AnnotatedSequence<Node>),
     /// YAML mapping, can be accessed as a `LinkedHashMap`.
@@ -83,8 +78,6 @@ where
     Mapping(AnnotatedMapping<'input, HashKey, Node>),
     /// Alias, not fully supported yet.
     Alias(usize),
-    /// YAML null, e.g. `null` or `~`.
-    Null,
     /// Accessing a nonexistent node via the Index trait returns `BadValue`. This
     /// simplifies error handling in the calling code. Invalid type conversion also
     /// returns `BadValue`.
@@ -126,7 +119,7 @@ where
 
         match self {
             YamlData::Mapping(mapping) => {
-                let needle = Node::HashKey::<'a>::from(YamlData::String(key.into()));
+                let needle = Node::HashKey::<'a>::from(YamlData::Value(Scalar::String(key.into())));
 
                 // In order to work around `needle`'s lifetime being different from `h`'s, we need
                 // to manually compute the hash. Otherwise, we'd use `h.get()`, which complains the
@@ -147,7 +140,7 @@ where
     /// Implementation detail for [`Self::as_mapping_get_mut`], which is generated from a macro.
     #[must_use]
     fn as_mapping_get_mut_impl(&mut self, key: &str) -> Option<&mut Node> {
-        match self.as_mut_mapping() {
+        match self.as_mapping_mut() {
             Some(mapping) => {
                 use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
                 use std::hash::Hash;
@@ -155,7 +148,7 @@ where
                 // In order to work around `needle`'s lifetime being different from `h`'s, we need
                 // to manually compute the hash. Otherwise, we'd use `h.get()`, which complains the
                 // needle's lifetime doesn't match that of the key in `h`.
-                let needle = Node::HashKey::<'_>::from(YamlData::String(key.into()));
+                let needle = Node::HashKey::<'_>::from(YamlData::Value(Scalar::String(key.into())));
                 let mut hasher = mapping.hasher().build_hasher();
                 needle.hash(&mut hasher);
                 let hash = hasher.finish();
@@ -255,7 +248,7 @@ where
     /// This function panics if the index given is out of range (as per [`Index`]). If `self` is a
     /// [`YamlData::Sequence`], this is when the index is bigger or equal to the length of the
     /// underlying `Vec`. If `self` is a [`YamlData::Mapping`], this is when the mapping sequence
-    /// does not contain [`YamlData::Integer`]`(idx)` as a key.
+    /// does not contain [`Scalar::Integer`]`(idx)` as a key.
     ///
     /// This function also panics if `self` is not a [`YamlData::Sequence`] nor a
     /// [`YamlData::Mapping`].
@@ -269,7 +262,7 @@ where
                 panic!("Attempt to index YamlData mapping with overflowing index")
             });
             mapping
-                .get(&Self::Integer(key).into())
+                .get(&Self::Value(Scalar::Integer(key)).into())
                 .unwrap_or_else(|| panic!("Key '{idx}' not found in YamlData mapping"))
         } else {
             panic!("Attempt to index YamlData with {idx} but it's not a mapping nor a sequence");
@@ -292,7 +285,7 @@ where
     /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
     /// a [`YamlData::Sequence`], this is when the index is bigger or equal to the length of the
     /// underlying `Vec`. If `self` is a [`YamlData::Mapping`], this is when the mapping sequence
-    /// does not contain [`YamlData::Integer`]`(idx)` as a key.
+    /// does not contain [`Scalar::Integer`]`(idx)` as a key.
     ///
     /// This function also panics if `self` is not a [`YamlData::Sequence`] nor a
     /// [`YamlData::Mapping`].
@@ -306,7 +299,7 @@ where
                     panic!("Attempt to index YamlData mapping with overflowing index")
                 });
                 mapping
-                    .get_mut(&Self::Integer(key).into())
+                    .get_mut(&Self::Value(Scalar::Integer(key)).into())
                     .unwrap_or_else(|| panic!("Key {idx} not found in YamlData mapping"))
             }
             _ => {

@@ -1,16 +1,27 @@
-use saphyr::{Mapping, Yaml, YamlEmitter};
+use saphyr::{Mapping, Scalar, Yaml, YamlEmitter};
 
 #[test]
 fn test_mapvec_legal() {
     // Emitting a `map<map<seq<_>>, _>` should result in legal yaml that
     // we can parse.
 
-    let key = vec![Yaml::Integer(1), Yaml::Integer(2), Yaml::Integer(3)];
+    let key = vec![
+        Yaml::Value(Scalar::Integer(1)),
+        Yaml::Value(Scalar::Integer(2)),
+        Yaml::Value(Scalar::Integer(3)),
+    ];
 
     let mut keyhash = Mapping::new();
-    keyhash.insert(Yaml::String("key".into()), Yaml::Sequence(key));
+    keyhash.insert(
+        Yaml::Value(Scalar::String("key".into())),
+        Yaml::Sequence(key),
+    );
 
-    let val = vec![Yaml::Integer(4), Yaml::Integer(5), Yaml::Integer(6)];
+    let val = vec![
+        Yaml::Value(Scalar::Integer(4)),
+        Yaml::Value(Scalar::Integer(5)),
+        Yaml::Value(Scalar::Integer(6)),
+    ];
 
     let mut hash = Mapping::new();
     hash.insert(Yaml::Mapping(keyhash), Yaml::Sequence(val));

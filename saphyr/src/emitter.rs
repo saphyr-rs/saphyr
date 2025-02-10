@@ -1,7 +1,7 @@
 //! YAML serialization helpers.
 
-use crate::char_traits;
 use crate::yaml::{Mapping, Yaml};
+use crate::{char_traits, Scalar};
 use std::convert::From;
 use std::error::Error;
 use std::fmt::{self, Display};
@@ -214,7 +214,7 @@ impl<'a> YamlEmitter<'a> {
         match *node {
             Yaml::Sequence(ref v) => self.emit_sequence(v),
             Yaml::Mapping(ref h) => self.emit_mapping(h),
-            Yaml::String(ref v) => {
+            Yaml::Value(Scalar::String(ref v)) => {
                 if self.multiline_strings
                     && v.contains('\n')
                     && char_traits::is_valid_literal_block_scalar(v)
@@ -227,7 +227,7 @@ impl<'a> YamlEmitter<'a> {
                 }
                 Ok(())
             }
-            Yaml::Boolean(v) => {
+            Yaml::Value(Scalar::Boolean(v)) => {
                 if v {
                     self.writer.write_str("true")?;
                 } else {
@@ -235,18 +235,10 @@ impl<'a> YamlEmitter<'a> {
                 }
                 Ok(())
             }
-            Yaml::Integer(v) => {
-                write!(self.writer, "{v}")?;
-                Ok(())
-            }
-            Yaml::Real(ref v) => {
-                write!(self.writer, "{v}")?;
-                Ok(())
-            }
-            Yaml::Null | Yaml::BadValue => {
-                write!(self.writer, "~")?;
-                Ok(())
-            }
+            Yaml::Value(Scalar::Integer(v)) => Ok(write!(self.writer, "{v}")?),
+            Yaml::Value(Scalar::FloatingPoint(ref v)) => Ok(write!(self.writer, "{v}")?),
+            Yaml::Value(Scalar::Null) | Yaml::BadValue => Ok(write!(self.writer, "~")?),
+            Yaml::Representation(ref v) => Ok(write!(self.writer, "{v}")?),
             // XXX(chenyh) Alias
             Yaml::Alias(_) => Ok(()),
         }

@@ -1,7 +1,7 @@
 #![allow(clippy::bool_assert_comparison)]
 #![allow(clippy::float_cmp)]
 
-use saphyr::{Yaml, YamlEmitter};
+use saphyr::{Scalar, Yaml, YamlEmitter};
 
 #[test]
 fn test_api() {
@@ -52,9 +52,9 @@ c: [1, 2]
 ";
     let out = Yaml::load_from_str(s).unwrap();
     let doc = &out[0];
-    assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
-    assert_eq!(doc["b"].as_f64().unwrap(), 2.2f64);
-    assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
+    assert_eq!(doc["a"].as_integer().unwrap(), 1i64);
+    assert_eq!(doc["b"].as_floating_point().unwrap(), 2.2f64);
+    assert_eq!(doc["c"][1].as_integer().unwrap(), 2i64);
     assert!(!doc.contains_mapping_key("d"));
 }
 
@@ -68,7 +68,7 @@ a2: *DEFAULT
 ";
     let out = Yaml::load_from_str(s).unwrap();
     let doc = &out[0];
-    assert_eq!(doc["a2"]["b1"].as_i64().unwrap(), 4);
+    assert_eq!(doc["a2"]["b1"].as_integer().unwrap(), 4);
 }
 
 #[test]
@@ -120,29 +120,29 @@ fn test_plain_datatype() {
     assert_eq!(doc[0].as_str().unwrap(), "string");
     assert_eq!(doc[1].as_str().unwrap(), "string");
     assert_eq!(doc[2].as_str().unwrap(), "string");
-    assert_eq!(doc[3].as_i64().unwrap(), 123);
-    assert_eq!(doc[4].as_i64().unwrap(), -321);
-    assert_eq!(doc[5].as_f64().unwrap(), 1.23);
-    assert_eq!(doc[6].as_f64().unwrap(), -1e4);
+    assert_eq!(doc[3].as_integer().unwrap(), 123);
+    assert_eq!(doc[4].as_integer().unwrap(), -321);
+    assert_eq!(doc[5].as_floating_point().unwrap(), 1.23);
+    assert_eq!(doc[6].as_floating_point().unwrap(), -1e4);
     assert!(doc[7].is_null());
     assert!(doc[8].is_null());
     assert_eq!(doc[9].as_bool().unwrap(), true);
     assert_eq!(doc[10].as_bool().unwrap(), false);
     assert_eq!(doc[11].as_str().unwrap(), "0");
-    assert_eq!(doc[12].as_i64().unwrap(), 100);
-    assert_eq!(doc[13].as_f64().unwrap(), 2.0);
+    assert_eq!(doc[12].as_integer().unwrap(), 100);
+    assert_eq!(doc[13].as_floating_point().unwrap(), 2.0);
     assert!(doc[14].is_null());
     assert_eq!(doc[15].as_bool().unwrap(), true);
     assert_eq!(doc[16].as_bool().unwrap(), false);
-    assert_eq!(doc[17].as_i64().unwrap(), 255);
+    assert_eq!(doc[17].as_integer().unwrap(), 255);
     assert!(doc[18].is_badvalue());
     assert!(doc[19].is_badvalue());
     assert!(doc[20].is_badvalue());
     assert!(doc[21].is_badvalue());
-    assert_eq!(doc[22].as_i64().unwrap(), 63);
-    assert_eq!(doc[23][0].as_i64().unwrap(), 15);
-    assert_eq!(doc[23][1].as_i64().unwrap(), 15);
-    assert_eq!(doc[24].as_i64().unwrap(), 12345);
+    assert_eq!(doc[22].as_integer().unwrap(), 63);
+    assert_eq!(doc[23][0].as_integer().unwrap(), 15);
+    assert_eq!(doc[23][1].as_integer().unwrap(), 15);
+    assert_eq!(doc[24].as_integer().unwrap(), 12345);
     assert!(doc[25][0].as_bool().unwrap());
     assert!(!doc[25][1].as_bool().unwrap());
 }
@@ -177,23 +177,29 @@ fn test_plain_datatype_with_into_methods() {
     assert_eq!(doc.next().unwrap().into_string().unwrap(), "string");
     assert_eq!(doc.next().unwrap().into_string().unwrap(), "string");
     assert_eq!(doc.next().unwrap().into_string().unwrap(), "string");
-    assert_eq!(doc.next().unwrap().into_i64().unwrap(), 123);
-    assert_eq!(doc.next().unwrap().into_i64().unwrap(), -321);
-    assert_eq!(doc.next().unwrap().into_f64().unwrap(), 1.23);
-    assert_eq!(doc.next().unwrap().into_f64().unwrap(), -1e4);
+    assert_eq!(doc.next().unwrap().into_integer().unwrap(), 123);
+    assert_eq!(doc.next().unwrap().into_integer().unwrap(), -321);
+    assert_eq!(doc.next().unwrap().into_floating_point().unwrap(), 1.23);
+    assert_eq!(doc.next().unwrap().into_floating_point().unwrap(), -1e4);
     assert_eq!(doc.next().unwrap().into_bool().unwrap(), true);
     assert_eq!(doc.next().unwrap().into_bool().unwrap(), false);
     assert_eq!(doc.next().unwrap().into_string().unwrap(), "0");
-    assert_eq!(doc.next().unwrap().into_i64().unwrap(), 100);
-    assert_eq!(doc.next().unwrap().into_f64().unwrap(), 2.0);
+    assert_eq!(doc.next().unwrap().into_integer().unwrap(), 100);
+    assert_eq!(doc.next().unwrap().into_floating_point().unwrap(), 2.0);
     assert_eq!(doc.next().unwrap().into_bool().unwrap(), true);
     assert_eq!(doc.next().unwrap().into_bool().unwrap(), false);
-    assert_eq!(doc.next().unwrap().into_i64().unwrap(), 255);
-    assert_eq!(doc.next().unwrap().into_i64().unwrap(), 63);
-    assert_eq!(doc.next().unwrap().into_i64().unwrap(), 12345);
-    assert_eq!(doc.next().unwrap().into_f64().unwrap(), f64::NEG_INFINITY);
-    assert!(doc.next().unwrap().into_f64().is_some());
-    assert_eq!(doc.next().unwrap().into_f64().unwrap(), f64::INFINITY);
+    assert_eq!(doc.next().unwrap().into_integer().unwrap(), 255);
+    assert_eq!(doc.next().unwrap().into_integer().unwrap(), 63);
+    assert_eq!(doc.next().unwrap().into_integer().unwrap(), 12345);
+    assert_eq!(
+        doc.next().unwrap().into_floating_point().unwrap(),
+        f64::NEG_INFINITY
+    );
+    assert!(doc.next().unwrap().into_floating_point().is_some());
+    assert_eq!(
+        doc.next().unwrap().into_floating_point().unwrap(),
+        f64::INFINITY
+    );
 }
 
 #[test]
@@ -206,9 +212,27 @@ c: ~
     let out = Yaml::load_from_str(s).unwrap();
     let first = out.into_iter().next().unwrap();
     let mut iter = first.into_mapping().unwrap().into_iter();
-    assert_eq!(Some((Yaml::String("b".into()), Yaml::Null)), iter.next());
-    assert_eq!(Some((Yaml::String("a".into()), Yaml::Null)), iter.next());
-    assert_eq!(Some((Yaml::String("c".into()), Yaml::Null)), iter.next());
+    assert_eq!(
+        iter.next(),
+        Some((
+            Yaml::Value(Scalar::String("b".into())),
+            Yaml::Value(Scalar::Null)
+        ))
+    );
+    assert_eq!(
+        iter.next(),
+        Some((
+            Yaml::Value(Scalar::String("a".into())),
+            Yaml::Value(Scalar::Null)
+        ))
+    );
+    assert_eq!(
+        iter.next(),
+        Some((
+            Yaml::Value(Scalar::String("c".into())),
+            Yaml::Value(Scalar::Null)
+        ))
+    );
     assert_eq!(None, iter.next());
 }
 
