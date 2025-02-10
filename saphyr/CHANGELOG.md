@@ -9,6 +9,9 @@
   incorrect. This helps in making the behavior of `[]` more consistent across
   all operations.
 - Use `Mapping` instead of `Hash` to refer to YAML mappings.
+- Use `Sequence` instead of `Array` to refer to YAML sequences.
+  Methods to access sequences using `vec` instead of `array` still exist.
+  Another method using `sequence` has been added.
 
 **Features**:
 - Add the following convenience methods to the YAML objects:

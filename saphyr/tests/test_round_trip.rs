@@ -79,36 +79,36 @@ fn test_issue133() {
 
 #[test]
 fn test_newline() {
-    let y = Yaml::Array(vec![Yaml::String("\n".into())]);
+    let y = Yaml::Sequence(vec![Yaml::String("\n".into())]);
     roundtrip(&y);
 }
 
 #[test]
 fn test_crlf() {
-    let y = Yaml::Array(vec![Yaml::String("\r\n".into())]);
+    let y = Yaml::Sequence(vec![Yaml::String("\r\n".into())]);
     roundtrip(&y);
 }
 
 #[test]
 fn test_multiline_noline() {
-    let y = Yaml::Array(vec![Yaml::String("a".into())]);
+    let y = Yaml::Sequence(vec![Yaml::String("a".into())]);
     roundtrip_multiline(&y);
 }
 
 #[test]
 fn test_multiline_inner_newline() {
-    let y = Yaml::Array(vec![Yaml::String("a\nb".into())]);
+    let y = Yaml::Sequence(vec![Yaml::String("a\nb".into())]);
     roundtrip_multiline(&y);
 }
 
 #[test]
 fn test_multiline_trailing_newline() {
-    let y = Yaml::Array(vec![Yaml::String("a\n".into())]);
+    let y = Yaml::Sequence(vec![Yaml::String("a\n".into())]);
     roundtrip_multiline(&y);
 }
 
 #[test]
 fn test_multiline_leading_newline() {
-    let y = Yaml::Array(vec![Yaml::String("\na".into())]);
+    let y = Yaml::Sequence(vec![Yaml::String("\na".into())]);
     roundtrip_multiline(&y);
 }

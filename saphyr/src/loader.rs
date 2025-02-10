@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 use hashlink::LinkedHashMap;
 use saphyr_parser::{Event, ScanError, Span, SpannedEventReceiver, TScalarStyle, Tag};
 
-use crate::{Hash, Yaml};
+use crate::{Mapping, Yaml};
 
 /// Main structure for parsing YAML.
 ///
@@ -66,7 +66,7 @@ where
             }
             Event::SequenceStart(aid, _) => {
                 self.doc_stack.push((
-                    Node::from_bare_yaml(Yaml::Array(Vec::new())).with_span(span),
+                    Node::from_bare_yaml(Yaml::Sequence(Vec::new())).with_span(span),
                     aid,
                 ));
             }
@@ -76,7 +76,7 @@ where
             }
             Event::MappingStart(aid, _) => {
                 self.doc_stack.push((
-                    Node::from_bare_yaml(Yaml::Mapping(Hash::new())).with_span(span),
+                    Node::from_bare_yaml(Yaml::Mapping(Mapping::new())).with_span(span),
                     aid,
                 ));
                 self.key_stack.push(Node::from_bare_yaml(Yaml::BadValue));
@@ -148,8 +148,8 @@ where
         }
         if let Some(parent) = self.doc_stack.last_mut() {
             let parent_node = &mut parent.0;
-            if parent_node.is_array() {
-                parent_node.array_mut().push(node.0);
+            if parent_node.is_sequence() {
+                parent_node.sequence_mut().push(node.0);
             } else if parent_node.is_mapping() {
                 let cur_key = self.key_stack.last_mut().unwrap();
                 if cur_key.is_badvalue() {
@@ -241,16 +241,16 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
     ///
     /// Nodes must implement this to be built. The optional metadata that they contain will be
     /// later provided by the loader and can be default initialized. The [`Yaml`] object passed as
-    /// parameter may be of the [`Array`] or [`Mapping`] variants. In this event, the inner container
-    /// will always be empty. There is no need to traverse all elements to convert them from
-    /// [`Yaml`] to `Self`.
+    /// parameter may be of the [`Sequence`] or [`Mapping`] variants. In this event, the inner
+    /// container will always be empty. There is no need to traverse all elements to convert them
+    /// from [`Yaml`] to `Self`.
     ///
-    /// [`Array`]: `Yaml::Array`
+    /// [`Sequence`]: `Yaml::Sequence`
     /// [`Mapping`]: `Yaml::Mapping`
     fn from_bare_yaml(yaml: Yaml<'input>) -> Self;
 
     /// Return whether the YAML node is an array.
-    fn is_array(&self) -> bool;
+    fn is_sequence(&self) -> bool;
 
     /// Return whether the YAML node is a hash.
     fn is_mapping(&self) -> bool;
@@ -258,16 +258,16 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
     /// Return whether the YAML node is `BadValue`.
     fn is_badvalue(&self) -> bool;
 
-    /// Retrieve the array variant of the YAML node.
+    /// Retrieve the sequence variant of the YAML node.
     ///
     /// # Panics
-    /// This function panics if `self` is not an array.
-    fn array_mut(&mut self) -> &mut Vec<Self>;
+    /// This function panics if `self` is not a sequence.
+    fn sequence_mut(&mut self) -> &mut Vec<Self>;
 
-    /// Retrieve the hash variant of the YAML node.
+    /// Retrieve the mapping variant of the YAML node.
     ///
     /// # Panics
-    /// This function panics if `self` is not a hash.
+    /// This function panics if `self` is not a mapping.
     fn mapping_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self>;
 
     /// Take the contained node out of `Self`, leaving a `BadValue` in its place.

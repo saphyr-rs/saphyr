@@ -24,8 +24,8 @@ use crate::{loader::parse_f64, LoadableYamlNode, YamlLoader};
 /// let foo = Yaml::from_str("-123"); // convert the string to the appropriate YAML type
 /// assert_eq!(foo.as_i64().unwrap(), -123);
 ///
-/// // iterate over an Array
-/// let vec = Yaml::Array(vec![Yaml::Integer(1), Yaml::Integer(2)]);
+/// // iterate over an Sequence
+/// let vec = Yaml::Sequence(vec![Yaml::Integer(1), Yaml::Integer(2)]);
 /// for v in vec.as_vec().unwrap() {
 ///     assert!(v.as_i64().is_some());
 /// }
@@ -41,12 +41,12 @@ pub enum Yaml<'input> {
     String(Cow<'input, str>),
     /// YAML bool, e.g. `true` or `false`.
     Boolean(bool),
-    /// YAML array, can be accessed as a `Vec`.
-    Array(Array<'input>),
+    /// YAML sequence, can be accessed as a `Vec`.
+    Sequence(Sequence<'input>),
     /// YAML mapping, can be accessed as a `LinkedHashMap`.
     ///
     /// Insertion order will match the order of insertion into the map.
-    Mapping(Hash<'input>),
+    Mapping(Mapping<'input>),
     /// Alias, not fully supported yet.
     Alias(usize),
     /// YAML null, e.g. `null` or `~`.
@@ -57,17 +57,17 @@ pub enum Yaml<'input> {
     BadValue,
 }
 
-/// The type contained in the `Yaml::Array` variant. This corresponds to YAML sequences.
-pub type Array<'input> = Vec<Yaml<'input>>;
-/// The type contained in the `Yaml::Mapping` variant. This corresponds to YAML mappings.
-pub type Hash<'input> = LinkedHashMap<Yaml<'input>, Yaml<'input>>;
+/// The type contained in the `Yaml::Sequence` variant.
+pub type Sequence<'input> = Vec<Yaml<'input>>;
+/// The type contained in the `Yaml::Mapping` variant.
+pub type Mapping<'input> = LinkedHashMap<Yaml<'input>, Yaml<'input>>;
 
 // This defines most common operations on a YAML object. See macro definition for details.
 define_yaml_object_impl!(
     Yaml<'input>,
     <'input>,
-    mappingtype = Hash<'input>,
-    arraytype = Array<'input>,
+    mappingtype = Mapping<'input>,
+    sequencetype = Sequence<'input>,
     nodetype = Self
 );
 
@@ -230,8 +230,8 @@ impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
         yaml
     }
 
-    fn is_array(&self) -> bool {
-        self.is_array()
+    fn is_sequence(&self) -> bool {
+        self.is_sequence()
     }
 
     fn is_mapping(&self) -> bool {
@@ -242,8 +242,9 @@ impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
         self.is_badvalue()
     }
 
-    fn array_mut(&mut self) -> &mut Vec<Self> {
-        self.as_mut_vec().expect("Called array_mut on a non-array")
+    fn sequence_mut(&mut self) -> &mut Vec<Self> {
+        self.as_mut_vec()
+            .expect("Called sequence_mut on a non-array")
     }
 
     fn mapping_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
@@ -318,14 +319,14 @@ where
     ///
     /// # Panics
     /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
-    /// a [`Yaml::Array`], this is when the index is bigger or equal to the length of the
+    /// a [`Yaml::Sequence`], this is when the index is bigger or equal to the length of the
     /// underlying `Vec`. If `self` is a [`Yaml::Mapping`], this is when the mapping sequence does
     /// not contain [`Yaml::Integer`]`(idx)` as a key.
     ///
-    /// This function also panics if `self` is not a [`Yaml::Array`] nor a [`Yaml::Mapping`].
+    /// This function also panics if `self` is not a [`Yaml::Sequence`] nor a [`Yaml::Mapping`].
     fn index(&self, idx: usize) -> &Self::Output {
         match self {
-            Yaml::Array(sequence) => sequence
+            Yaml::Sequence(sequence) => sequence
                 .get(idx)
                 .unwrap_or_else(|| panic!("Index {idx} out of bounds in YAML sequence")),
             Yaml::Mapping(mapping) => {
@@ -350,14 +351,14 @@ impl<'input> IndexMut<usize> for Yaml<'input> {
     ///
     /// # Panics
     /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
-    /// a [`Yaml::Array`], this is when the index is bigger or equal to the length of the
+    /// a [`Yaml::Sequence`], this is when the index is bigger or equal to the length of the
     /// underlying `Vec`. If `self` is a [`Yaml::Mapping`], this is when the mapping sequence does
     /// not contain [`Yaml::Integer`]`(idx)` as a key.
     ///
-    /// This function also panics if `self` is not a [`Yaml::Array`] nor a [`Yaml::Mapping`].
+    /// This function also panics if `self` is not a [`Yaml::Sequence`] nor a [`Yaml::Mapping`].
     fn index_mut(&mut self, idx: usize) -> &mut Yaml<'input> {
         match self {
-            Yaml::Array(sequence) => sequence
+            Yaml::Sequence(sequence) => sequence
                 .get_mut(idx)
                 .unwrap_or_else(|| panic!("Index {idx} out of bounds in YAML sequence")),
             Yaml::Mapping(mapping) => {

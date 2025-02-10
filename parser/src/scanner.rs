@@ -211,9 +211,9 @@ pub enum TokenType<'input> {
     BlockMappingStart,
     /// End of the corresponding `BlockSequenceStart` or `BlockMappingStart`.
     BlockEnd,
-    /// Start of an inline array (`[ a, b ]`).
+    /// Start of an inline sequence (`[ a, b ]`).
     FlowSequenceStart,
-    /// End of an inline array.
+    /// End of an inline sequence.
     FlowSequenceEnd,
     /// Start of an inline mapping (`{ a: b, c: d }`).
     FlowMappingStart,

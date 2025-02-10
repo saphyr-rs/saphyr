@@ -1,7 +1,7 @@
 //! YAML serialization helpers.
 
 use crate::char_traits;
-use crate::yaml::{Hash, Yaml};
+use crate::yaml::{Mapping, Yaml};
 use std::convert::From;
 use std::error::Error;
 use std::fmt::{self, Display};
@@ -212,7 +212,7 @@ impl<'a> YamlEmitter<'a> {
 
     fn emit_node(&mut self, node: &Yaml) -> EmitResult {
         match *node {
-            Yaml::Array(ref v) => self.emit_array(v),
+            Yaml::Sequence(ref v) => self.emit_sequence(v),
             Yaml::Mapping(ref h) => self.emit_mapping(h),
             Yaml::String(ref v) => {
                 if self.multiline_strings
@@ -272,7 +272,7 @@ impl<'a> YamlEmitter<'a> {
         Ok(())
     }
 
-    fn emit_array(&mut self, v: &[Yaml]) -> EmitResult {
+    fn emit_sequence(&mut self, v: &[Yaml]) -> EmitResult {
         if v.is_empty() {
             write!(self.writer, "[]")?;
         } else {
@@ -290,13 +290,13 @@ impl<'a> YamlEmitter<'a> {
         Ok(())
     }
 
-    fn emit_mapping(&mut self, h: &Hash) -> EmitResult {
+    fn emit_mapping(&mut self, h: &Mapping) -> EmitResult {
         if h.is_empty() {
             self.writer.write_str("{}")?;
         } else {
             self.level += 1;
             for (cnt, (k, v)) in h.iter().enumerate() {
-                let complex_key = matches!(k, Yaml::Mapping(_) | Yaml::Array(_));
+                let complex_key = matches!(k, Yaml::Mapping(_) | Yaml::Sequence(_));
                 if cnt > 0 {
                     writeln!(self.writer)?;
                     self.write_indent()?;
@@ -325,7 +325,7 @@ impl<'a> YamlEmitter<'a> {
     /// and short enough to respect the compact flag.
     fn emit_val(&mut self, inline: bool, val: &Yaml) -> EmitResult {
         match *val {
-            Yaml::Array(ref v) => {
+            Yaml::Sequence(ref v) => {
                 if (inline && self.compact) || v.is_empty() {
                     write!(self.writer, " ")?;
                 } else {
@@ -334,7 +334,7 @@ impl<'a> YamlEmitter<'a> {
                     self.write_indent()?;
                     self.level -= 1;
                 }
-                self.emit_array(v)
+                self.emit_sequence(v)
             }
             Yaml::Mapping(ref h) => {
                 if (inline && self.compact) || h.is_empty() {

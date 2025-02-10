@@ -2,7 +2,7 @@ use std::fs::{self, DirEntry};
 
 use libtest_mimic::{run_tests, Arguments, Outcome, Test};
 
-use saphyr::{Hash, Yaml};
+use saphyr::{Mapping, Yaml};
 use saphyr_parser::{
     Event, Marker, Parser, ScanError, Span, SpannedEventReceiver, TScalarStyle, Tag,
 };
@@ -99,7 +99,7 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
     let tests = tests[0].as_vec().ok_or("no test list found in file")?;
 
     let mut result = vec![];
-    let mut current_test = Hash::new();
+    let mut current_test = Mapping::new();
     for (idx, test_data) in tests.iter().enumerate() {
         let name = if tests.len() > 1 {
             format!("{test_name}-{idx:02}")

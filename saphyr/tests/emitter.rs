@@ -225,7 +225,7 @@ e:
 }
 
 #[test]
-fn test_nested_arrays() {
+fn test_nested_sequences() {
     let s = r"---
 a:
   - b
@@ -248,7 +248,7 @@ a:
 }
 
 #[test]
-fn test_deeply_nested_arrays() {
+fn test_deeply_nested_sequences() {
     let s = r"---
 a:
   - b

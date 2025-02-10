@@ -102,8 +102,8 @@ impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
                 Yaml::Integer(x) => YamlData::Integer(x),
                 Yaml::String(x) => YamlData::String(x),
                 Yaml::Boolean(x) => YamlData::Boolean(x),
-                // Array and Hash will always have their container empty.
-                Yaml::Array(_) => YamlData::Array(vec![]),
+                // Sequence and Mapping will always have their container empty.
+                Yaml::Sequence(_) => YamlData::Sequence(vec![]),
                 Yaml::Mapping(_) => YamlData::Mapping(LinkedHashMap::new()),
                 Yaml::Alias(x) => YamlData::Alias(x),
                 Yaml::Null => YamlData::Null,
@@ -112,8 +112,8 @@ impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
         }
     }
 
-    fn is_array(&self) -> bool {
-        self.data.is_array()
+    fn is_sequence(&self) -> bool {
+        self.data.is_sequence()
     }
 
     fn is_mapping(&self) -> bool {
@@ -124,10 +124,10 @@ impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
         self.data.is_badvalue()
     }
 
-    fn array_mut(&mut self) -> &mut Vec<Self> {
+    fn sequence_mut(&mut self) -> &mut Vec<Self> {
         self.data
             .as_mut_vec()
-            .expect("Called array_mut on a non-array")
+            .expect("Called sequence_mut on a non-array")
     }
 
     fn mapping_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {

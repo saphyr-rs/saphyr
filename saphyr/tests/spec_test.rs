@@ -1,4 +1,4 @@
-use saphyr::{Hash, Yaml, YamlEmitter};
+use saphyr::{Mapping, Yaml, YamlEmitter};
 
 #[test]
 fn test_mapvec_legal() {
@@ -7,13 +7,13 @@ fn test_mapvec_legal() {
 
     let key = vec![Yaml::Integer(1), Yaml::Integer(2), Yaml::Integer(3)];
 
-    let mut keyhash = Hash::new();
-    keyhash.insert(Yaml::String("key".into()), Yaml::Array(key));
+    let mut keyhash = Mapping::new();
+    keyhash.insert(Yaml::String("key".into()), Yaml::Sequence(key));
 
     let val = vec![Yaml::Integer(4), Yaml::Integer(5), Yaml::Integer(6)];
 
-    let mut hash = Hash::new();
-    hash.insert(Yaml::Mapping(keyhash), Yaml::Array(val));
+    let mut hash = Mapping::new();
+    hash.insert(Yaml::Mapping(keyhash), Yaml::Sequence(val));
 
     let mut out_str = String::new();
     {

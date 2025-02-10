@@ -47,7 +47,7 @@ use crate::loader::parse_f64;
 /// ```ignore
 /// pub enum YamlData {
 ///   // ...
-///   Array(Vec<Yaml>),
+///   Sequence(Vec<Yaml>),
 ///   Mapping(LinkedHashMap<Yaml, Yaml>),
 ///   // ...
 /// }
@@ -75,12 +75,12 @@ where
     String(Cow<'input, str>),
     /// YAML bool, e.g. `true` or `false`.
     Boolean(bool),
-    /// YAML array, can be accessed as a `Vec`.
-    Array(AnnotatedArray<Node>),
-    /// YAML hash, can be accessed as a `LinkedHashMap`.
+    /// YAML sequence, can be accessed as a `Vec`.
+    Sequence(AnnotatedSequence<Node>),
+    /// YAML mapping, can be accessed as a `LinkedHashMap`.
     ///
     /// Insertion order will match the order of insertion into the map.
-    Mapping(AnnotatedHash<'input, HashKey, Node>),
+    Mapping(AnnotatedMapping<'input, HashKey, Node>),
     /// Alias, not fully supported yet.
     Alias(usize),
     /// YAML null, e.g. `null` or `~`.
@@ -103,8 +103,8 @@ define_yaml_object_impl!(
             + From<Node>
             + for<'b> PartialEq<Node::HashKey<'b>>,
     },
-    mappingtype = AnnotatedHash<'input, HashKey, Node>,
-    arraytype = AnnotatedArray<Node>,
+    mappingtype = AnnotatedMapping<'input, HashKey, Node>,
+    sequencetype = AnnotatedSequence<Node>,
     nodetype = Node
 );
 
@@ -253,11 +253,11 @@ where
     ///
     /// # Panics
     /// This function panics if the index given is out of range (as per [`Index`]). If `self` is a
-    /// [`YamlData::Array`], this is when the index is bigger or equal to the length of the
+    /// [`YamlData::Sequence`], this is when the index is bigger or equal to the length of the
     /// underlying `Vec`. If `self` is a [`YamlData::Mapping`], this is when the mapping sequence
     /// does not contain [`YamlData::Integer`]`(idx)` as a key.
     ///
-    /// This function also panics if `self` is not a [`YamlData::Array`] nor a
+    /// This function also panics if `self` is not a [`YamlData::Sequence`] nor a
     /// [`YamlData::Mapping`].
     fn index(&self, idx: usize) -> &Node {
         if let Some(sequence) = self.as_vec() {
@@ -290,15 +290,15 @@ where
     ///
     /// # Panics
     /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
-    /// a [`YamlData::Array`], this is when the index is bigger or equal to the length of the
+    /// a [`YamlData::Sequence`], this is when the index is bigger or equal to the length of the
     /// underlying `Vec`. If `self` is a [`YamlData::Mapping`], this is when the mapping sequence
     /// does not contain [`YamlData::Integer`]`(idx)` as a key.
     ///
-    /// This function also panics if `self` is not a [`YamlData::Array`] nor a
+    /// This function also panics if `self` is not a [`YamlData::Sequence`] nor a
     /// [`YamlData::Mapping`].
     fn index_mut(&mut self, idx: usize) -> &mut Node {
         match self {
-            Self::Array(sequence) => sequence
+            Self::Sequence(sequence) => sequence
                 .get_mut(idx)
                 .unwrap_or_else(|| panic!("Index {idx} out of bounds in YamlData sequence")),
             Self::Mapping(mapping) => {
@@ -367,12 +367,12 @@ where
     }
 }
 
-/// The type contained in the [`YamlData::Array`] variant. This corresponds to YAML sequences.
+/// The type contained in the [`YamlData::Sequence`] variant. This corresponds to YAML sequences.
 #[allow(clippy::module_name_repetitions)]
-pub type AnnotatedArray<Node> = Vec<Node>;
+pub type AnnotatedSequence<Node> = Vec<Node>;
 /// The type contained in the [`YamlData::Mapping`] variant. This corresponds to YAML mappings.
 #[allow(clippy::module_name_repetitions)]
-pub type AnnotatedHash<'input, HashKey, Node> = LinkedHashMap<HashKey, Node>;
+pub type AnnotatedMapping<'input, HashKey, Node> = LinkedHashMap<HashKey, Node>;
 
 /// A trait allowing for introspection in the hash types of the [`YamlData::Mapping`] variant.
 ///

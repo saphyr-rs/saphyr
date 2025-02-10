@@ -100,7 +100,7 @@ macro_rules! define_yaml_object_impl (
         < $( $generic:tt ),+ >,
         $( where { $($whereclause:tt)+ }, )?
         mappingtype = $mappingtype:ty,
-        arraytype = $arraytype:ty,
+        sequencetype = $sequencetype:ty,
         nodetype = $nodetype:ty
     ) => (
 impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
@@ -109,18 +109,21 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
 
     define_as_ref!(as_mapping, &$mappingtype, Mapping);
     define_as_ref!(as_str, &str, String);
-    define_as_ref!(as_vec, &$arraytype, Array);
+    define_as_ref!(as_sequence, &$sequencetype, Sequence);
+    define_as_ref!(as_vec, &$sequencetype, Sequence);
 
     define_as_mut_ref!(as_mut_mapping, &mut $mappingtype, Mapping);
-    define_as_mut_ref!(as_mut_vec, &mut $arraytype, Array);
+    define_as_mut_ref!(as_mut_sequence, &mut $sequencetype, Sequence);
+    define_as_mut_ref!(as_mut_vec, &mut $sequencetype, Sequence);
 
     define_into!(into_bool, bool, Boolean);
     define_into!(into_mapping, $mappingtype, Mapping);
     define_into!(into_i64, i64, Integer);
-    define_into!(into_vec, $arraytype, Array);
+    define_into!(into_vec, $sequencetype, Sequence);
+    define_into!(into_sequence, $sequencetype, Sequence);
 
     define_is!(is_alias, Self::Alias(_));
-    define_is!(is_array, Self::Array(_));
+    define_is!(is_sequence, Self::Sequence(_));
     define_is!(is_badvalue, Self::BadValue);
     define_is!(is_boolean, Self::Boolean(_));
     define_is!(is_mapping, Self::Mapping(_));

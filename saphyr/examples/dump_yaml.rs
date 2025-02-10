@@ -11,7 +11,7 @@ fn print_indent(indent: usize) {
 
 fn dump_node(doc: &Yaml, indent: usize) {
     match *doc {
-        Yaml::Array(ref v) => {
+        Yaml::Sequence(ref v) => {
             for x in v {
                 dump_node(x, indent + 1);
             }
