@@ -76,7 +76,7 @@ where
             }
             Event::MappingStart(aid, _) => {
                 self.doc_stack.push((
-                    Node::from_bare_yaml(Yaml::Hash(Hash::new())).with_span(span),
+                    Node::from_bare_yaml(Yaml::Mapping(Hash::new())).with_span(span),
                     aid,
                 ));
                 self.key_stack.push(Node::from_bare_yaml(Yaml::BadValue));
@@ -150,14 +150,14 @@ where
             let parent_node = &mut parent.0;
             if parent_node.is_array() {
                 parent_node.array_mut().push(node.0);
-            } else if parent_node.is_hash() {
+            } else if parent_node.is_mapping() {
                 let cur_key = self.key_stack.last_mut().unwrap();
                 if cur_key.is_badvalue() {
                     // current node is a key
                     *cur_key = node.0;
                 } else {
                     // current node is a value
-                    let hash = parent_node.hash_mut();
+                    let hash = parent_node.mapping_mut();
                     hash.insert(cur_key.take().into(), node.0);
                 }
             }
@@ -241,19 +241,19 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
     ///
     /// Nodes must implement this to be built. The optional metadata that they contain will be
     /// later provided by the loader and can be default initialized. The [`Yaml`] object passed as
-    /// parameter may be of the [`Array`] or [`Hash`] variants. In this event, the inner container
+    /// parameter may be of the [`Array`] or [`Mapping`] variants. In this event, the inner container
     /// will always be empty. There is no need to traverse all elements to convert them from
     /// [`Yaml`] to `Self`.
     ///
     /// [`Array`]: `Yaml::Array`
-    /// [`Hash`]: `Yaml::Hash`
+    /// [`Mapping`]: `Yaml::Mapping`
     fn from_bare_yaml(yaml: Yaml<'input>) -> Self;
 
     /// Return whether the YAML node is an array.
     fn is_array(&self) -> bool;
 
     /// Return whether the YAML node is a hash.
-    fn is_hash(&self) -> bool;
+    fn is_mapping(&self) -> bool;
 
     /// Return whether the YAML node is `BadValue`.
     fn is_badvalue(&self) -> bool;
@@ -268,7 +268,7 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
     ///
     /// # Panics
     /// This function panics if `self` is not a hash.
-    fn hash_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self>;
+    fn mapping_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self>;
 
     /// Take the contained node out of `Self`, leaving a `BadValue` in its place.
     #[must_use]

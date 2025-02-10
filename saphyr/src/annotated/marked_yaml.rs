@@ -104,7 +104,7 @@ impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
                 Yaml::Boolean(x) => YamlData::Boolean(x),
                 // Array and Hash will always have their container empty.
                 Yaml::Array(_) => YamlData::Array(vec![]),
-                Yaml::Hash(_) => YamlData::Hash(LinkedHashMap::new()),
+                Yaml::Mapping(_) => YamlData::Mapping(LinkedHashMap::new()),
                 Yaml::Alias(x) => YamlData::Alias(x),
                 Yaml::Null => YamlData::Null,
                 Yaml::BadValue => YamlData::BadValue,
@@ -116,8 +116,8 @@ impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
         self.data.is_array()
     }
 
-    fn is_hash(&self) -> bool {
-        self.data.is_hash()
+    fn is_mapping(&self) -> bool {
+        self.data.is_mapping()
     }
 
     fn is_badvalue(&self) -> bool {
@@ -130,10 +130,10 @@ impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
             .expect("Called array_mut on a non-array")
     }
 
-    fn hash_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
+    fn mapping_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
         self.data
-            .as_mut_hash()
-            .expect("Called hash_mut on a non-hash")
+            .as_mut_mapping()
+            .expect("Called mapping_mut on a non-hash")
     }
 
     fn take(&mut self) -> Self {

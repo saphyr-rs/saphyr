@@ -41,14 +41,14 @@ use crate::loader::parse_f64;
 ///
 /// This definition is recursive. Each annotated node will be a structure storing the annotations
 /// and the YAML data. We need to have a distinct enumeration from [`Yaml`] because the type for
-/// the `Array` and `Hash` variants is dependant on that structure.
+/// the `Array` and `Mapping` variants is dependant on that structure.
 ///
 /// If we had written [`YamlData`] as:
 /// ```ignore
 /// pub enum YamlData {
 ///   // ...
 ///   Array(Vec<Yaml>),
-///   Hash(LinkedHashMap<Yaml, Yaml>),
+///   Mapping(LinkedHashMap<Yaml, Yaml>),
 ///   // ...
 /// }
 /// ```
@@ -80,7 +80,7 @@ where
     /// YAML hash, can be accessed as a `LinkedHashMap`.
     ///
     /// Insertion order will match the order of insertion into the map.
-    Hash(AnnotatedHash<'input, HashKey, Node>),
+    Mapping(AnnotatedHash<'input, HashKey, Node>),
     /// Alias, not fully supported yet.
     Alias(usize),
     /// YAML null, e.g. `null` or `~`.
@@ -103,7 +103,7 @@ define_yaml_object_impl!(
             + From<Node>
             + for<'b> PartialEq<Node::HashKey<'b>>,
     },
-    hashtype = AnnotatedHash<'input, HashKey, Node>,
+    mappingtype = AnnotatedHash<'input, HashKey, Node>,
     arraytype = AnnotatedArray<Node>,
     nodetype = Node
 );
@@ -125,7 +125,7 @@ where
         use std::hash::Hash;
 
         match self {
-            YamlData::Hash(mapping) => {
+            YamlData::Mapping(mapping) => {
                 let needle = Node::HashKey::<'a>::from(YamlData::String(key.into()));
 
                 // In order to work around `needle`'s lifetime being different from `h`'s, we need
@@ -147,7 +147,7 @@ where
     /// Implementation detail for [`Self::as_mapping_mut_get`], which is generated from a macro.
     #[must_use]
     fn as_mapping_get_mut_impl(&mut self, key: &str) -> Option<&mut Node> {
-        match self.as_mut_hash() {
+        match self.as_mut_mapping() {
             Some(mapping) => {
                 use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
                 use std::hash::Hash;
@@ -193,12 +193,12 @@ where
     /// # Panics
     /// This function panics if the key given does not exist within `self` (as per [`Index`]).
     ///
-    /// This function also panics if `self` is not a [`YamlData::Hash`].
+    /// This function also panics if `self` is not a [`YamlData::Mapping`].
     fn index(&self, idx: &'a str) -> &Node {
         match self.as_mapping_get_impl(idx) {
             Some(value) => value,
             None => {
-                if matches!(self, Self::Hash(_)) {
+                if matches!(self, Self::Mapping(_)) {
                     panic!("Key '{idx}' not found in YamlData mapping")
                 } else {
                     panic!("Attempt to index YamlData with '{idx}' but it's not a mapping")
@@ -223,10 +223,10 @@ where
     /// # Panics
     /// This function panics if the key given does not exist within `self` (as per [`Index`]).
     ///
-    /// This function also panics if `self` is not a [`YamlData::Hash`].
+    /// This function also panics if `self` is not a [`YamlData::Mapping`].
     fn index_mut(&mut self, idx: &'a str) -> &mut Node {
         assert!(
-            matches!(self, Self::Hash(_)),
+            matches!(self, Self::Mapping(_)),
             "Attempt to index YamlData with '{idx}' but it's not a mapping"
         );
         match self.as_mapping_get_mut_impl(idx) {
@@ -254,16 +254,17 @@ where
     /// # Panics
     /// This function panics if the index given is out of range (as per [`Index`]). If `self` is a
     /// [`YamlData::Array`], this is when the index is bigger or equal to the length of the
-    /// underlying `Vec`. If `self` is a [`YamlData::Hash`], this is when the mapping sequence does
-    /// not contain [`YamlData::Integer`]`(idx)` as a key.
+    /// underlying `Vec`. If `self` is a [`YamlData::Mapping`], this is when the mapping sequence
+    /// does not contain [`YamlData::Integer`]`(idx)` as a key.
     ///
-    /// This function also panics if `self` is not a [`YamlData::Array`] nor a [`YamlData::Hash`].
+    /// This function also panics if `self` is not a [`YamlData::Array`] nor a
+    /// [`YamlData::Mapping`].
     fn index(&self, idx: usize) -> &Node {
         if let Some(sequence) = self.as_vec() {
             sequence
                 .get(idx)
                 .unwrap_or_else(|| panic!("Index {idx} out of bounds in YamlData sequence"))
-        } else if let Some(mapping) = self.as_hash() {
+        } else if let Some(mapping) = self.as_mapping() {
             let key = i64::try_from(idx).unwrap_or_else(|_| {
                 panic!("Attempt to index YamlData mapping with overflowing index")
             });
@@ -290,16 +291,17 @@ where
     /// # Panics
     /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
     /// a [`YamlData::Array`], this is when the index is bigger or equal to the length of the
-    /// underlying `Vec`. If `self` is a [`YamlData::Hash`], this is when the mapping sequence does
-    /// not contain [`YamlData::Integer`]`(idx)` as a key.
+    /// underlying `Vec`. If `self` is a [`YamlData::Mapping`], this is when the mapping sequence
+    /// does not contain [`YamlData::Integer`]`(idx)` as a key.
     ///
-    /// This function also panics if `self` is not a [`YamlData::Array`] nor a [`YamlData::Hash`].
+    /// This function also panics if `self` is not a [`YamlData::Array`] nor a
+    /// [`YamlData::Mapping`].
     fn index_mut(&mut self, idx: usize) -> &mut Node {
         match self {
             Self::Array(sequence) => sequence
                 .get_mut(idx)
                 .unwrap_or_else(|| panic!("Index {idx} out of bounds in YamlData sequence")),
-            Self::Hash(mapping) => {
+            Self::Mapping(mapping) => {
                 let key = i64::try_from(idx).unwrap_or_else(|_| {
                     panic!("Attempt to index YamlData mapping with overflowing index")
                 });
@@ -368,11 +370,11 @@ where
 /// The type contained in the [`YamlData::Array`] variant. This corresponds to YAML sequences.
 #[allow(clippy::module_name_repetitions)]
 pub type AnnotatedArray<Node> = Vec<Node>;
-/// The type contained in the [`YamlData::Hash`] variant. This corresponds to YAML mappings.
+/// The type contained in the [`YamlData::Mapping`] variant. This corresponds to YAML mappings.
 #[allow(clippy::module_name_repetitions)]
 pub type AnnotatedHash<'input, HashKey, Node> = LinkedHashMap<HashKey, Node>;
 
-/// A trait allowing for introspection in the hash types of the [`YamlData::Hash`] variant.
+/// A trait allowing for introspection in the hash types of the [`YamlData::Mapping`] variant.
 ///
 /// This trait must be implemented by annotated YAML objects.
 ///
@@ -381,7 +383,7 @@ pub type AnnotatedHash<'input, HashKey, Node> = LinkedHashMap<HashKey, Node>;
 /// [`LoadableYamlNode::HashKey`]: crate::loader::LoadableYamlNode::HashKey
 #[allow(clippy::module_name_repetitions)]
 pub trait AnnotatedNode: std::hash::Hash + std::cmp::Eq {
-    /// The type used as the key in the [`YamlData::Hash`] variant.
+    /// The type used as the key in the [`YamlData::Mapping`] variant.
     type HashKey<'a>: From<YamlData<'a, Self::HashKey<'a>, Self::HashKey<'a>>>
         + for<'b> std::cmp::PartialEq<Self::HashKey<'b>>
         + AnnotatedNode;

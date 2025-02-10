@@ -272,7 +272,7 @@ a:
 }
 
 #[test]
-fn test_nested_hashes() {
+fn test_nested_mappings() {
     let s = r"---
 a:
   b:

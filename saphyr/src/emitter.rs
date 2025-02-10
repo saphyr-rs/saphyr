@@ -213,7 +213,7 @@ impl<'a> YamlEmitter<'a> {
     fn emit_node(&mut self, node: &Yaml) -> EmitResult {
         match *node {
             Yaml::Array(ref v) => self.emit_array(v),
-            Yaml::Hash(ref h) => self.emit_hash(h),
+            Yaml::Mapping(ref h) => self.emit_mapping(h),
             Yaml::String(ref v) => {
                 if self.multiline_strings
                     && v.contains('\n')
@@ -290,13 +290,13 @@ impl<'a> YamlEmitter<'a> {
         Ok(())
     }
 
-    fn emit_hash(&mut self, h: &Hash) -> EmitResult {
+    fn emit_mapping(&mut self, h: &Hash) -> EmitResult {
         if h.is_empty() {
             self.writer.write_str("{}")?;
         } else {
             self.level += 1;
             for (cnt, (k, v)) in h.iter().enumerate() {
-                let complex_key = matches!(k, Yaml::Hash(_) | Yaml::Array(_));
+                let complex_key = matches!(k, Yaml::Mapping(_) | Yaml::Array(_));
                 if cnt > 0 {
                     writeln!(self.writer)?;
                     self.write_indent()?;
@@ -336,7 +336,7 @@ impl<'a> YamlEmitter<'a> {
                 }
                 self.emit_array(v)
             }
-            Yaml::Hash(ref h) => {
+            Yaml::Mapping(ref h) => {
                 if (inline && self.compact) || h.is_empty() {
                     write!(self.writer, " ")?;
                 } else {
@@ -345,7 +345,7 @@ impl<'a> YamlEmitter<'a> {
                     self.write_indent()?;
                     self.level -= 1;
                 }
-                self.emit_hash(h)
+                self.emit_mapping(h)
             }
             _ => {
                 write!(self.writer, " ")?;

@@ -197,7 +197,7 @@ fn test_plain_datatype_with_into_methods() {
 }
 
 #[test]
-fn test_hash_order() {
+fn test_mapping_order() {
     let s = "---
 b: ~
 a: ~
@@ -205,7 +205,7 @@ c: ~
 ";
     let out = Yaml::load_from_str(s).unwrap();
     let first = out.into_iter().next().unwrap();
-    let mut iter = first.into_hash().unwrap().into_iter();
+    let mut iter = first.into_mapping().unwrap().into_iter();
     assert_eq!(Some((Yaml::String("b".into()), Yaml::Null)), iter.next());
     assert_eq!(Some((Yaml::String("a".into()), Yaml::Null)), iter.next());
     assert_eq!(Some((Yaml::String("c".into()), Yaml::Null)), iter.next());

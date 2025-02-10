@@ -87,7 +87,7 @@ pub fn $fn_name(&self) -> bool {
 /// Generate common methods for all YAML objects ([`Yaml`], [`YamlData`]).
 ///
 /// The generated methods are:
-///  - `as_*` access methods (including ref / ref mut versions for hash, vec and string)
+///  - `as_*` access methods (including ref / ref mut versions for mappings, vec and string)
 ///  - `into_*` conversion methods
 ///  - `is_*` introspection methods
 ///  - `or` and `borrowed_or` methods
@@ -99,7 +99,7 @@ macro_rules! define_yaml_object_impl (
         $yaml:ty,
         < $( $generic:tt ),+ >,
         $( where { $($whereclause:tt)+ }, )?
-        hashtype = $hashtype:ty,
+        mappingtype = $mappingtype:ty,
         arraytype = $arraytype:ty,
         nodetype = $nodetype:ty
     ) => (
@@ -107,15 +107,15 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     define_as!(as_bool, bool, Boolean);
     define_as!(as_i64, i64, Integer);
 
-    define_as_ref!(as_hash, &$hashtype, Hash);
+    define_as_ref!(as_mapping, &$mappingtype, Mapping);
     define_as_ref!(as_str, &str, String);
     define_as_ref!(as_vec, &$arraytype, Array);
 
-    define_as_mut_ref!(as_mut_hash, &mut $hashtype, Hash);
+    define_as_mut_ref!(as_mut_mapping, &mut $mappingtype, Mapping);
     define_as_mut_ref!(as_mut_vec, &mut $arraytype, Array);
 
     define_into!(into_bool, bool, Boolean);
-    define_into!(into_hash, $hashtype, Hash);
+    define_into!(into_mapping, $mappingtype, Mapping);
     define_into!(into_i64, i64, Integer);
     define_into!(into_vec, $arraytype, Array);
 
@@ -123,7 +123,7 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     define_is!(is_array, Self::Array(_));
     define_is!(is_badvalue, Self::BadValue);
     define_is!(is_boolean, Self::Boolean(_));
-    define_is!(is_hash, Self::Hash(_));
+    define_is!(is_mapping, Self::Mapping(_));
     define_is!(is_integer, Self::Integer(_));
     define_is!(is_null, Self::Null);
     define_is!(is_real, Self::Real(_));
@@ -193,30 +193,30 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
         }
     }
 
-    /// Check whether `self` is a [`Self::Hash`] and that it contains the given key.
+    /// Check whether `self` is a [`Self::Mapping`] and that it contains the given key.
     ///
     /// This is equivalent to:
     /// ```ignore
-    /// matches!(self, Self::Hash(ref x) if x.contains_key(&Yaml::<'_>::String(key.into())))
+    /// matches!(self, Self::Mapping(ref x) if x.contains_key(&Yaml::<'_>::String(key.into())))
     /// ```
     ///
     /// # Return
-    /// If the variant of `self` is `Self::Hash` and the mapping contains the key, returns `true`.
+    /// If the variant of `self` is `Self::Mapping` and the mapping contains the key, returns `true`.
     /// Otherwise, returns `false`.
     #[must_use]
     pub fn contains_mapping_key(&self, key: &str) -> bool {
         self.as_mapping_get_impl(key).is_some()
     }
 
-    /// Return the value associated to the given key if `self` is a [`Self::Hash`].
+    /// Return the value associated to the given key if `self` is a [`Self::Mapping`].
     ///
     /// This is equivalent to:
     /// ```ignore
-    /// self.as_hash().flat_map(|mapping| mapping.get(key))
+    /// self.as_mapping().flat_map(|mapping| mapping.get(key))
     /// ```
     ///
     /// # Return
-    /// If the variant of `self` is `Self::Hash` and the mapping contains the key, returns the
+    /// If the variant of `self` is `Self::Mapping` and the mapping contains the key, returns the
     /// value associated with it.
     /// Otherwise, returns `None`.
     #[must_use]
@@ -224,15 +224,15 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
         self.as_mapping_get_impl(key)
     }
 
-    /// Return the value associated to the given key if `self` is a [`Self::Hash`].
+    /// Return the value associated to the given key if `self` is a [`Self::Mapping`].
     ///
     /// This is equivalent to:
     /// ```ignore
-    /// self.as_hash_mut().flat_map(|mapping| mapping.get_mut(key))
+    /// self.as_mapping_mut().flat_map(|mapping| mapping.get_mut(key))
     /// ```
     ///
     /// # Return
-    /// If the variant of `self` is `Self::Hash` and the mapping contains the key, returns the
+    /// If the variant of `self` is `Self::Mapping` and the mapping contains the key, returns the
     /// value associated with it.
     /// Otherwise, returns `None`.
     #[must_use]

@@ -108,13 +108,13 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
         };
 
         // Test fields except `fail` are "inherited"
-        let test_data = test_data.as_hash().unwrap();
+        let test_data = test_data.as_mapping().unwrap();
         current_test.remove(&Yaml::String("fail".into()));
         for (key, value) in test_data.clone() {
             current_test.insert(key, value);
         }
 
-        let current_test = Yaml::Hash(current_test.clone()); // Much better indexing
+        let current_test = Yaml::Mapping(current_test.clone()); // Much better indexing
 
         if current_test.contains_mapping_key("skip") {
             continue;

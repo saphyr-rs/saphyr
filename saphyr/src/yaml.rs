@@ -43,10 +43,10 @@ pub enum Yaml<'input> {
     Boolean(bool),
     /// YAML array, can be accessed as a `Vec`.
     Array(Array<'input>),
-    /// YAML hash, can be accessed as a `LinkedHashMap`.
+    /// YAML mapping, can be accessed as a `LinkedHashMap`.
     ///
     /// Insertion order will match the order of insertion into the map.
-    Hash(Hash<'input>),
+    Mapping(Hash<'input>),
     /// Alias, not fully supported yet.
     Alias(usize),
     /// YAML null, e.g. `null` or `~`.
@@ -59,14 +59,14 @@ pub enum Yaml<'input> {
 
 /// The type contained in the `Yaml::Array` variant. This corresponds to YAML sequences.
 pub type Array<'input> = Vec<Yaml<'input>>;
-/// The type contained in the `Yaml::Hash` variant. This corresponds to YAML mappings.
+/// The type contained in the `Yaml::Mapping` variant. This corresponds to YAML mappings.
 pub type Hash<'input> = LinkedHashMap<Yaml<'input>, Yaml<'input>>;
 
 // This defines most common operations on a YAML object. See macro definition for details.
 define_yaml_object_impl!(
     Yaml<'input>,
     <'input>,
-    hashtype = Hash<'input>,
+    mappingtype = Hash<'input>,
     arraytype = Array<'input>,
     nodetype = Self
 );
@@ -134,7 +134,7 @@ impl<'input> Yaml<'input> {
     /// Implementation detail for [`Self::as_mapping_get`], which is generated from a macro.
     #[must_use]
     fn as_mapping_get_impl(&self, key: &str) -> Option<&Self> {
-        match self.as_hash() {
+        match self.as_mapping() {
             Some(mapping) => {
                 let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
                 mapping
@@ -150,7 +150,7 @@ impl<'input> Yaml<'input> {
     #[must_use]
     fn as_mapping_get_mut_impl(&mut self, key: &str) -> Option<&mut Self> {
         use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
-        match self.as_mut_hash() {
+        match self.as_mut_mapping() {
             Some(mapping) => {
                 let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
                 match mapping
@@ -234,8 +234,8 @@ impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
         self.is_array()
     }
 
-    fn is_hash(&self) -> bool {
-        self.is_hash()
+    fn is_mapping(&self) -> bool {
+        self.is_mapping()
     }
 
     fn is_badvalue(&self) -> bool {
@@ -246,8 +246,9 @@ impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
         self.as_mut_vec().expect("Called array_mut on a non-array")
     }
 
-    fn hash_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
-        self.as_mut_hash().expect("Called hash_mut on a non-hash")
+    fn mapping_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
+        self.as_mut_mapping()
+            .expect("Called mapping_mut on a non-hash")
     }
 
     fn take(&mut self) -> Self {
@@ -268,12 +269,12 @@ where
     /// # Panics
     /// This function panics if the key given does not exist within `self` (as per [`Index`]).
     ///
-    /// This function also panics if `self` is not a [`Yaml::Hash`].
+    /// This function also panics if `self` is not a [`Yaml::Mapping`].
     fn index(&self, idx: &'a str) -> &Self::Output {
         match self.as_mapping_get_impl(idx) {
             Some(value) => value,
             None => {
-                if matches!(self, Self::Hash(_)) {
+                if matches!(self, Self::Mapping(_)) {
                     panic!("Key '{idx}' not found in YAML mapping")
                 } else {
                     panic!("Attempt to index YAML with '{idx}' but it's not a mapping")
@@ -292,10 +293,10 @@ where
     /// # Panics
     /// This function panics if the key given does not exist within `self` (as per [`Index`]).
     ///
-    /// This function also panics if `self` is not a [`Yaml::Hash`].
+    /// This function also panics if `self` is not a [`Yaml::Mapping`].
     fn index_mut(&mut self, idx: &'a str) -> &mut Yaml<'input> {
         assert!(
-            matches!(self, Self::Hash(_)),
+            matches!(self, Self::Mapping(_)),
             "Attempt to index YAML with '{idx}' but it's not a mapping"
         );
         match self.as_mapping_get_mut_impl(idx) {
@@ -318,16 +319,16 @@ where
     /// # Panics
     /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
     /// a [`Yaml::Array`], this is when the index is bigger or equal to the length of the
-    /// underlying `Vec`. If `self` is a [`Yaml::Hash`], this is when the mapping sequence does not
-    /// contain [`Yaml::Integer`]`(idx)` as a key.
+    /// underlying `Vec`. If `self` is a [`Yaml::Mapping`], this is when the mapping sequence does
+    /// not contain [`Yaml::Integer`]`(idx)` as a key.
     ///
-    /// This function also panics if `self` is not a [`Yaml::Array`] nor a [`Yaml::Hash`].
+    /// This function also panics if `self` is not a [`Yaml::Array`] nor a [`Yaml::Mapping`].
     fn index(&self, idx: usize) -> &Self::Output {
         match self {
             Yaml::Array(sequence) => sequence
                 .get(idx)
                 .unwrap_or_else(|| panic!("Index {idx} out of bounds in YAML sequence")),
-            Yaml::Hash(mapping) => {
+            Yaml::Mapping(mapping) => {
                 let idx = i64::try_from(idx).unwrap_or_else(|_| {
                     panic!("Attempt to index YAML sequence with overflowing index")
                 });
@@ -350,16 +351,16 @@ impl<'input> IndexMut<usize> for Yaml<'input> {
     /// # Panics
     /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
     /// a [`Yaml::Array`], this is when the index is bigger or equal to the length of the
-    /// underlying `Vec`. If `self` is a [`Yaml::Hash`], this is when the mapping sequence does not
-    /// contain [`Yaml::Integer`]`(idx)` as a key.
+    /// underlying `Vec`. If `self` is a [`Yaml::Mapping`], this is when the mapping sequence does
+    /// not contain [`Yaml::Integer`]`(idx)` as a key.
     ///
-    /// This function also panics if `self` is not a [`Yaml::Array`] nor a [`Yaml::Hash`].
+    /// This function also panics if `self` is not a [`Yaml::Array`] nor a [`Yaml::Mapping`].
     fn index_mut(&mut self, idx: usize) -> &mut Yaml<'input> {
         match self {
             Yaml::Array(sequence) => sequence
                 .get_mut(idx)
                 .unwrap_or_else(|| panic!("Index {idx} out of bounds in YAML sequence")),
-            Yaml::Hash(mapping) => {
+            Yaml::Mapping(mapping) => {
                 let idx = i64::try_from(idx).unwrap_or_else(|_| {
                     panic!("Attempt to index YAML sequence with overflowing index")
                 });

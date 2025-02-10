@@ -16,7 +16,7 @@ fn dump_node(doc: &Yaml, indent: usize) {
                 dump_node(x, indent + 1);
             }
         }
-        Yaml::Hash(ref h) => {
+        Yaml::Mapping(ref h) => {
             for (k, v) in h {
                 print_indent(indent);
                 println!("{k:?}:");

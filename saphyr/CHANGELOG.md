@@ -8,6 +8,7 @@
 - All indexing traits now panic if the key is not found or the YAML variant is
   incorrect. This helps in making the behavior of `[]` more consistent across
   all operations.
+- Use `Mapping` instead of `Hash` to refer to YAML mappings.
 
 **Features**:
 - Add the following convenience methods to the YAML objects:

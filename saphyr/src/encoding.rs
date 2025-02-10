@@ -213,10 +213,7 @@ c: [1, 2]
         assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
         assert!((doc["b"].as_f64().unwrap() - 2.2f64).abs() <= f64::EPSILON);
         assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
-        assert!(!doc
-            .as_hash()
-            .unwrap()
-            .contains_key(&Yaml::String("d".into())));
+        assert!(!doc.contains_mapping_key("d"));
     }
 
     #[test]
@@ -233,10 +230,7 @@ c: [1, 2]
         assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
         assert!((doc["b"].as_f64().unwrap() - 2.2f64) <= f64::EPSILON);
         assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
-        assert!(!doc
-            .as_hash()
-            .unwrap()
-            .contains_key(&Yaml::String("d".into())));
+        assert!(!doc.contains_mapping_key("d"));
     }
 
     #[test]

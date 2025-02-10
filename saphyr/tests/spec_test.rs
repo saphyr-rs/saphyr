@@ -13,12 +13,12 @@ fn test_mapvec_legal() {
     let val = vec![Yaml::Integer(4), Yaml::Integer(5), Yaml::Integer(6)];
 
     let mut hash = Hash::new();
-    hash.insert(Yaml::Hash(keyhash), Yaml::Array(val));
+    hash.insert(Yaml::Mapping(keyhash), Yaml::Array(val));
 
     let mut out_str = String::new();
     {
         let mut emitter = YamlEmitter::new(&mut out_str);
-        emitter.dump(&Yaml::Hash(hash)).unwrap();
+        emitter.dump(&Yaml::Mapping(hash)).unwrap();
     }
 
     // At this point, we are tempted to naively render like this:
