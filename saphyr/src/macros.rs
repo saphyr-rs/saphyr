@@ -1,4 +1,7 @@
-/// Generate `as_TYPE` methods for the [`crate::Yaml`] enum.
+/// Generate `as_TYPE` methods for YAML objects ([`Yaml`], [`YamlData`]).
+///
+/// [`Yaml`]: crate::Yaml
+/// [`YamlData`]: crate::YamlData
 macro_rules! define_as (
     ($fn_name:ident, $t:ident, $variant:ident) => (
 /// Get a copy of the inner object in the YAML enum if it is a `$t`.
@@ -9,14 +12,17 @@ macro_rules! define_as (
 #[must_use]
 pub fn $fn_name(&self) -> Option<$t> {
     match *self {
-        Self::$variant(v) => Some(v),
+        Self::$variant(v) => Some(v.into()),
         _ => None
     }
 }
     );
 );
 
-/// Generate `as_TYPE` methods for the [`crate::Yaml`] enum, returning references.
+/// Generate `as_TYPE` methods for YAML objects ([`Yaml`], [`YamlData`]), returning references.
+///
+/// [`Yaml`]: crate::Yaml
+/// [`YamlData`]: crate::YamlData
 macro_rules! define_as_ref (
     ($fn_name:ident, $t:ty, $variant:ident) => (
 /// Get a reference to the inner object in the YAML enum if it is a `$t`.
@@ -34,7 +40,11 @@ pub fn $fn_name(&self) -> Option<$t> {
     );
 );
 
-/// Generate `as_TYPE` methods for the [`crate::Yaml`] enum, returning mutable references.
+/// Generate `as_TYPE` methods for YAML objects ([`Yaml`], [`YamlData`]), returning mutable
+/// references.
+///
+/// [`Yaml`]: crate::Yaml
+/// [`YamlData`]: crate::YamlData
 macro_rules! define_as_mut_ref (
     ($fn_name:ident, $t:ty, $variant:ident) => (
 /// Get a mutable reference to the inner object in the YAML enum if it is a `$t`.
@@ -52,7 +62,10 @@ pub fn $fn_name(&mut self) -> Option<$t> {
     );
 );
 
-/// Generate `into_TYPE` methods for the [`crate::Yaml`] enum.
+/// Generate `into_TYPE` methods for YAML objects ([`Yaml`], [`YamlData`]).
+///
+/// [`Yaml`]: crate::Yaml
+/// [`YamlData`]: crate::YamlData
 macro_rules! define_into (
     ($fn_name:ident, $t:ty, $variant:ident) => (
 /// Get the inner object in the YAML enum if it is a `$t`.
@@ -63,14 +76,17 @@ macro_rules! define_into (
 #[must_use]
 pub fn $fn_name(self) -> Option<$t> {
     match self {
-        Self::$variant(v) => Some(v),
+        Self::$variant(v) => Some(v.into()),
         _ => None
     }
 }
     );
 );
 
-/// Generate `is_TYPE` methods for the [`crate::Yaml`] enum.
+/// Generate `is_TYPE` methods for YAML objects ([`Yaml`], [`YamlData`]).
+///
+/// [`Yaml`]: crate::Yaml
+/// [`YamlData`]: crate::YamlData
 macro_rules! define_is (
     ($fn_name:ident, $variant:pat) => (
 /// Check whether the YAML enum contains the given variant.
@@ -84,6 +100,37 @@ pub fn $fn_name(&self) -> bool {
     );
 );
 
+/// Generate common conversion methods for scalar variants of YAML enums.
+///
+/// This is used by [`Scalar`].
+///
+/// [`Scalar`]: crate::Scalar
+macro_rules! define_yaml_scalar_conversion_ops (
+    () => (
+define_is!(is_null, Self::Null);
+define_is!(is_boolean, Self::Boolean(_));
+define_is!(is_integer, Self::Integer(_));
+define_is!(is_floating_point, Self::FloatingPoint(_));
+define_is!(is_string, Self::String(_));
+
+define_as!(as_bool, bool, Boolean);
+define_as!(as_i64, i64, Integer);
+define_as!(as_f64, f64, FloatingPoint);
+
+define_as_ref!(as_str, &str, String);
+
+define_as_mut_ref!(as_mut_bool, &mut bool, Boolean);
+define_as_mut_ref!(as_mut_i64, &mut i64, Integer);
+define_as_mut_ref!(as_mut_f64, &mut f64, FloatingPoint);
+define_as_mut_ref!(as_mut_cow_str, &mut Cow<'input, str>, String);
+
+define_into!(into_boolean, bool, Boolean);
+define_into!(into_i64, i64, Integer);
+define_into!(into_f64, f64, FloatingPoint);
+define_into!(into_string, String, String);
+    );
+);
+
 /// Generate common methods for all YAML objects ([`Yaml`], [`YamlData`]).
 ///
 /// The generated methods are:
@@ -94,6 +141,7 @@ pub fn $fn_name(&self) -> bool {
 ///
 /// [`Yaml`]: crate::Yaml
 /// [`YamlData`]: crate::YamlData
+// TODO(ethiraric, 10/02/2025): Use `define_yaml_scalar_conversion_ops`.
 macro_rules! define_yaml_object_impl (
     (
         $yaml:ty,

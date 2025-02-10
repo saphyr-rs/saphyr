@@ -49,6 +49,7 @@ mod annotated;
 mod char_traits;
 mod emitter;
 mod loader;
+mod scalar;
 mod yaml;
 
 // Re-export main components.
@@ -58,6 +59,7 @@ pub use crate::annotated::{
 };
 pub use crate::emitter::YamlEmitter;
 pub use crate::loader::{LoadableYamlNode, YamlLoader};
+pub use crate::scalar::Scalar;
 pub use crate::yaml::{Mapping, Sequence, Yaml, YamlIter};
 
 #[cfg(feature = "encoding")]
