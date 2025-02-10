@@ -144,7 +144,7 @@ pub struct Parser<'input, T: Input> {
     tags: HashMap<String, String>,
     /// Whether we have emitted [`Event::StreamEnd`].
     ///
-    /// Emitted means that it has been returned from [`Self::next_token`]. If it is stored in
+    /// Emitted means that it has been returned from [`Self::next`]. If it is stored in
     /// [`Self::token`], this is set to `false`.
     stream_end_emitted: bool,
     /// Make tags global across all documents.

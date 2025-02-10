@@ -144,7 +144,7 @@ where
         }
     }
 
-    /// Implementation detail for [`Self::as_mapping_mut_get`], which is generated from a macro.
+    /// Implementation detail for [`Self::as_mapping_get_mut`], which is generated from a macro.
     #[must_use]
     fn as_mapping_get_mut_impl(&mut self, key: &str) -> Option<&mut Node> {
         match self.as_mut_mapping() {
