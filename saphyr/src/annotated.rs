@@ -111,6 +111,13 @@ where
         + From<Node>
         + for<'b> PartialEq<Node::HashKey<'b>>,
 {
+    /// Take the contained node out of `Self`, leaving a `BadValue` in its place.
+    #[must_use]
+    pub fn take(&mut self) -> Self {
+        let mut taken_out = Self::BadValue;
+        std::mem::swap(self, &mut taken_out);
+        taken_out
+    }
     /// Implementation detail for [`Self::as_mapping_get`], which is generated from a macro.
     fn as_mapping_get_impl<'a>(&self, key: &'a str) -> Option<&Node>
     where

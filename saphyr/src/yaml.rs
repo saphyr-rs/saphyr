@@ -65,6 +65,29 @@ define_yaml_object_impl!(
 );
 
 impl<'input> Yaml<'input> {
+    /// If `self` is of the [`Self::Representation`] variant, parse it to the value.
+    ///
+    /// # Return
+    /// Returns `true` if `self` is successfully parsed, `false` otherwise. If `self` was
+    /// [`Self::Value`], [`Self::Sequence`], [`Self::Mapping`] or [`Self::Alias`] upon calling,
+    /// this function does nothing and returns `true`.
+    pub fn parse_representation_bleh(&mut self) -> bool {
+        match self.take() {
+            Self::Representation(value, style, tag) => {
+                if let Some(scalar) =
+                    Scalar::parse_from_cow_and_metadata(value, style, tag.as_ref())
+                {
+                    *self = Self::Value(scalar);
+                    true
+                } else {
+                    *self = Self::BadValue;
+                    false
+                }
+            }
+            _ => true,
+        }
+    }
+
     /// Load the given string as an array of YAML documents.
     ///
     /// The `source` is interpreted as YAML documents and is parsed. Parsing succeeds if and only
@@ -124,42 +147,6 @@ impl<'input> Yaml<'input> {
         Ok(loader.into_documents())
     }
 
-    /// Implementation detail for [`Self::as_mapping_get`], which is generated from a macro.
-    #[must_use]
-    fn as_mapping_get_impl(&self, key: &str) -> Option<&Self> {
-        match self.as_mapping() {
-            Some(mapping) => {
-                let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
-                mapping
-                    .raw_entry()
-                    .from_hash(hash, |k| k.as_str().is_some_and(|s| s == key))
-                    .map(|(_, v)| v)
-            }
-            _ => None,
-        }
-    }
-
-    /// Implementation detail for [`Self::as_mapping_get_mut`], which is generated from a macro.
-    #[must_use]
-    fn as_mapping_get_mut_impl(&mut self, key: &str) -> Option<&mut Self> {
-        use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
-        match self.as_mapping_mut() {
-            Some(mapping) => {
-                let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
-                match mapping
-                    .raw_entry_mut()
-                    .from_hash(hash, |k| k.as_str().is_some_and(|s| s == key))
-                {
-                    Occupied(entry) => Some(entry.into_mut()),
-                    Vacant(_) => None,
-                }
-            }
-            _ => None,
-        }
-    }
-}
-
-impl<'input> Yaml<'input> {
     /// Convert a string to a [`Yaml`] scalar node.
     ///
     /// [`Yaml`] does not implement [`std::str::FromStr`] since the trait requires that conversion
@@ -213,6 +200,40 @@ impl<'input> Yaml<'input> {
         tag: Option<&Tag>,
     ) -> Self {
         Scalar::parse_from_cow_and_metadata(v, style, tag).map_or(Yaml::BadValue, Yaml::Value)
+    }
+
+    /// Implementation detail for [`Self::as_mapping_get`], which is generated from a macro.
+    #[must_use]
+    fn as_mapping_get_impl(&self, key: &str) -> Option<&Self> {
+        match self.as_mapping() {
+            Some(mapping) => {
+                let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
+                mapping
+                    .raw_entry()
+                    .from_hash(hash, |k| k.as_str().is_some_and(|s| s == key))
+                    .map(|(_, v)| v)
+            }
+            _ => None,
+        }
+    }
+
+    /// Implementation detail for [`Self::as_mapping_get_mut`], which is generated from a macro.
+    #[must_use]
+    fn as_mapping_get_mut_impl(&mut self, key: &str) -> Option<&mut Self> {
+        use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
+        match self.as_mapping_mut() {
+            Some(mapping) => {
+                let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
+                match mapping
+                    .raw_entry_mut()
+                    .from_hash(hash, |k| k.as_str().is_some_and(|s| s == key))
+                {
+                    Occupied(entry) => Some(entry.into_mut()),
+                    Vacant(_) => None,
+                }
+            }
+            _ => None,
+        }
     }
 }
 

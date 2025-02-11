@@ -100,6 +100,29 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     define_is!(is_mapping,        Self::Mapping(_));
     define_is!(is_alias,          Self::Alias(_));
 
+    /// If `self` is of the [`Self::Representation`] variant, parse it to the value.
+    ///
+    /// # Return
+    /// Returns `true` if `self` is successfully parsed, `false` otherwise. If `self` was
+    /// [`Self::Value`], [`Self::Sequence`], [`Self::Mapping`] or [`Self::Alias`] upon calling,
+    /// this function does nothing and returns `true`.
+    pub fn parse_representation(&mut self) -> bool {
+        match self.take() {
+            Self::Representation(value, style, tag) => {
+                if let Some(scalar) =
+                    Scalar::parse_from_cow_and_metadata(value, style, tag.as_ref())
+                {
+                    *self = Self::Value(scalar);
+                    true
+                } else {
+                    *self = Self::BadValue;
+                    false
+                }
+            }
+            _ => true,
+        }
+    }
+
     /// If a value is null or otherwise bad (see variants), consume it and
     /// replace it with a given value `other`. Otherwise, return self unchanged.
     ///
