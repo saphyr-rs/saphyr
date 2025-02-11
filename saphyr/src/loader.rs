@@ -31,170 +31,6 @@ where
     early_parse: bool,
 }
 
-// For some reason, rustc wants `Node: Default` if I `#[derive(Default)]`.
-impl<'input, Node> Default for YamlLoader<'input, Node>
-where
-    Node: LoadableYamlNode<'input>,
-{
-    fn default() -> Self {
-        Self {
-            docs: vec![],
-            doc_stack: vec![],
-            key_stack: vec![],
-            anchor_map: BTreeMap::new(),
-            marker: PhantomData,
-            early_parse: true,
-        }
-    }
-}
-
-impl<'input, Node> SpannedEventReceiver<'input> for YamlLoader<'input, Node>
-where
-    Node: LoadableYamlNode<'input>,
-{
-    fn on_event(&mut self, ev: Event<'input>, span: Span) {
-        match ev {
-            Event::DocumentStart(_) | Event::Nothing | Event::StreamStart | Event::StreamEnd => {
-                // do nothing
-            }
-            Event::DocumentEnd => {
-                match self.doc_stack.len() {
-                    // empty document
-                    0 => self
-                        .docs
-                        .push(Node::from_bare_yaml(Yaml::BadValue).with_span(span)),
-                    1 => self.docs.push(self.doc_stack.pop().unwrap().0),
-                    _ => unreachable!(),
-                }
-            }
-            Event::SequenceStart(aid, _) => {
-                self.doc_stack.push((
-                    Node::from_bare_yaml(Yaml::Sequence(Vec::new())).with_span(span),
-                    aid,
-                ));
-            }
-            Event::SequenceEnd => {
-                let node = self.doc_stack.pop().unwrap();
-                self.insert_new_node(node);
-            }
-            Event::MappingStart(aid, _) => {
-                self.doc_stack.push((
-                    Node::from_bare_yaml(Yaml::Mapping(Mapping::new())).with_span(span),
-                    aid,
-                ));
-                self.key_stack.push(Node::from_bare_yaml(Yaml::BadValue));
-            }
-            Event::MappingEnd => {
-                self.key_stack.pop().unwrap();
-                let node = self.doc_stack.pop().unwrap();
-                self.insert_new_node(node);
-            }
-            Event::Scalar(v, style, aid, tag) => {
-                let node = if self.early_parse {
-                    Yaml::value_from_cow_and_metadata(v, style, tag.as_ref())
-                } else {
-                    Yaml::Representation(v, style, tag)
-                };
-                self.insert_new_node((Node::from_bare_yaml(node).with_span(span), aid));
-            }
-            Event::Alias(id) => {
-                let n = match self.anchor_map.get(&id) {
-                    Some(v) => v.clone(),
-                    None => Node::from_bare_yaml(Yaml::BadValue),
-                };
-                self.insert_new_node((n.with_span(span), 0));
-            }
-        }
-    }
-}
-
-impl<'input, Node> YamlLoader<'input, Node>
-where
-    Node: LoadableYamlNode<'input>,
-{
-    /// Whether to parse scalars into their value while loading a YAML.
-    ///
-    /// If set to `true` (default), the loader will attempt to parse scalars into [`Scalar`]s. The
-    /// loaded [`Yaml`] nodes will use the [`Value`] variant.
-    /// If set to `false`, the loader will skip scalar parsing and only store the string
-    /// representation in [`Representation`].
-    ///
-    /// [`Value`]: Yaml::Value
-    /// [`Representation`]: Yaml::Representation
-    /// [`Scalar`]: crate::Scalar
-    pub fn early_parse(&mut self, enabled: bool) {
-        self.early_parse = enabled;
-    }
-
-    /// Return the document nodes from `self`, consuming it in the process.
-    #[must_use]
-    pub fn into_documents(self) -> Vec<Node> {
-        self.docs
-    }
-
-    fn insert_new_node(&mut self, node: (Node, usize)) {
-        // valid anchor id starts from 1
-        if node.1 > 0 {
-            self.anchor_map.insert(node.1, node.0.clone());
-        }
-        if let Some(parent) = self.doc_stack.last_mut() {
-            let parent_node = &mut parent.0;
-            if parent_node.is_sequence() {
-                parent_node.sequence_mut().push(node.0);
-            } else if parent_node.is_mapping() {
-                let cur_key = self.key_stack.last_mut().unwrap();
-                if cur_key.is_badvalue() {
-                    // current node is a key
-                    *cur_key = node.0;
-                } else {
-                    // current node is a value
-                    let hash = parent_node.mapping_mut();
-                    hash.insert(cur_key.take().into(), node.0);
-                }
-            }
-        } else {
-            self.doc_stack.push(node);
-        }
-    }
-}
-
-/// An error that happened when loading a YAML document.
-#[derive(Debug, Clone)]
-pub enum LoadError {
-    /// An I/O error.
-    IO(Arc<std::io::Error>),
-    /// An error within the scanner. This indicates a malformed YAML input.
-    Scan(ScanError),
-    /// A decoding error (e.g.: Invalid UTF-8).
-    Decode(std::borrow::Cow<'static, str>),
-}
-
-impl From<std::io::Error> for LoadError {
-    fn from(error: std::io::Error) -> Self {
-        LoadError::IO(Arc::new(error))
-    }
-}
-
-impl std::error::Error for LoadError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(match &self {
-            LoadError::IO(e) => e,
-            LoadError::Scan(e) => e,
-            LoadError::Decode(_) => return None,
-        })
-    }
-}
-
-impl std::fmt::Display for LoadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LoadError::IO(e) => e.fmt(f),
-            LoadError::Scan(e) => e.fmt(f),
-            LoadError::Decode(e) => e.fmt(f),
-        }
-    }
-}
-
 /// A trait providing methods used by the [`YamlLoader`].
 ///
 /// This trait must be implemented on YAML node types (i.e.: [`Yaml`] and annotated YAML nodes). It
@@ -264,6 +100,175 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
     #[must_use]
     fn with_span(self, _: Span) -> Self {
         self
+    }
+}
+
+impl<'input, Node> YamlLoader<'input, Node>
+where
+    Node: LoadableYamlNode<'input>,
+{
+    /// Whether to parse scalars into their value while loading a YAML.
+    ///
+    /// If set to `true` (default), the loader will attempt to parse scalars into [`Scalar`]s. The
+    /// loaded [`Yaml`] nodes will use the [`Value`] variant.
+    /// If set to `false`, the loader will skip scalar parsing and only store the string
+    /// representation in [`Representation`].
+    ///
+    /// [`Value`]: Yaml::Value
+    /// [`Representation`]: Yaml::Representation
+    /// [`Scalar`]: crate::Scalar
+    pub fn early_parse(&mut self, enabled: bool) {
+        self.early_parse = enabled;
+    }
+
+    /// Return the document nodes from `self`, consuming it in the process.
+    #[must_use]
+    pub fn into_documents(self) -> Vec<Node> {
+        self.docs
+    }
+}
+
+impl<'input, Node> SpannedEventReceiver<'input> for YamlLoader<'input, Node>
+where
+    Node: LoadableYamlNode<'input>,
+{
+    fn on_event(&mut self, ev: Event<'input>, span: Span) {
+        match ev {
+            Event::DocumentStart(_) | Event::Nothing | Event::StreamStart | Event::StreamEnd => {
+                // do nothing
+            }
+            Event::DocumentEnd => {
+                match self.doc_stack.len() {
+                    // empty document
+                    0 => self
+                        .docs
+                        .push(Node::from_bare_yaml(Yaml::BadValue).with_span(span)),
+                    1 => self.docs.push(self.doc_stack.pop().unwrap().0),
+                    _ => unreachable!(),
+                }
+            }
+            Event::SequenceStart(aid, _) => {
+                self.doc_stack.push((
+                    Node::from_bare_yaml(Yaml::Sequence(Vec::new())).with_span(span),
+                    aid,
+                ));
+            }
+            Event::SequenceEnd => {
+                let node = self.doc_stack.pop().unwrap();
+                self.insert_new_node(node);
+            }
+            Event::MappingStart(aid, _) => {
+                self.doc_stack.push((
+                    Node::from_bare_yaml(Yaml::Mapping(Mapping::new())).with_span(span),
+                    aid,
+                ));
+                self.key_stack.push(Node::from_bare_yaml(Yaml::BadValue));
+            }
+            Event::MappingEnd => {
+                self.key_stack.pop().unwrap();
+                let node = self.doc_stack.pop().unwrap();
+                self.insert_new_node(node);
+            }
+            Event::Scalar(v, style, aid, tag) => {
+                let node = if self.early_parse {
+                    Yaml::value_from_cow_and_metadata(v, style, tag.as_ref())
+                } else {
+                    Yaml::Representation(v, style, tag)
+                };
+                self.insert_new_node((Node::from_bare_yaml(node).with_span(span), aid));
+            }
+            Event::Alias(id) => {
+                let n = match self.anchor_map.get(&id) {
+                    Some(v) => v.clone(),
+                    None => Node::from_bare_yaml(Yaml::BadValue),
+                };
+                self.insert_new_node((n.with_span(span), 0));
+            }
+        }
+    }
+}
+
+impl<'input, Node> YamlLoader<'input, Node>
+where
+    Node: LoadableYamlNode<'input>,
+{
+    fn insert_new_node(&mut self, node: (Node, usize)) {
+        // valid anchor id starts from 1
+        if node.1 > 0 {
+            self.anchor_map.insert(node.1, node.0.clone());
+        }
+        if let Some(parent) = self.doc_stack.last_mut() {
+            let parent_node = &mut parent.0;
+            if parent_node.is_sequence() {
+                parent_node.sequence_mut().push(node.0);
+            } else if parent_node.is_mapping() {
+                let cur_key = self.key_stack.last_mut().unwrap();
+                if cur_key.is_badvalue() {
+                    // current node is a key
+                    *cur_key = node.0;
+                } else {
+                    // current node is a value
+                    let hash = parent_node.mapping_mut();
+                    hash.insert(cur_key.take().into(), node.0);
+                }
+            }
+        } else {
+            self.doc_stack.push(node);
+        }
+    }
+}
+
+// For some reason, rustc wants `Node: Default` if I `#[derive(Default)]`.
+impl<'input, Node> Default for YamlLoader<'input, Node>
+where
+    Node: LoadableYamlNode<'input>,
+{
+    fn default() -> Self {
+        Self {
+            docs: vec![],
+            doc_stack: vec![],
+            key_stack: vec![],
+            anchor_map: BTreeMap::new(),
+            marker: PhantomData,
+            early_parse: true,
+        }
+    }
+}
+
+/// An error that happened when loading a YAML document.
+#[derive(Debug, Clone)]
+pub enum LoadError {
+    /// An I/O error.
+    IO(Arc<std::io::Error>),
+    /// An error within the scanner. This indicates a malformed YAML input.
+    Scan(ScanError),
+    /// A decoding error (e.g.: Invalid UTF-8).
+    Decode(std::borrow::Cow<'static, str>),
+}
+
+impl From<std::io::Error> for LoadError {
+    fn from(error: std::io::Error) -> Self {
+        LoadError::IO(Arc::new(error))
+    }
+}
+
+impl std::error::Error for LoadError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(match &self {
+            LoadError::IO(e) => e,
+            LoadError::Scan(e) => e,
+            LoadError::Decode(_) => return None,
+        })
+    }
+}
+
+impl std::fmt::Display for LoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LoadError::IO(e) => e.fmt(f),
+            LoadError::Scan(e) => e.fmt(f),
+            LoadError::Decode(e) => e.fmt(f),
+        }
     }
 }
 
