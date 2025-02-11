@@ -22,6 +22,9 @@
   - The idea behind this is to allow lazy-parsing of scalar nodes and to give
     more control about key duplication detection in mappings (e.g.: is `{ 0xB:
     ~, 11: ~ }` considered a duplicate because `0xB == 11`?).
+- Rename `from_str` to `value_from_str` to better highlight it:
+  - Doesn't load a YAML document
+  - Doesn't always load into a YAML string
 
 **Features**:
 - Add the following convenience methods to the YAML objects:

@@ -21,7 +21,7 @@ use crate::{LoadableYamlNode, Scalar, YamlLoader};
 ///
 /// ```
 /// use saphyr::{Scalar, Yaml};
-/// let foo = Yaml::from_str("-123"); // convert the string to the appropriate YAML type
+/// let foo = Yaml::value_from_str("-123"); // convert the string to the appropriate YAML type
 /// assert_eq!(foo.as_integer().unwrap(), -123);
 ///
 /// // iterate over an Sequence
@@ -92,7 +92,7 @@ impl<'input> Yaml<'input> {
     /// ```
     ///
     /// # Errors
-    /// Returns `ScanError` when loading fails.
+    /// Returns [`ScanError`] when loading fails.
     pub fn load_from_str(source: &str) -> Result<Vec<Self>, ScanError> {
         Self::load_from_iter(source.chars())
     }
@@ -159,34 +159,45 @@ impl<'input> Yaml<'input> {
     }
 }
 
-#[allow(clippy::should_implement_trait)]
 impl<'input> Yaml<'input> {
-    /// Convert a string to a [`Yaml`] node.
+    /// Convert a string to a [`Yaml`] scalar node.
     ///
     /// [`Yaml`] does not implement [`std::str::FromStr`] since the trait requires that conversion
     /// does not fail. This function attempts to parse the given string as a scalar node, falling
     /// back to a [`Scalar::String`].
     ///
+    /// **Note:** This attempts to resolve the content as a scalar node. This means that `"a: b"`
+    /// gets resolved to `Yaml::Value(Scalar::String("a: b"))` and not a mapping. If you want to
+    /// parse a YAML document, use [`load_from_str`].
+    ///
     /// # Examples
     /// ```
     /// # use saphyr::{Scalar, Yaml};
-    /// assert!(matches!(Yaml::from_str("42"),   Yaml::Value(Scalar::Integer(42))));
-    /// assert!(matches!(Yaml::from_str("0x2A"), Yaml::Value(Scalar::Integer(42))));
-    /// assert!(matches!(Yaml::from_str("0o52"), Yaml::Value(Scalar::Integer(42))));
-    /// assert!(matches!(Yaml::from_str("~"),    Yaml::Value(Scalar::Null)));
-    /// assert!(matches!(Yaml::from_str("null"), Yaml::Value(Scalar::Null)));
-    /// assert!(matches!(Yaml::from_str("true"), Yaml::Value(Scalar::Boolean(true))));
-    /// assert!(matches!(Yaml::from_str("3.14"), Yaml::Value(Scalar::FloatingPoint(_))));
-    /// assert!(matches!(Yaml::from_str("foo"),  Yaml::Value(Scalar::String(_))));
+    /// assert!(matches!(Yaml::value_from_str("42"),   Yaml::Value(Scalar::Integer(42))));
+    /// assert!(matches!(Yaml::value_from_str("0x2A"), Yaml::Value(Scalar::Integer(42))));
+    /// assert!(matches!(Yaml::value_from_str("0o52"), Yaml::Value(Scalar::Integer(42))));
+    /// assert!(matches!(Yaml::value_from_str("~"),    Yaml::Value(Scalar::Null)));
+    /// assert!(matches!(Yaml::value_from_str("null"), Yaml::Value(Scalar::Null)));
+    /// assert!(matches!(Yaml::value_from_str("true"), Yaml::Value(Scalar::Boolean(true))));
+    /// assert!(matches!(Yaml::value_from_str("3.14"), Yaml::Value(Scalar::FloatingPoint(_))));
+    /// assert!(matches!(Yaml::value_from_str("foo"),  Yaml::Value(Scalar::String(_))));
     /// ```
+    ///
+    /// [`load_from_str`]: Self::load_from_str
     #[must_use]
-    pub fn from_str(v: &'input str) -> Self {
-        Self::from_cow(v.into())
+    pub fn value_from_str(v: &'input str) -> Self {
+        Self::value_from_cow(v.into())
     }
 
-    /// Same as [`Self::from_str`] but uses a [`Cow`] instead.
+    /// Same as [`Self::value_from_str`] but uses a [`String`] instead.
     #[must_use]
-    pub fn from_cow(v: Cow<'input, str>) -> Yaml<'input> {
+    pub fn scalar_from_string(v: String) -> Self {
+        Self::value_from_cow(v.into())
+    }
+
+    /// Same as [`Self::value_from_str`] but uses a [`Cow`] instead.
+    #[must_use]
+    pub fn value_from_cow(v: Cow<'input, str>) -> Yaml<'input> {
         Self::Value(Scalar::parse_from_cow(v))
     }
 }

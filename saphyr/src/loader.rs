@@ -1,11 +1,11 @@
 //! The default loader.
 
-use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData, sync::Arc};
+use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 
 use hashlink::LinkedHashMap;
-use saphyr_parser::{Event, ScalarStyle, ScanError, Span, SpannedEventReceiver, Tag};
+use saphyr_parser::{Event, ScanError, Span, SpannedEventReceiver};
 
-use crate::{Mapping, Scalar, Yaml};
+use crate::{Mapping, Yaml};
 
 /// Main structure for parsing YAML.
 ///
@@ -121,6 +121,7 @@ where
     ///
     /// [`Value`]: Yaml::Value
     /// [`Representation`]: Yaml::Representation
+    /// [`Scalar`]: crate::Scalar
     pub fn early_parse(&mut self, enabled: bool) {
         self.early_parse = enabled;
     }
@@ -195,7 +196,7 @@ fn parse_scalar_to_yaml<'a>(v: Cow<'a, str>, style: ScalarStyle, tag: Option<&Ta
         }
     } else {
         // Datatype is not specified, or unrecognized
-        Yaml::from_cow(v)
+        Yaml::scalar_from_cow(v)
     }
 }
 
