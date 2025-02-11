@@ -91,7 +91,7 @@ where
             }
             Event::Scalar(v, style, aid, tag) => {
                 let node = if self.early_parse {
-                    parse_scalar_node(v, style, &tag)
+                    parse_scalar_to_yaml(v, style, tag.as_ref())
                 } else {
                     Yaml::Representation(v, style, tag)
                 };
@@ -162,7 +162,7 @@ where
 /// The variant returned by this function will always be a [`Yaml::Value`], unless the tag forces a
 /// particular type and the representation cannot be parsed as this type, in which case it returns
 /// a [`Yaml::BadValue`].
-fn parse_scalar_node<'a>(v: Cow<'a, str>, style: TScalarStyle, tag: &Option<Tag>) -> Yaml<'a> {
+fn parse_scalar_to_yaml<'a>(v: Cow<'a, str>, style: TScalarStyle, tag: Option<&Tag>) -> Yaml<'a> {
     if style != TScalarStyle::Plain {
         Yaml::Value(Scalar::String(v))
     } else if let Some(Tag {

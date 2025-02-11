@@ -186,7 +186,7 @@ impl<'input> Yaml<'input> {
 
     /// Same as [`Self::from_str`] but uses a [`Cow`] instead.
     #[must_use]
-    pub fn from_cow(v: Cow<'input, str>) -> Yaml {
+    pub fn from_cow(v: Cow<'input, str>) -> Yaml<'input> {
         if let Some(number) = v.strip_prefix("0x") {
             if let Ok(i) = i64::from_str_radix(number, 16) {
                 return Yaml::Value(Scalar::Integer(i));

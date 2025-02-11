@@ -102,7 +102,7 @@ impl Display for Tag {
     }
 }
 
-impl<'input> Event<'input> {
+impl Event<'_> {
     /// Create an empty scalar.
     fn empty_scalar() -> Self {
         // a null scalar

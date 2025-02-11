@@ -232,7 +232,7 @@ where
     }
 }
 
-impl<'input, Node, HashKey> Index<usize> for YamlData<'input, Node, HashKey>
+impl<Node, HashKey> Index<usize> for YamlData<'_, Node, HashKey>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
     HashKey: Eq
@@ -271,7 +271,7 @@ where
     }
 }
 
-impl<'input, Node, HashKey> IndexMut<usize> for YamlData<'input, Node, HashKey>
+impl<Node, HashKey> IndexMut<usize> for YamlData<'_, Node, HashKey>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
     HashKey: Eq

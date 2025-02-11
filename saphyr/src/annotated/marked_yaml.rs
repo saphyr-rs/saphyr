@@ -63,7 +63,7 @@ impl<'input> MarkedYaml<'input> {
     }
 }
 
-impl<'input> super::AnnotatedNode for MarkedYaml<'input> {
+impl super::AnnotatedNode for MarkedYaml<'_> {
     type HashKey<'a> = MarkedYaml<'a>;
 }
 
@@ -76,16 +76,16 @@ impl<'a> From<YamlData<'a, MarkedYaml<'a>, MarkedYaml<'a>>> for MarkedYaml<'a> {
     }
 }
 
-impl<'input, 'b> PartialEq<MarkedYaml<'b>> for MarkedYaml<'input> {
+impl<'b> PartialEq<MarkedYaml<'b>> for MarkedYaml<'_> {
     fn eq(&self, other: &MarkedYaml<'b>) -> bool {
         self.data.eq(&other.data)
     }
 }
 
 // I don't know if it's okay to implement that, but we need it for the hashmap.
-impl<'input> Eq for MarkedYaml<'input> {}
+impl Eq for MarkedYaml<'_> {}
 
-impl<'input> std::hash::Hash for MarkedYaml<'input> {
+impl std::hash::Hash for MarkedYaml<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.data.hash(state);
     }
