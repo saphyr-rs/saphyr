@@ -91,7 +91,7 @@ where
             }
             Event::Scalar(v, style, aid, tag) => {
                 let node = if self.early_parse {
-                    parse_scalar_to_yaml(v, style, tag.as_ref())
+                    Yaml::value_from_cow_and_metadata(v, style, tag.as_ref())
                 } else {
                     Yaml::Representation(v, style, tag)
                 };
@@ -155,48 +155,6 @@ where
         } else {
             self.doc_stack.push(node);
         }
-    }
-}
-
-/// Parse a scalar node representation into its value.
-///
-/// The variant returned by this function will always be a [`Yaml::Value`], unless the tag forces a
-/// particular type and the representation cannot be parsed as this type, in which case it returns
-/// a [`Yaml::BadValue`].
-fn parse_scalar_to_yaml<'a>(v: Cow<'a, str>, style: ScalarStyle, tag: Option<&Tag>) -> Yaml<'a> {
-    if style != ScalarStyle::Plain {
-        Yaml::Value(Scalar::String(v))
-    } else if let Some(Tag {
-        ref handle,
-        ref suffix,
-    }) = tag
-    {
-        if handle == "tag:yaml.org,2002:" {
-            match suffix.as_ref() {
-                "bool" => match v.parse::<bool>() {
-                    Err(_) => Yaml::BadValue,
-                    Ok(v) => Yaml::Value(Scalar::Boolean(v)),
-                },
-                "int" => match v.parse::<i64>() {
-                    Err(_) => Yaml::BadValue,
-                    Ok(v) => Yaml::Value(Scalar::Integer(v)),
-                },
-                "float" => match parse_f64(&v) {
-                    Some(f) => Yaml::Value(Scalar::FloatingPoint(f.into())),
-                    None => Yaml::BadValue,
-                },
-                "null" => match v.as_ref() {
-                    "~" | "null" => Yaml::Value(Scalar::Null),
-                    _ => Yaml::BadValue,
-                },
-                _ => Yaml::Value(Scalar::String(v)),
-            }
-        } else {
-            Yaml::Value(Scalar::String(v))
-        }
-    } else {
-        // Datatype is not specified, or unrecognized
-        Yaml::scalar_from_cow(v)
     }
 }
 

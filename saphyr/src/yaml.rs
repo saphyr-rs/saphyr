@@ -200,6 +200,20 @@ impl<'input> Yaml<'input> {
     pub fn value_from_cow(v: Cow<'input, str>) -> Yaml<'input> {
         Self::Value(Scalar::parse_from_cow(v))
     }
+
+    /// Convert a string to a [`Yaml`] scalar node, abiding by the given metadata.
+    ///
+    /// The variant returned by this function will always be a [`Yaml::Value`], unless the tag
+    /// forces a particular type and the representation cannot be parsed as this type, in which
+    /// case it returns a [`Yaml::BadValue`].
+    #[must_use]
+    pub fn value_from_cow_and_metadata(
+        v: Cow<'input, str>,
+        style: ScalarStyle,
+        tag: Option<&Tag>,
+    ) -> Self {
+        Scalar::parse_from_cow_and_metadata(v, style, tag).map_or(Yaml::BadValue, Yaml::Value)
+    }
 }
 
 impl<'input> LoadableYamlNode<'input> for Yaml<'input> {

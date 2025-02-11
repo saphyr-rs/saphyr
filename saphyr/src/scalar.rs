@@ -41,11 +41,11 @@ impl<'input> Scalar<'input> {
     /// ```
     /// # use saphyr::{Scalar, ScalarStyle, Tag};
     /// assert_eq!(
-    ///     Scalar::parse_from_cow_and_tag("123".into(), ScalarStyle::Plain, None),
+    ///     Scalar::parse_from_cow_and_metadata("123".into(), ScalarStyle::Plain, None),
     ///     Some(Scalar::Integer(123))
     /// );
     /// assert_eq!(
-    ///     Scalar::parse_from_cow_and_tag(
+    ///     Scalar::parse_from_cow_and_metadata(
     ///         "123".into(),
     ///         ScalarStyle::Plain,
     ///         Some(&Tag { handle: "tag:yaml.org,2002:".into(), suffix: "str".into() })
@@ -53,7 +53,7 @@ impl<'input> Scalar<'input> {
     ///     Some(Scalar::String("123".into()))
     /// );
     /// assert_eq!(
-    ///     Scalar::parse_from_cow_and_tag(
+    ///     Scalar::parse_from_cow_and_metadata(
     ///         "not a number".into(),
     ///         ScalarStyle::Plain,
     ///         Some(&Tag { handle: "tag:yaml.org,2002:".into(), suffix: "int".into() })
@@ -61,7 +61,7 @@ impl<'input> Scalar<'input> {
     ///     None
     /// );
     /// assert_eq!(
-    ///     Scalar::parse_from_cow_and_tag(
+    ///     Scalar::parse_from_cow_and_metadata(
     ///         "No".into(),
     ///         ScalarStyle::Plain,
     ///         Some(&Tag { handle: "tag:yaml.org,2002:".into(), suffix: "bool".into() })
@@ -69,7 +69,7 @@ impl<'input> Scalar<'input> {
     ///     None
     /// );
     /// ```
-    pub fn parse_from_cow_and_tag(
+    pub fn parse_from_cow_and_metadata(
         v: Cow<'input, str>,
         style: ScalarStyle,
         tag: Option<&Tag>,
