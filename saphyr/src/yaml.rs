@@ -12,7 +12,7 @@ use std::{
 use hashlink::LinkedHashMap;
 use saphyr_parser::{BufferedInput, Input, Parser, ScalarStyle, ScanError, Tag};
 
-use crate::{loader::parse_f64, LoadableYamlNode, Scalar, YamlLoader};
+use crate::{LoadableYamlNode, Scalar, YamlLoader};
 
 /// A YAML node is stored as this `Yaml` enumeration, which provides an easy way to
 /// access your YAML document.
@@ -187,33 +187,7 @@ impl<'input> Yaml<'input> {
     /// Same as [`Self::from_str`] but uses a [`Cow`] instead.
     #[must_use]
     pub fn from_cow(v: Cow<'input, str>) -> Yaml<'input> {
-        if let Some(number) = v.strip_prefix("0x") {
-            if let Ok(i) = i64::from_str_radix(number, 16) {
-                return Yaml::Value(Scalar::Integer(i));
-            }
-        } else if let Some(number) = v.strip_prefix("0o") {
-            if let Ok(i) = i64::from_str_radix(number, 8) {
-                return Yaml::Value(Scalar::Integer(i));
-            }
-        } else if let Some(number) = v.strip_prefix('+') {
-            if let Ok(i) = number.parse::<i64>() {
-                return Yaml::Value(Scalar::Integer(i));
-            }
-        }
-        match &*v {
-            "~" | "null" => Yaml::Value(Scalar::Null),
-            "true" => Yaml::Value(Scalar::Boolean(true)),
-            "false" => Yaml::Value(Scalar::Boolean(false)),
-            _ => {
-                if let Ok(integer) = v.parse::<i64>() {
-                    Yaml::Value(Scalar::Integer(integer))
-                } else if let Some(float) = parse_f64(&v) {
-                    Yaml::Value(Scalar::FloatingPoint(float.into()))
-                } else {
-                    Yaml::Value(Scalar::String(v))
-                }
-            }
-        }
+        Self::Value(Scalar::parse_from_cow(v))
     }
 }
 

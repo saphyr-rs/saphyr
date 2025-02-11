@@ -72,3 +72,5 @@ pub use crate::encoding::{YAMLDecodingTrap, YAMLDecodingTrapFn, YamlDecoder};
 pub use saphyr_parser::ScanError;
 // Re-export `Marker` which is used for annotated YAMLs.
 pub use saphyr_parser::Marker;
+// Re-export `ScalarStyle` and `Tag` which are used for representations.
+pub use saphyr_parser::{ScalarStyle, Tag};
