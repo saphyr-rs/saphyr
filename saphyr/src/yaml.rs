@@ -10,7 +10,7 @@ use std::{
 };
 
 use hashlink::LinkedHashMap;
-use saphyr_parser::{BufferedInput, Input, Parser, ScanError};
+use saphyr_parser::{BufferedInput, Input, Parser, ScanError, TScalarStyle, Tag};
 
 use crate::{loader::parse_f64, LoadableYamlNode, Scalar, YamlLoader};
 
@@ -33,7 +33,7 @@ use crate::{loader::parse_f64, LoadableYamlNode, Scalar, YamlLoader};
 #[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
 pub enum Yaml<'input> {
     /// The raw string from the input.
-    Representation(Cow<'input, str>),
+    Representation(Cow<'input, str>, TScalarStyle, Option<Tag>),
     /// The resolved value from the representation.
     Value(Scalar<'input>),
     /// YAML sequence, can be accessed as a `Vec`.

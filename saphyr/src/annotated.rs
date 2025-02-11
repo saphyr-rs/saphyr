@@ -27,6 +27,7 @@ use std::{
 };
 
 use hashlink::LinkedHashMap;
+use saphyr_parser::{TScalarStyle, Tag};
 
 use crate::Scalar;
 
@@ -67,7 +68,7 @@ where
     HashKey: Eq + std::hash::Hash + std::borrow::Borrow<Node> + From<Node>,
 {
     /// The raw string from the input.
-    Representation(Cow<'input, str>),
+    Representation(Cow<'input, str>, TScalarStyle, Option<Tag>),
     /// The resolved value from the representation.
     Value(Scalar<'input>),
     /// YAML sequence, can be accessed as a `Vec`.

@@ -27,7 +27,7 @@ pub enum TEncoding {
 }
 
 /// The style as which the scalar was written in the YAML document.
-#[derive(Clone, Copy, PartialEq, Debug, Eq)]
+#[derive(Clone, Copy, PartialEq, Debug, Eq, Hash, PartialOrd, Ord)]
 pub enum TScalarStyle {
     /// A YAML plain scalar.
     Plain,

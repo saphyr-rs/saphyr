@@ -103,7 +103,7 @@ impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
                 Yaml::Mapping(_) => YamlData::Mapping(LinkedHashMap::new()),
                 Yaml::Alias(x) => YamlData::Alias(x),
                 Yaml::BadValue => YamlData::BadValue,
-                Yaml::Representation(x) => YamlData::Representation(x),
+                Yaml::Representation(v, style, tag) => YamlData::Representation(v, style, tag),
                 Yaml::Value(x) => YamlData::Value(x),
             },
         }

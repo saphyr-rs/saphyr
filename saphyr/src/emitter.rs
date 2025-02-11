@@ -1,5 +1,7 @@
 //! YAML serialization helpers.
 
+use saphyr_parser::Tag;
+
 use crate::yaml::{Mapping, Yaml};
 use crate::{char_traits, Scalar};
 use std::convert::From;
@@ -238,7 +240,23 @@ impl<'a> YamlEmitter<'a> {
             Yaml::Value(Scalar::Integer(v)) => Ok(write!(self.writer, "{v}")?),
             Yaml::Value(Scalar::FloatingPoint(ref v)) => Ok(write!(self.writer, "{v}")?),
             Yaml::Value(Scalar::Null) | Yaml::BadValue => Ok(write!(self.writer, "~")?),
-            Yaml::Representation(ref v) => Ok(write!(self.writer, "{v}")?),
+            Yaml::Representation(ref v, style, ref tag) => {
+                if let Some(Tag {
+                    ref handle,
+                    ref suffix,
+                }) = tag
+                {
+                    write!(self.writer, "{handle}!{suffix} ")?;
+                }
+                match style {
+                    saphyr_parser::TScalarStyle::Plain => write!(self.writer, "{v}")?,
+                    saphyr_parser::TScalarStyle::SingleQuoted => write!(self.writer, "'{v}'")?,
+                    saphyr_parser::TScalarStyle::DoubleQuoted => write!(self.writer, "\"{v}\"")?,
+                    saphyr_parser::TScalarStyle::Literal => todo!(),
+                    saphyr_parser::TScalarStyle::Folded => todo!(),
+                };
+                Ok(())
+            }
             // XXX(chenyh) Alias
             Yaml::Alias(_) => Ok(()),
         }

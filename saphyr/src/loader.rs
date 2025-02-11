@@ -1,6 +1,6 @@
 //! The default loader.
 
-use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
+use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData, sync::Arc};
 
 use hashlink::LinkedHashMap;
 use saphyr_parser::{Event, ScanError, Span, SpannedEventReceiver, TScalarStyle, Tag};
@@ -27,6 +27,8 @@ where
     key_stack: Vec<Node>,
     anchor_map: BTreeMap<usize, Node>,
     marker: PhantomData<&'input u32>,
+    /// See [`Self::early_parse()`]
+    early_parse: bool,
 }
 
 // For some reason, rustc wants `Node: Default` if I `#[derive(Default)]`.
@@ -41,6 +43,7 @@ where
             key_stack: vec![],
             anchor_map: BTreeMap::new(),
             marker: PhantomData,
+            early_parse: true,
         }
     }
 }
@@ -87,42 +90,10 @@ where
                 self.insert_new_node(node);
             }
             Event::Scalar(v, style, aid, tag) => {
-                let node = if style != TScalarStyle::Plain {
-                    Yaml::Value(Scalar::String(v))
-                } else if let Some(Tag {
-                    ref handle,
-                    ref suffix,
-                }) = tag
-                {
-                    if handle == "tag:yaml.org,2002:" {
-                        match suffix.as_ref() {
-                            "bool" => {
-                                // "true" or "false"
-                                match v.parse::<bool>() {
-                                    Err(_) => Yaml::BadValue,
-                                    Ok(v) => Yaml::Value(Scalar::Boolean(v)),
-                                }
-                            }
-                            "int" => match v.parse::<i64>() {
-                                Err(_) => Yaml::BadValue,
-                                Ok(v) => Yaml::Value(Scalar::Integer(v)),
-                            },
-                            "float" => match parse_f64(&v) {
-                                Some(f) => Yaml::Value(Scalar::FloatingPoint(f.into())),
-                                None => Yaml::BadValue,
-                            },
-                            "null" => match v.as_ref() {
-                                "~" | "null" => Yaml::Value(Scalar::Null),
-                                _ => Yaml::BadValue,
-                            },
-                            _ => Yaml::Value(Scalar::String(v)),
-                        }
-                    } else {
-                        Yaml::Value(Scalar::String(v))
-                    }
+                let node = if self.early_parse {
+                    parse_scalar_node(v, style, &tag)
                 } else {
-                    // Datatype is not specified, or unrecognized
-                    Yaml::from_cow(v)
+                    Yaml::Representation(v, style, tag)
                 };
                 self.insert_new_node((Node::from_bare_yaml(node).with_span(span), aid));
             }
@@ -141,6 +112,25 @@ impl<'input, Node> YamlLoader<'input, Node>
 where
     Node: LoadableYamlNode<'input>,
 {
+    /// Whether to parse scalars into their value while loading a YAML.
+    ///
+    /// If set to `true` (default), the loader will attempt to parse scalars into [`Scalar`]s. The
+    /// loaded [`Yaml`] nodes will use the [`Value`] variant.
+    /// If set to `false`, the loader will skip scalar parsing and only store the string
+    /// representation in [`Representation`].
+    ///
+    /// [`Value`]: Yaml::Value
+    /// [`Representation`]: Yaml::Representation
+    pub fn early_parse(&mut self, enabled: bool) {
+        self.early_parse = enabled;
+    }
+
+    /// Return the document nodes from `self`, consuming it in the process.
+    #[must_use]
+    pub fn into_documents(self) -> Vec<Node> {
+        self.docs
+    }
+
     fn insert_new_node(&mut self, node: (Node, usize)) {
         // valid anchor id starts from 1
         if node.1 > 0 {
@@ -165,11 +155,47 @@ where
             self.doc_stack.push(node);
         }
     }
+}
 
-    /// Return the document nodes from `self`, consuming it in the process.
-    #[must_use]
-    pub fn into_documents(self) -> Vec<Node> {
-        self.docs
+/// Parse a scalar node representation into its value.
+///
+/// The variant returned by this function will always be a [`Yaml::Value`], unless the tag forces a
+/// particular type and the representation cannot be parsed as this type, in which case it returns
+/// a [`Yaml::BadValue`].
+fn parse_scalar_node<'a>(v: Cow<'a, str>, style: TScalarStyle, tag: &Option<Tag>) -> Yaml<'a> {
+    if style != TScalarStyle::Plain {
+        Yaml::Value(Scalar::String(v))
+    } else if let Some(Tag {
+        ref handle,
+        ref suffix,
+    }) = tag
+    {
+        if handle == "tag:yaml.org,2002:" {
+            match suffix.as_ref() {
+                "bool" => match v.parse::<bool>() {
+                    Err(_) => Yaml::BadValue,
+                    Ok(v) => Yaml::Value(Scalar::Boolean(v)),
+                },
+                "int" => match v.parse::<i64>() {
+                    Err(_) => Yaml::BadValue,
+                    Ok(v) => Yaml::Value(Scalar::Integer(v)),
+                },
+                "float" => match parse_f64(&v) {
+                    Some(f) => Yaml::Value(Scalar::FloatingPoint(f.into())),
+                    None => Yaml::BadValue,
+                },
+                "null" => match v.as_ref() {
+                    "~" | "null" => Yaml::Value(Scalar::Null),
+                    _ => Yaml::BadValue,
+                },
+                _ => Yaml::Value(Scalar::String(v)),
+            }
+        } else {
+            Yaml::Value(Scalar::String(v))
+        }
+    } else {
+        // Datatype is not specified, or unrecognized
+        Yaml::from_cow(v)
     }
 }
 
