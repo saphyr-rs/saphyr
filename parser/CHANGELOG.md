@@ -5,6 +5,7 @@
 **Breaking Changes**:
 
 - Allow events to borrow from the input.
+- Rename `TScalarStyle` to `ScalarStyle`.
 
 ## v0.0.3
 

@@ -6,7 +6,7 @@
 
 use crate::{
     input::{str::StrInput, Input},
-    scanner::{ScanError, Scanner, Span, TScalarStyle, Token, TokenType},
+    scanner::{ScalarStyle, ScanError, Scanner, Span, Token, TokenType},
     BufferedInput, Marker,
 };
 
@@ -66,7 +66,7 @@ pub enum Event<'input> {
         usize,
     ),
     /// Value, style, `anchor_id`, tag
-    Scalar(Cow<'input, str>, TScalarStyle, usize, Option<Tag>),
+    Scalar(Cow<'input, str>, ScalarStyle, usize, Option<Tag>),
     /// The start of a YAML sequence (array).
     SequenceStart(
         /// The anchor ID of the start of the sequence.
@@ -106,12 +106,12 @@ impl Event<'_> {
     /// Create an empty scalar.
     fn empty_scalar() -> Self {
         // a null scalar
-        Event::Scalar("~".into(), TScalarStyle::Plain, 0, None)
+        Event::Scalar("~".into(), ScalarStyle::Plain, 0, None)
     }
 
     /// Create an empty scalar with the given anchor.
     fn empty_scalar_with_anchor(anchor: usize, tag: Option<Tag>) -> Self {
-        Event::Scalar(Cow::default(), TScalarStyle::Plain, anchor, tag)
+        Event::Scalar(Cow::default(), ScalarStyle::Plain, anchor, tag)
     }
 }
 

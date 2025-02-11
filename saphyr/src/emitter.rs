@@ -249,11 +249,11 @@ impl<'a> YamlEmitter<'a> {
                     write!(self.writer, "{handle}!{suffix} ")?;
                 }
                 match style {
-                    saphyr_parser::TScalarStyle::Plain => write!(self.writer, "{v}")?,
-                    saphyr_parser::TScalarStyle::SingleQuoted => write!(self.writer, "'{v}'")?,
-                    saphyr_parser::TScalarStyle::DoubleQuoted => write!(self.writer, "\"{v}\"")?,
-                    saphyr_parser::TScalarStyle::Literal => todo!(),
-                    saphyr_parser::TScalarStyle::Folded => todo!(),
+                    saphyr_parser::ScalarStyle::Plain => write!(self.writer, "{v}")?,
+                    saphyr_parser::ScalarStyle::SingleQuoted => write!(self.writer, "'{v}'")?,
+                    saphyr_parser::ScalarStyle::DoubleQuoted => write!(self.writer, "\"{v}\"")?,
+                    saphyr_parser::ScalarStyle::Literal => todo!(),
+                    saphyr_parser::ScalarStyle::Folded => todo!(),
                 };
                 Ok(())
             }

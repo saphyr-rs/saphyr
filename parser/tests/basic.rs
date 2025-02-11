@@ -1,7 +1,7 @@
 #![allow(clippy::bool_assert_comparison)]
 #![allow(clippy::float_cmp)]
 
-use saphyr_parser::{Event, Parser, ScanError, TScalarStyle};
+use saphyr_parser::{Event, Parser, ScalarStyle, ScanError};
 
 /// Run the parser through the string.
 ///
@@ -82,7 +82,7 @@ fn test_empty_doc() {
         [
             Event::StreamStart,
             Event::DocumentStart(true),
-            Event::Scalar("~".into(), TScalarStyle::Plain, 0, None),
+            Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::StreamEnd,
         ]
@@ -97,8 +97,8 @@ fn test_utf() {
             Event::StreamStart,
             Event::DocumentStart(false),
             Event::MappingStart(0, None),
-            Event::Scalar("a".into(), TScalarStyle::Plain, 0, None),
-            Event::Scalar("你好".into(), TScalarStyle::Plain, 0, None),
+            Event::Scalar("a".into(), ScalarStyle::Plain, 0, None),
+            Event::Scalar("你好".into(), ScalarStyle::Plain, 0, None),
             Event::MappingEnd,
             Event::DocumentEnd,
             Event::StreamEnd,
@@ -121,8 +121,8 @@ a: b # This is another comment
             Event::StreamStart,
             Event::DocumentStart(false),
             Event::MappingStart(0, None),
-            Event::Scalar("a".into(), TScalarStyle::Plain, 0, None),
-            Event::Scalar("b".into(), TScalarStyle::Plain, 0, None),
+            Event::Scalar("a".into(), ScalarStyle::Plain, 0, None),
+            Event::Scalar("b".into(), ScalarStyle::Plain, 0, None),
             Event::MappingEnd,
             Event::DocumentEnd,
             Event::StreamEnd,
@@ -144,9 +144,9 @@ fn test_quoting() {
             Event::StreamStart,
             Event::DocumentStart(false),
             Event::SequenceStart(0, None),
-            Event::Scalar("plain".into(), TScalarStyle::Plain, 0, None),
-            Event::Scalar("squote".into(), TScalarStyle::SingleQuoted, 0, None),
-            Event::Scalar("dquote".into(), TScalarStyle::DoubleQuoted, 0, None),
+            Event::Scalar("plain".into(), ScalarStyle::Plain, 0, None),
+            Event::Scalar("squote".into(), ScalarStyle::SingleQuoted, 0, None),
+            Event::Scalar("dquote".into(), ScalarStyle::DoubleQuoted, 0, None),
             Event::SequenceEnd,
             Event::DocumentEnd,
             Event::StreamEnd,
@@ -168,13 +168,13 @@ a scalar
         [
             Event::StreamStart,
             Event::DocumentStart(false),
-            Event::Scalar("a scalar".into(), TScalarStyle::Plain, 0, None),
+            Event::Scalar("a scalar".into(), ScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::DocumentStart(true),
-            Event::Scalar("a scalar".into(), TScalarStyle::Plain, 0, None),
+            Event::Scalar("a scalar".into(), ScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::DocumentStart(true),
-            Event::Scalar("a scalar".into(), TScalarStyle::Plain, 0, None),
+            Event::Scalar("a scalar".into(), ScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::StreamEnd,
         ]
@@ -189,7 +189,7 @@ fn test_github_27() {
         [
             Event::StreamStart,
             Event::DocumentStart(false),
-            Event::Scalar("".into(), TScalarStyle::Plain, 1, None),
+            Event::Scalar("".into(), ScalarStyle::Plain, 1, None),
             Event::DocumentEnd,
             Event::StreamEnd,
         ]
@@ -231,7 +231,7 @@ foobar";
         [
             Event::StreamStart,
             Event::DocumentStart(true),
-            Event::Scalar("foobar".into(), TScalarStyle::Plain, 0, None),
+            Event::Scalar("foobar".into(), ScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::StreamEnd,
         ]
@@ -256,8 +256,8 @@ a: |-
             Event::StreamStart,
             Event::DocumentStart(false),
             Event::MappingStart(0, None),
-            Event::Scalar("a".into(), TScalarStyle::Plain, 0, None),
-            Event::Scalar("a\n    b".into(), TScalarStyle::Literal, 0, None),
+            Event::Scalar("a".into(), ScalarStyle::Plain, 0, None),
+            Event::Scalar("a\n    b".into(), ScalarStyle::Literal, 0, None),
             Event::MappingEnd,
             Event::DocumentEnd,
             Event::StreamEnd,
@@ -273,7 +273,7 @@ fn test_bad_docstart() {
         [
             Event::StreamStart,
             Event::DocumentStart(false),
-            Event::Scalar("----".into(), TScalarStyle::Plain, 0, None),
+            Event::Scalar("----".into(), ScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::StreamEnd,
         ]
@@ -284,7 +284,7 @@ fn test_bad_docstart() {
         [
             Event::StreamStart,
             Event::DocumentStart(true),
-            Event::Scalar("~".into(), TScalarStyle::Plain, 0, None),
+            Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::StreamEnd,
         ]
@@ -295,7 +295,7 @@ fn test_bad_docstart() {
         [
             Event::StreamStart,
             Event::DocumentStart(false),
-            Event::Scalar("----".into(), TScalarStyle::Plain, 0, None),
+            Event::Scalar("----".into(), ScalarStyle::Plain, 0, None),
             Event::DocumentEnd,
             Event::StreamEnd,
         ]

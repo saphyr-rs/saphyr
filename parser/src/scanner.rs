@@ -28,7 +28,7 @@ pub enum TEncoding {
 
 /// The style as which the scalar was written in the YAML document.
 #[derive(Clone, Copy, PartialEq, Debug, Eq, Hash, PartialOrd, Ord)]
-pub enum TScalarStyle {
+pub enum ScalarStyle {
     /// A YAML plain scalar.
     Plain,
     /// A YAML single quoted scalar.
@@ -239,7 +239,7 @@ pub enum TokenType<'input> {
         String,
     ),
     /// A regular YAML scalar.
-    Scalar(TScalarStyle, Cow<'input, str>),
+    Scalar(ScalarStyle, Cow<'input, str>),
 }
 
 /// A scanner token.
@@ -1566,9 +1566,9 @@ impl<'input, T: Input> Scanner<'input, T> {
         let mut trailing_blank: bool;
         let mut leading_blank: bool = false;
         let style = if literal {
-            TScalarStyle::Literal
+            ScalarStyle::Literal
         } else {
-            TScalarStyle::Folded
+            ScalarStyle::Folded
         };
 
         let mut string = String::new();
@@ -2019,9 +2019,9 @@ impl<'input, T: Input> Scanner<'input, T> {
         }
 
         let style = if single {
-            TScalarStyle::SingleQuoted
+            ScalarStyle::SingleQuoted
         } else {
-            TScalarStyle::DoubleQuoted
+            ScalarStyle::DoubleQuoted
         };
         Ok(Token(
             Span::new(start_mark, self.mark),
@@ -2314,7 +2314,7 @@ impl<'input, T: Input> Scanner<'input, T> {
         } else {
             Ok(Token(
                 Span::new(start_mark, end_mark),
-                TokenType::Scalar(TScalarStyle::Plain, string.into()),
+                TokenType::Scalar(ScalarStyle::Plain, string.into()),
             ))
         }
     }

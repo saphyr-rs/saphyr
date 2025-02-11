@@ -3,7 +3,7 @@
 use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData, sync::Arc};
 
 use hashlink::LinkedHashMap;
-use saphyr_parser::{Event, ScanError, Span, SpannedEventReceiver, TScalarStyle, Tag};
+use saphyr_parser::{Event, ScalarStyle, ScanError, Span, SpannedEventReceiver, Tag};
 
 use crate::{Mapping, Scalar, Yaml};
 
@@ -162,8 +162,8 @@ where
 /// The variant returned by this function will always be a [`Yaml::Value`], unless the tag forces a
 /// particular type and the representation cannot be parsed as this type, in which case it returns
 /// a [`Yaml::BadValue`].
-fn parse_scalar_to_yaml<'a>(v: Cow<'a, str>, style: TScalarStyle, tag: Option<&Tag>) -> Yaml<'a> {
-    if style != TScalarStyle::Plain {
+fn parse_scalar_to_yaml<'a>(v: Cow<'a, str>, style: ScalarStyle, tag: Option<&Tag>) -> Yaml<'a> {
+    if style != ScalarStyle::Plain {
         Yaml::Value(Scalar::String(v))
     } else if let Some(Tag {
         ref handle,

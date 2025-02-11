@@ -2,7 +2,7 @@
 #![allow(non_upper_case_globals)]
 extern crate saphyr_parser;
 
-use saphyr_parser::{Event, EventReceiver, Parser, TScalarStyle};
+use saphyr_parser::{Event, EventReceiver, Parser, ScalarStyle};
 
 // These names match the names used in the C++ test suite.
 #[allow(clippy::enum_variant_names)]
@@ -33,7 +33,7 @@ impl EventReceiver<'_> for YamlChecker {
             Event::MappingStart(..) => TestEvent::OnMapStart,
             Event::MappingEnd => TestEvent::OnMapEnd,
             Event::Scalar(ref v, style, _, _) => {
-                if v == "~" && style == TScalarStyle::Plain {
+                if v == "~" && style == ScalarStyle::Plain {
                     TestEvent::OnNull
                 } else {
                     TestEvent::OnScalar

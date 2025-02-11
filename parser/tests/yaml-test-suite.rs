@@ -4,7 +4,7 @@ use libtest_mimic::{run_tests, Arguments, Outcome, Test};
 
 use saphyr::{Mapping, Scalar, Yaml};
 use saphyr_parser::{
-    Event, Marker, Parser, ScanError, Span, SpannedEventReceiver, TScalarStyle, Tag,
+    Event, Marker, Parser, ScalarStyle, ScanError, Span, SpannedEventReceiver, Tag,
 };
 
 type Result<T, E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
@@ -224,11 +224,11 @@ impl<'input> SpannedEventReceiver<'input> for EventReporter<'input> {
 
             Event::Scalar(ref text, style, idx, ref tag) => {
                 let kind = match style {
-                    TScalarStyle::Plain => ":",
-                    TScalarStyle::SingleQuoted => "'",
-                    TScalarStyle::DoubleQuoted => r#"""#,
-                    TScalarStyle::Literal => "|",
-                    TScalarStyle::Folded => ">",
+                    ScalarStyle::Plain => ":",
+                    ScalarStyle::SingleQuoted => "'",
+                    ScalarStyle::DoubleQuoted => r#"""#,
+                    ScalarStyle::Literal => "|",
+                    ScalarStyle::Folded => ">",
                 };
                 format!(
                     "=VAL{}{} {}{}",
