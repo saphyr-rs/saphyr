@@ -102,10 +102,11 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
 
     /// If `self` is of the [`Self::Representation`] variant, parse it to the value.
     ///
+    /// If `self` was [`Self::Value`], [`Self::Sequence`], [`Self::Mapping`] or [`Self::Alias`]
+    /// upon calling, this function does nothing and returns `true`.
+    ///
     /// # Return
-    /// Returns `true` if `self` is successfully parsed, `false` otherwise. If `self` was
-    /// [`Self::Value`], [`Self::Sequence`], [`Self::Mapping`] or [`Self::Alias`] upon calling,
-    /// this function does nothing and returns `true`.
+    /// Returns `true` if `self` is successfully parsed, `false` otherwise.
     pub fn parse_representation(&mut self) -> bool {
         match self.take() {
             Self::Representation(value, style, tag) => {
@@ -118,6 +119,60 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
                     *self = Self::BadValue;
                     false
                 }
+            }
+            _ => true,
+        }
+    }
+
+    /// Call [`Self::parse_representation`] on `self` and children nodes.
+    ///
+    /// If `self` was [`Self::Value`] or [`Self::Alias`] upon calling, this function does nothing
+    /// and returns `true`.
+    ///
+    /// If [`Self::parse_representation`] fails on a descendent node, this function will not short
+    /// circuit but still attempt to call [`Self::parse_representation`] on further nodes. Even if
+    /// all further nodes succeed, this function will still return `false`.
+    ///
+    /// # Return
+    /// Returns `true` if all `self` and its children are successfully parsed, `false` otherwise.
+    #[allow(clippy::unnecessary_fold)]
+    pub fn parse_representation_recursive(&mut self) -> bool {
+        match self.take() {
+            mut zelf @ Self::Representation(..) => {
+                let succeeded = zelf.parse_representation();
+                *self = zelf;
+                succeeded
+            }
+            Self::Sequence(mut vec) => vec
+                .iter_mut()
+                .map(|v| v.parse_representation_recursive())
+                // Using `all` here would short-circuit. We need a `fold` to continue parsing
+                // further nodes even if parsing one fails.
+                .fold(true, |a, b| a && b),
+            Self::Mapping(mut map) => {
+                let mut succeeded = true;
+                // Keys are immutable. We cannot just do `map.iter_mut().map(...)`. We need to
+                // tear apart the hashmap to rebuild it.
+                let mut tmp = LinkedHashMap::default();
+                std::mem::swap(&mut tmp, &mut map);
+
+                // Turn the temporary into an iterator, call `parse_representation_recursive`
+                map = tmp
+                    .into_iter()
+                    .map(|(mut k, mut v)| {
+                        let a = k.parse_representation_recursive();
+                        let b = v.parse_representation_recursive();
+                        // Trying to fold the booleans whilst keeping an iterator with key-values and
+                        // no unnecessary allocations is a pain. It's easier to use a captured
+                        // variable.
+                        succeeded = succeeded && a && b;
+                        (k, v)
+                    })
+                    // Then collect the result back to our map...
+                    .collect::<LinkedHashMap<_, _, _>>();
+                // ... for reassigning into `self`.
+                *self = Self::Mapping(map);
+                succeeded
             }
             _ => true,
         }

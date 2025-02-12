@@ -62,10 +62,9 @@ use crate::Scalar;
 /// [`Yaml`]: crate::Yaml
 /// [`MarkedYaml`]: marked_yaml::MarkedYaml
 #[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
-pub enum YamlData<'input, Node, HashKey>
+pub enum YamlData<'input, Node>
 where
     Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
-    HashKey: Eq + std::hash::Hash + std::borrow::Borrow<Node> + From<Node>,
 {
     /// The raw string from the input.
     Representation(Cow<'input, str>, ScalarStyle, Option<Tag>),
@@ -76,7 +75,7 @@ where
     /// YAML mapping, can be accessed as a `LinkedHashMap`.
     ///
     /// Insertion order will match the order of insertion into the map.
-    Mapping(AnnotatedMapping<'input, HashKey, Node>),
+    Mapping(AnnotatedMapping<'input, Node>),
     /// Alias, not fully supported yet.
     Alias(usize),
     /// Accessing a nonexistent node via the Index trait returns `BadValue`. This
@@ -87,29 +86,27 @@ where
 
 // This defines most common operations on a YAML object. See macro definition for details.
 define_yaml_object_impl!(
-    YamlData<'input, Node, HashKey>,
-    < 'input, Node, HashKey>,
+    YamlData<'input, Node>,
+    < 'input, Node>,
     where {
-        Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
-        HashKey: Eq
-            + std::hash::Hash
-            + std::borrow::Borrow<Node>
-            + From<Node>
-            + for<'b> PartialEq<Node::HashKey<'b>>,
+        Node: std::hash::Hash
+            + std::cmp::Eq
+            + From<Self>
+            + AnnotatedNode
+            + for<'a> std::cmp::PartialEq<Node::HashKey<'a>>,
     },
-    mappingtype = AnnotatedMapping<'input, HashKey, Node>,
+    mappingtype = AnnotatedMapping<'input, Node>,
     sequencetype = AnnotatedSequence<Node>,
     nodetype = Node
 );
 
-impl<'input, Node, HashKey> YamlData<'input, Node, HashKey>
+impl<'input, Node> YamlData<'input, Node>
 where
-    Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
-    HashKey: Eq
-        + std::hash::Hash
-        + std::borrow::Borrow<Node>
-        + From<Node>
-        + for<'b> PartialEq<Node::HashKey<'b>>,
+    Node: std::hash::Hash
+        + std::cmp::Eq
+        + From<Self>
+        + AnnotatedNode
+        + for<'a> std::cmp::PartialEq<Node::HashKey<'a>>,
 {
     /// Take the contained node out of `Self`, leaving a `BadValue` in its place.
     #[must_use]
@@ -177,15 +174,14 @@ where
 // NOTE(ethiraric, 10/06/2024): We cannot create a "generic static" variable which would act as a
 // `BAD_VALUE`. This means that, unlike for `Yaml`, we have to make the indexing method panic.
 
-impl<'input, 'a, Node, HashKey> Index<&'a str> for YamlData<'input, Node, HashKey>
+impl<'input, 'a, Node> Index<&'a str> for YamlData<'input, Node>
 where
     'input: 'a,
-    Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
-    HashKey: Eq
-        + std::hash::Hash
-        + std::borrow::Borrow<Node>
-        + From<Node>
-        + for<'b> PartialEq<Node::HashKey<'b>>,
+    Node: std::hash::Hash
+        + std::cmp::Eq
+        + From<Self>
+        + AnnotatedNode
+        + for<'b> std::cmp::PartialEq<Node::HashKey<'b>>,
 {
     type Output = Node;
 
@@ -209,15 +205,14 @@ where
     }
 }
 
-impl<'input, 'a, Node, HashKey> IndexMut<&'a str> for YamlData<'input, Node, HashKey>
+impl<'input, 'a, Node> IndexMut<&'a str> for YamlData<'input, Node>
 where
     'input: 'a,
-    Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
-    HashKey: Eq
-        + std::hash::Hash
-        + std::borrow::Borrow<Node>
-        + From<Node>
-        + for<'b> PartialEq<Node::HashKey<'b>>,
+    Node: std::hash::Hash
+        + std::cmp::Eq
+        + From<Self>
+        + AnnotatedNode
+        + for<'b> std::cmp::PartialEq<Node::HashKey<'b>>,
 {
     /// Perform indexing if `self` is a mapping.
     ///
@@ -239,14 +234,13 @@ where
     }
 }
 
-impl<Node, HashKey> Index<usize> for YamlData<'_, Node, HashKey>
+impl<Node> Index<usize> for YamlData<'_, Node>
 where
-    Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
-    HashKey: Eq
-        + std::hash::Hash
-        + std::borrow::Borrow<Node>
-        + From<Node>
-        + for<'b> PartialEq<Node::HashKey<'b>>,
+    Node: std::hash::Hash
+        + std::cmp::Eq
+        + From<Self>
+        + AnnotatedNode
+        + for<'a> std::cmp::PartialEq<Node::HashKey<'a>>,
 {
     type Output = Node;
 
@@ -278,14 +272,13 @@ where
     }
 }
 
-impl<Node, HashKey> IndexMut<usize> for YamlData<'_, Node, HashKey>
+impl<Node> IndexMut<usize> for YamlData<'_, Node>
 where
-    Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
-    HashKey: Eq
-        + std::hash::Hash
-        + std::borrow::Borrow<Node>
-        + From<Node>
-        + for<'b> PartialEq<Node::HashKey<'b>>,
+    Node: std::hash::Hash
+        + std::cmp::Eq
+        + From<Self>
+        + AnnotatedNode
+        + for<'a> std::cmp::PartialEq<Node::HashKey<'a>>,
 {
     /// Perform indexing if `self` is a sequence or a mapping.
     ///
@@ -317,17 +310,16 @@ where
     }
 }
 
-impl<'input, Node, HashKey> IntoIterator for YamlData<'input, Node, HashKey>
+impl<'input, Node> IntoIterator for YamlData<'input, Node>
 where
-    Node: std::hash::Hash + std::cmp::Eq + From<Self> + AnnotatedNode,
-    HashKey: Eq
-        + std::hash::Hash
-        + std::borrow::Borrow<Node>
-        + From<Node>
-        + for<'b> PartialEq<Node::HashKey<'b>>,
+    Node: std::hash::Hash
+        + std::cmp::Eq
+        + From<Self>
+        + AnnotatedNode
+        + for<'a> std::cmp::PartialEq<Node::HashKey<'a>>,
 {
     type Item = Node;
-    type IntoIter = AnnotatedYamlIter<'input, Node, HashKey>;
+    type IntoIter = AnnotatedYamlIter<'input, Node>;
 
     fn into_iter(self) -> Self::IntoIter {
         Self::IntoIter {
@@ -339,27 +331,17 @@ where
 
 /// An iterator over a [`YamlData`] node.
 #[allow(clippy::module_name_repetitions)]
-pub struct AnnotatedYamlIter<'input, Node, HashKey>
+pub struct AnnotatedYamlIter<'input, Node>
 where
-    Node: std::hash::Hash + std::cmp::Eq + From<YamlData<'input, Node, HashKey>> + AnnotatedNode,
-    HashKey: Eq
-        + std::hash::Hash
-        + std::borrow::Borrow<Node>
-        + From<Node>
-        + for<'b> PartialEq<Node::HashKey<'b>>,
+    Node: std::hash::Hash + std::cmp::Eq + From<YamlData<'input, Node>> + AnnotatedNode,
 {
     yaml: std::vec::IntoIter<Node>,
-    marker: PhantomData<(&'input (), HashKey)>,
+    marker: PhantomData<&'input ()>,
 }
 
-impl<'input, Node, HashKey> Iterator for AnnotatedYamlIter<'input, Node, HashKey>
+impl<'input, Node> Iterator for AnnotatedYamlIter<'input, Node>
 where
-    Node: std::hash::Hash + std::cmp::Eq + From<YamlData<'input, Node, HashKey>> + AnnotatedNode,
-    HashKey: Eq
-        + std::hash::Hash
-        + std::borrow::Borrow<Node>
-        + From<Node>
-        + for<'b> PartialEq<Node::HashKey<'b>>,
+    Node: std::hash::Hash + std::cmp::Eq + From<YamlData<'input, Node>> + AnnotatedNode,
 {
     type Item = Node;
 
@@ -373,7 +355,7 @@ where
 pub type AnnotatedSequence<Node> = Vec<Node>;
 /// The type contained in the [`YamlData::Mapping`] variant. This corresponds to YAML mappings.
 #[allow(clippy::module_name_repetitions)]
-pub type AnnotatedMapping<'input, HashKey, Node> = LinkedHashMap<HashKey, Node>;
+pub type AnnotatedMapping<'input, Node> = LinkedHashMap<Node, Node>;
 
 /// A trait allowing for introspection in the hash types of the [`YamlData::Mapping`] variant.
 ///
@@ -385,7 +367,10 @@ pub type AnnotatedMapping<'input, HashKey, Node> = LinkedHashMap<HashKey, Node>;
 #[allow(clippy::module_name_repetitions)]
 pub trait AnnotatedNode: std::hash::Hash + std::cmp::Eq {
     /// The type used as the key in the [`YamlData::Mapping`] variant.
-    type HashKey<'a>: From<YamlData<'a, Self::HashKey<'a>, Self::HashKey<'a>>>
+    type HashKey<'a>: From<YamlData<'a, Self::HashKey<'a>>>
         + for<'b> std::cmp::PartialEq<Self::HashKey<'b>>
         + AnnotatedNode;
+
+    /// See [`YamlData::parse_representation_recursive`].
+    fn parse_representation_recursive(&mut self) -> bool;
 }

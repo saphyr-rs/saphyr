@@ -65,29 +65,6 @@ define_yaml_object_impl!(
 );
 
 impl<'input> Yaml<'input> {
-    /// If `self` is of the [`Self::Representation`] variant, parse it to the value.
-    ///
-    /// # Return
-    /// Returns `true` if `self` is successfully parsed, `false` otherwise. If `self` was
-    /// [`Self::Value`], [`Self::Sequence`], [`Self::Mapping`] or [`Self::Alias`] upon calling,
-    /// this function does nothing and returns `true`.
-    pub fn parse_representation_bleh(&mut self) -> bool {
-        match self.take() {
-            Self::Representation(value, style, tag) => {
-                if let Some(scalar) =
-                    Scalar::parse_from_cow_and_metadata(value, style, tag.as_ref())
-                {
-                    *self = Self::Value(scalar);
-                    true
-                } else {
-                    *self = Self::BadValue;
-                    false
-                }
-            }
-            _ => true,
-        }
-    }
-
     /// Load the given string as an array of YAML documents.
     ///
     /// The `source` is interpreted as YAML documents and is parsed. Parsing succeeds if and only

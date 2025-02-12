@@ -23,7 +23,7 @@ pub struct MarkedYaml<'input> {
     /// to the start of the document within the input stream.
     pub span: Span,
     /// The YAML contents of the node.
-    pub data: YamlData<'input, MarkedYaml<'input>, MarkedYaml<'input>>,
+    pub data: YamlData<'input, MarkedYaml<'input>>,
 }
 
 impl<'input> MarkedYaml<'input> {
@@ -65,10 +65,14 @@ impl<'input> MarkedYaml<'input> {
 
 impl super::AnnotatedNode for MarkedYaml<'_> {
     type HashKey<'a> = MarkedYaml<'a>;
+
+    fn parse_representation_recursive(&mut self) -> bool {
+        self.data.parse_representation_recursive()
+    }
 }
 
-impl<'a> From<YamlData<'a, MarkedYaml<'a>, MarkedYaml<'a>>> for MarkedYaml<'a> {
-    fn from(value: YamlData<'a, MarkedYaml<'a>, MarkedYaml<'a>>) -> Self {
+impl<'a> From<YamlData<'a, MarkedYaml<'a>>> for MarkedYaml<'a> {
+    fn from(value: YamlData<'a, MarkedYaml<'a>>) -> Self {
         Self {
             span: Span::default(),
             data: value,
