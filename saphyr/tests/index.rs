@@ -48,7 +48,7 @@ fn yaml_index_str() {
 #[should_panic(expected = "Key 'oob' not found in YAML mapping")]
 fn yaml_index_str_oob() {
     let doc = get_yaml_mapping();
-    assert_eq!(doc["oob"], Yaml::BadValue);
+    let _ = doc["oob"];
 }
 
 #[test]
@@ -106,7 +106,7 @@ fn yaml_index_integer() {
 #[should_panic(expected = "Index 12 out of bounds in YAML sequence")]
 fn yaml_index_integer_oob() {
     let doc = get_yaml_sequence();
-    assert_eq!(doc[12], Yaml::BadValue);
+    let _ = doc[12];
 }
 
 #[test]

@@ -99,11 +99,15 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     define_is!(is_badvalue,       Self::BadValue);
     define_is!(is_mapping,        Self::Mapping(_));
     define_is!(is_alias,          Self::Alias(_));
+    define_is!(is_representation, Self::Representation(..));
+    define_is!(is_value,          Self::Value(_));
 
     /// If `self` is of the [`Self::Representation`] variant, parse it to the value.
     ///
     /// If `self` was [`Self::Value`], [`Self::Sequence`], [`Self::Mapping`] or [`Self::Alias`]
     /// upon calling, this function does nothing and returns `true`.
+    ///
+    /// If parsing fails, `*self` is assigned [`Self::BadValue`].
     ///
     /// # Return
     /// Returns `true` if `self` is successfully parsed, `false` otherwise.
@@ -182,8 +186,8 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     /// replace it with a given value `other`. Otherwise, return self unchanged.
     ///
     /// ```
-    /// use saphyr::{Scalar, Yaml};
-    ///
+    /// # use saphyr::{Scalar, Yaml};
+    /// #
     /// assert_eq!(
     ///     Yaml::Value(Scalar::Null).or(Yaml::Value(Scalar::Integer(3))),
     ///     Yaml::Value(Scalar::Integer(3))
@@ -231,7 +235,7 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     ///
     /// This is equivalent to:
     /// ```ignore
-    /// self.as_mapping().flat_map(|mapping| mapping.get(key))
+    /// self.as_mapping().and_then(|mapping| mapping.get(key))
     /// ```
     ///
     /// # Return
@@ -247,7 +251,7 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     ///
     /// This is equivalent to:
     /// ```ignore
-    /// self.as_mapping_mut().flat_map(|mapping| mapping.get_mut(key))
+    /// self.as_mapping_mut().and_then(|mapping| mapping.get_mut(key))
     /// ```
     ///
     /// # Return
@@ -257,6 +261,38 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     #[must_use]
     pub fn as_mapping_get_mut(&mut self, key: &str) -> Option<&mut $nodetype> {
         self.as_mapping_get_mut_impl(key)
+    }
+
+    /// Return the value at the given index if `self` is a [`Self::Sequence`].
+    ///
+    /// This is equivalent to:
+    /// ```ignore
+    /// self.as_sequence().and_then(|seq| seq.get(idx))
+    /// ```
+    ///
+    /// # Return
+    /// If the variant of `self` is `Self::Sequence` and the index is not out of bounds, returns
+    /// the value at the given index.
+    /// Otherwise, returns `None`.
+    #[must_use]
+    pub fn as_sequence_get(&self, idx:usize) -> Option<&$nodetype> {
+        self.as_sequence().and_then(|seq| seq.get(idx))
+    }
+
+    /// Return the value at the given index if `self` is a [`Self::Sequence`].
+    ///
+    /// This is equivalent to:
+    /// ```ignore
+    /// self.as_sequence_mut().and_then(|seq| seq.get_mut(idx))
+    /// ```
+    ///
+    /// # Return
+    /// If the variant of `self` is `Self::Sequence` and the index is not out of bounds, returns
+    /// the value at the given index.
+    /// Otherwise, returns `None`.
+    #[must_use]
+    pub fn as_sequence_get_mut(&mut self, idx:usize) -> Option<&mut $nodetype> {
+        self.as_sequence_mut().and_then(|seq| seq.get_mut(idx))
     }
 }
     );

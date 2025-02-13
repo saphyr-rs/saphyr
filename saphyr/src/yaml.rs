@@ -33,20 +33,66 @@ use crate::{LoadableYamlNode, Scalar, YamlLoader};
 #[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
 pub enum Yaml<'input> {
     /// The raw string from the input.
+    ///
+    /// When the field is left in the [`Representation`] variant, methods that rely on the value
+    /// (e.g.: [`is_boolean`], [`as_integer`], [`into_floating_point`], ...) will always return
+    /// [`None`].
+    ///
+    /// This variant is only meant:
+    ///   - As an optimization, when lazy-parsing is preferred.
+    ///   - As a more generic way of handling keys in [`Mapping`]s (if user-defined key duplication
+    ///     detection is required.
+    ///
+    /// [`Mapping`]: Yaml::Mapping
+    /// [`Representation`]: Yaml::Representation
+    /// [`is_boolean`]: Yaml::is_boolean
+    /// [`as_integer`]: Yaml::as_integer
+    /// [`into_floating_point`]: Yaml::into_floating_point
     Representation(Cow<'input, str>, ScalarStyle, Option<Tag>),
     /// The resolved value from the representation.
     Value(Scalar<'input>),
     /// YAML sequence, can be accessed as a `Vec`.
     Sequence(Sequence<'input>),
-    /// YAML mapping, can be accessed as a `LinkedHashMap`.
+    /// YAML mapping, can be accessed as a [`LinkedHashMap`].
     ///
-    /// Insertion order will match the order of insertion into the map.
+    /// Iteration order will match the order of insertion into the map and that of the document.
+    ///
+    /// If keys use the [`Representation`] variant, equality will be based on their representation.
+    /// When comparing representations for equality, the string, [scalar style] and tags must
+    /// match. This means that `'100'` and `"100"`, although similar in their value, have different
+    /// representations.
+    ///
+    /// If keys use the [`Value`] variant, they will be compared by value. It is discouraged to use
+    /// floating point values as keys. [`Scalar`] uses [`OrderedFloat`] for hash and equality.
+    /// Refer to their documentation for details on float comparisons.
+    ///
+    /// Comparison between [`Representation`] variants and [`Value`] variants will always fail.
+    /// Users must ensure all keys in a map are of the same variant, as well as the query keys.
+    ///
+    /// For complex keys, the [`Mapping`] and [`Sequence`] variants are compared for equality. Both
+    /// these comparisons are sensitive to the order of insertions. For instance, in the following
+    /// mapping, the two complex keys are considered different:
+    ///
+    /// ```yaml
+    /// ? { a: b, c: d }: foo
+    /// ? { c: d, a: b }: bar
+    /// ```
+    ///
+    /// [`Mapping`]: Yaml::Mapping
+    /// [`Representation`]: Yaml::Representation
+    /// [`Sequence`]: Yaml::Sequence
+    /// [`Value`]: Yaml::Value
+    /// [scalar style]: ScalarStyle
+    /// [`OrderedFloat`]: ordered_float::OrderedFloat
     Mapping(Mapping<'input>),
     /// Alias, not fully supported yet.
     Alias(usize),
-    /// Accessing a nonexistent node via the Index trait returns `BadValue`. This
-    /// simplifies error handling in the calling code. Invalid type conversion also
-    /// returns `BadValue`.
+    /// A variant used when parsing the representation of a scalar node fails.
+    ///
+    /// The YAML is syntactically valid, but its contents are incoherent. See
+    /// [`Scalar::parse_from_cow_and_metadata`] for details.
+    /// This variant is also used when stealing the contents of `self`, meaning `self` should no
+    /// longer be used. See [`Self::take`] for details
     BadValue,
 }
 
