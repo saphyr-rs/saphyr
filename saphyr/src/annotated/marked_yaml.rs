@@ -2,10 +2,12 @@
 //!
 //! This is set aside so as to not clutter `annotated.rs`.
 
-use hashlink::LinkedHashMap;
-use saphyr_parser::Span;
+use std::borrow::Cow;
 
-use crate::{LoadableYamlNode, Yaml, YamlData};
+use hashlink::LinkedHashMap;
+use saphyr_parser::{ScalarStyle, Span, Tag};
+
+use crate::{LoadableYamlNode, Scalar, Yaml, YamlData};
 
 /// A YAML node with [`Span`]s pointing to the start of the node.
 ///
@@ -24,6 +26,66 @@ pub struct MarkedYaml<'input> {
     pub span: Span,
     /// The YAML contents of the node.
     pub data: YamlData<'input, MarkedYaml<'input>>,
+}
+
+impl<'input> MarkedYaml<'input> {
+    /// Convert a string to a scalar node.
+    ///
+    /// See [`YamlData::value_from_str`] for more details.
+    ///
+    /// The returned node is created with a default [`Span`].
+    #[must_use]
+    pub fn value_from_str(v: &'input str) -> Self {
+        Self::value_from_cow(v.into())
+    }
+
+    /// Same as [`Self::value_from_str`] but uses a [`String`] instead.
+    ///
+    /// See [`YamlData::value_from_str`] for more details.
+    ///
+    /// The returned node is created with a default [`Span`].
+    #[must_use]
+    pub fn scalar_from_string(v: String) -> Self {
+        Self::value_from_cow(v.into())
+    }
+
+    /// Same as [`Self::value_from_str`] but uses a [`Cow`] instead.
+    ///
+    /// See [`YamlData::value_from_str`] for more details.
+    ///
+    /// The returned node is created with a default [`Span`].
+    #[must_use]
+    pub fn value_from_cow(v: Cow<'input, str>) -> Self {
+        Self {
+            data: YamlData::Value(Scalar::parse_from_cow(v)),
+            span: Span::default(),
+        }
+    }
+
+    /// Convert a string to a  scalar node, abiding by the given metadata.
+    ///
+    /// The variant returned by this function will always be a [`YamlData::Value`], unless the tag
+    /// forces a particular type and the representation cannot be parsed as this type, in which
+    /// case it returns a [`YamlData::BadValue`].
+    ///
+    /// The returned node is created with a default [`Span`].
+    #[must_use]
+    pub fn value_from_cow_and_metadata(
+        v: Cow<'input, str>,
+        style: ScalarStyle,
+        tag: Option<&Tag>,
+    ) -> Self {
+        Scalar::parse_from_cow_and_metadata(v, style, tag).map_or_else(
+            || Self {
+                data: YamlData::BadValue,
+                span: Span::default(),
+            },
+            |v| Self {
+                data: YamlData::Value(v),
+                span: Span::default(),
+            },
+        )
+    }
 }
 
 impl super::AnnotatedNode for MarkedYaml<'_> {
