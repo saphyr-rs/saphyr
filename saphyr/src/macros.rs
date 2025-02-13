@@ -55,8 +55,13 @@ define_is!(is_string,         Self::String(_));
 ///  - `or` and `borrowed_or` methods
 ///  - `contains_mapping_key`, `as_mapping_get`, `as_mapping_get_mut`
 ///
+/// This also calls `define_yaml_object_index_traits_impl`, which creates the [`Index`] and
+/// [`IndexMut`] impls.
+///
 /// [`Yaml`]: crate::Yaml
 /// [`YamlData`]: crate::YamlData
+/// [`Index`]: std::ops::Index
+/// [`IndexMut`]: std::ops::IndexMut
 macro_rules! define_yaml_object_impl (
     (
         $yaml:ty,
@@ -64,7 +69,8 @@ macro_rules! define_yaml_object_impl (
         $( where { $($whereclause:tt)+ }, )?
         mappingtype = $mappingtype:ty,
         sequencetype = $sequencetype:ty,
-        nodetype = $nodetype:ty
+        nodetype = $nodetype:ty,
+        selfname = $selfname:literal
     ) => (
 impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     // ---------- SCALAR CONVERSIONS ----------
@@ -304,6 +310,146 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     #[must_use]
     pub fn as_sequence_get_mut(&mut self, idx:usize) -> Option<&mut $nodetype> {
         self.as_sequence_mut().and_then(|seq| seq.get_mut(idx))
+    }
+}
+
+define_yaml_object_index_traits_impl!(
+    $yaml,
+    < $( $generic ),+ >,
+    $( where { $($whereclause)+ }, )?
+    mappingtype = $mappingtype,
+    sequencetype = $sequencetype,
+    nodetype = $nodetype,
+    selfname = $selfname
+);
+    );
+);
+
+/// Generate the [`Index`] and [`IndexMut`] impls for all YAML objects.
+///
+/// This is called by [`define_yaml_object_impl`].
+///
+/// [`Index`]: std::ops::Index
+/// [`IndexMut`]: std::ops::IndexMut
+macro_rules! define_yaml_object_index_traits_impl (
+    (
+        $yaml:ty,
+        < $( $generic:tt ),+ >,
+        $( where { $($whereclause:tt)+ }, )?
+        mappingtype = $mappingtype:ty,
+        sequencetype = $sequencetype:ty,
+        nodetype = $nodetype:ty,
+        selfname = $selfname:literal
+    ) => (
+impl<'key, $($generic),+ > Index<&'key str> for $yaml $( where $($whereclause)+ )? {
+    type Output = $nodetype;
+
+    /// Perform indexing if `self` is a mapping.
+    ///
+    /// # Panics
+    /// This function panics if the key given does not exist within `self` (as per [`Index`]).
+    ///
+    /// This function also panics if `self` is not a [`$t::Mapping`].
+    fn index(&self, idx: &'key str) -> &$nodetype {
+        match self.as_mapping_get_impl(idx) {
+            Some(value) => value,
+            None => {
+                if matches!(self, Self::Mapping(_)) {
+                    panic!("Key '{idx}' not found in {} mapping", $selfname)
+                } else {
+                    panic!("Attempt to index {} with '{idx}' but it's not a mapping", $selfname)
+                }
+            }
+        }
+    }
+}
+
+impl<'key, $($generic),+> IndexMut<&'key str> for $yaml $( where $($whereclause)+ )? {
+    /// Perform indexing if `self` is a mapping.
+    ///
+    /// # Panics
+    /// This function panics if the key given does not exist within `self` (as per [`Index`]).
+    ///
+    /// This function also panics if `self` is not a [`$t::Mapping`].
+    fn index_mut(&mut self, idx: &'key str) -> &mut $nodetype {
+        assert!(
+            matches!(self, Self::Mapping(_)),
+            "Attempt to index {} with '{idx}' but it's not a mapping", $selfname
+        );
+        match self.as_mapping_get_mut_impl(idx) {
+            Some(value) => value,
+            None => {
+                panic!("Key '{idx}' not found in {} mapping", $selfname)
+            }
+        }
+    }
+}
+
+impl<$($generic),+> Index<usize> for $yaml $( where $($whereclause)+ )? {
+    type Output = $nodetype;
+
+    /// Perform indexing if `self` is a sequence or a mapping.
+    ///
+    /// # Panics
+    /// This function panics if the index given is out of range (as per [`Index`]). If `self` is a
+    /// [`$t::Sequence`], this is when the index is bigger or equal to the length of the underlying
+    /// `Vec`. If `self` is a [`$t::Mapping`], this is when the mapping sequence
+    /// does not contain [`Scalar::Integer`]`(idx)` as a key.
+    ///
+    /// This function also panics if `self` is not a [`$t::Sequence`] nor a [`$t::Mapping`].
+    fn index(&self, idx: usize) -> &$nodetype {
+        match self {
+            Self::Sequence(sequence) => sequence
+                .get(idx)
+                .unwrap_or_else(|| panic!("Index {idx} out of bounds in {} sequence", $selfname)),
+            Self::Mapping(mapping) => {
+                let key = i64::try_from(idx).unwrap_or_else(|_| {
+                    panic!("Attempt to index {} mapping with overflowing index", $selfname)
+                });
+                mapping
+                    .get(&Self::Value(Scalar::Integer(key)).into())
+                    .unwrap_or_else(|| panic!("Key '{idx}' not found in {} mapping", $selfname))
+            }
+            _ => {
+                panic!(
+                    "Attempt to index {} with {idx} but it's not a mapping nor a sequence",
+                    $selfname
+                );
+            }
+        }
+    }
+}
+
+impl<$($generic),+> IndexMut<usize> for $yaml $( where $($whereclause)+ )? {
+    /// Perform indexing if `self` is a sequence or a mapping.
+    ///
+    /// # Panics
+    /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
+    /// a [`$t::Sequence`], this is when the index is bigger or equal to the length of the
+    /// underlying `Vec`. If `self` is a [`$t::Mapping`], this is when the mapping sequence does
+    /// not contain [`Scalar::Integer`]`(idx)` as a key.
+    ///
+    /// This function also panics if `self` is not a [`$t::Sequence`] nor a [`$t::Mapping`].
+    fn index_mut(&mut self, idx: usize) -> &mut $nodetype {
+        match self {
+            Self::Sequence(sequence) => sequence
+                .get_mut(idx)
+                .unwrap_or_else(|| panic!("Index {idx} out of bounds in {} sequence", $selfname)),
+            Self::Mapping(mapping) => {
+                let key = i64::try_from(idx).unwrap_or_else(|_| {
+                    panic!("Attempt to index {} mapping with overflowing index", $selfname)
+                });
+                mapping
+                    .get_mut(&Self::Value(Scalar::Integer(key)).into())
+                    .unwrap_or_else(|| panic!("Key {idx} not found in {} mapping", $selfname))
+            }
+            _ => {
+                panic!(
+                    "Attempt to index {} with {idx} but it's not a mapping nor a sequence",
+                    $selfname
+                )
+            }
+        }
     }
 }
     );

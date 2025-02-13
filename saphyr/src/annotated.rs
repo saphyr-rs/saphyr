@@ -140,7 +140,8 @@ define_yaml_object_impl!(
     },
     mappingtype = AnnotatedMapping<'input, Node>,
     sequencetype = AnnotatedSequence<Node>,
-    nodetype = Node
+    nodetype = Node,
+    selfname = "YamlData"
 );
 
 impl<'input, Node> YamlData<'input, Node>
@@ -158,6 +159,7 @@ where
         std::mem::swap(self, &mut taken_out);
         taken_out
     }
+
     /// Implementation detail for [`Self::as_mapping_get`], which is generated from a macro.
     fn as_mapping_get_impl<'a>(&self, key: &'a str) -> Option<&Node>
     where
@@ -210,145 +212,6 @@ where
                 }
             }
             _ => None,
-        }
-    }
-}
-
-// NOTE(ethiraric, 10/06/2024): We cannot create a "generic static" variable which would act as a
-// `BAD_VALUE`. This means that, unlike for `Yaml`, we have to make the indexing method panic.
-
-impl<'input, 'a, Node> Index<&'a str> for YamlData<'input, Node>
-where
-    'input: 'a,
-    Node: std::hash::Hash
-        + std::cmp::Eq
-        + From<Self>
-        + AnnotatedNode
-        + for<'b> std::cmp::PartialEq<Node::HashKey<'b>>,
-{
-    type Output = Node;
-
-    /// Perform indexing if `self` is a mapping.
-    ///
-    /// # Panics
-    /// This function panics if the key given does not exist within `self` (as per [`Index`]).
-    ///
-    /// This function also panics if `self` is not a [`YamlData::Mapping`].
-    fn index(&self, idx: &'a str) -> &Node {
-        match self.as_mapping_get_impl(idx) {
-            Some(value) => value,
-            None => {
-                if matches!(self, Self::Mapping(_)) {
-                    panic!("Key '{idx}' not found in YamlData mapping")
-                } else {
-                    panic!("Attempt to index YamlData with '{idx}' but it's not a mapping")
-                }
-            }
-        }
-    }
-}
-
-impl<'input, 'a, Node> IndexMut<&'a str> for YamlData<'input, Node>
-where
-    'input: 'a,
-    Node: std::hash::Hash
-        + std::cmp::Eq
-        + From<Self>
-        + AnnotatedNode
-        + for<'b> std::cmp::PartialEq<Node::HashKey<'b>>,
-{
-    /// Perform indexing if `self` is a mapping.
-    ///
-    /// # Panics
-    /// This function panics if the key given does not exist within `self` (as per [`Index`]).
-    ///
-    /// This function also panics if `self` is not a [`YamlData::Mapping`].
-    fn index_mut(&mut self, idx: &'a str) -> &mut Node {
-        assert!(
-            matches!(self, Self::Mapping(_)),
-            "Attempt to index YamlData with '{idx}' but it's not a mapping"
-        );
-        match self.as_mapping_get_mut_impl(idx) {
-            Some(value) => value,
-            None => {
-                panic!("Key '{idx}' not found in YamlData mapping")
-            }
-        }
-    }
-}
-
-impl<Node> Index<usize> for YamlData<'_, Node>
-where
-    Node: std::hash::Hash
-        + std::cmp::Eq
-        + From<Self>
-        + AnnotatedNode
-        + for<'a> std::cmp::PartialEq<Node::HashKey<'a>>,
-{
-    type Output = Node;
-
-    /// Perform indexing if `self` is a sequence or a mapping.
-    ///
-    /// # Panics
-    /// This function panics if the index given is out of range (as per [`Index`]). If `self` is a
-    /// [`YamlData::Sequence`], this is when the index is bigger or equal to the length of the
-    /// underlying `Vec`. If `self` is a [`YamlData::Mapping`], this is when the mapping sequence
-    /// does not contain [`Scalar::Integer`]`(idx)` as a key.
-    ///
-    /// This function also panics if `self` is not a [`YamlData::Sequence`] nor a
-    /// [`YamlData::Mapping`].
-    fn index(&self, idx: usize) -> &Node {
-        if let Some(sequence) = self.as_vec() {
-            sequence
-                .get(idx)
-                .unwrap_or_else(|| panic!("Index {idx} out of bounds in YamlData sequence"))
-        } else if let Some(mapping) = self.as_mapping() {
-            let key = i64::try_from(idx).unwrap_or_else(|_| {
-                panic!("Attempt to index YamlData mapping with overflowing index")
-            });
-            mapping
-                .get(&Self::Value(Scalar::Integer(key)).into())
-                .unwrap_or_else(|| panic!("Key '{idx}' not found in YamlData mapping"))
-        } else {
-            panic!("Attempt to index YamlData with {idx} but it's not a mapping nor a sequence");
-        }
-    }
-}
-
-impl<Node> IndexMut<usize> for YamlData<'_, Node>
-where
-    Node: std::hash::Hash
-        + std::cmp::Eq
-        + From<Self>
-        + AnnotatedNode
-        + for<'a> std::cmp::PartialEq<Node::HashKey<'a>>,
-{
-    /// Perform indexing if `self` is a sequence or a mapping.
-    ///
-    /// # Panics
-    /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
-    /// a [`YamlData::Sequence`], this is when the index is bigger or equal to the length of the
-    /// underlying `Vec`. If `self` is a [`YamlData::Mapping`], this is when the mapping sequence
-    /// does not contain [`Scalar::Integer`]`(idx)` as a key.
-    ///
-    /// This function also panics if `self` is not a [`YamlData::Sequence`] nor a
-    /// [`YamlData::Mapping`].
-    fn index_mut(&mut self, idx: usize) -> &mut Node {
-        match self {
-            Self::Sequence(sequence) => sequence
-                .get_mut(idx)
-                .unwrap_or_else(|| panic!("Index {idx} out of bounds in YamlData sequence")),
-            Self::Mapping(mapping) => {
-                let key = i64::try_from(idx).unwrap_or_else(|_| {
-                    panic!("Attempt to index YamlData mapping with overflowing index")
-                });
-                mapping
-                    .get_mut(&Self::Value(Scalar::Integer(key)).into())
-                    .unwrap_or_else(|| panic!("Key {idx} not found in YamlData mapping"))
-            }
-            _ => {
-                panic!("Attempt to index YamlData with {idx} but it's not a mapping nor a sequence")
-            }
         }
     }
 }
