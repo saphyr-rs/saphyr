@@ -1,30 +1,41 @@
 /// Generate common conversion methods for scalar variants of YAML enums.
 ///
-/// This is used by [`Scalar`].
+/// This is used by [`Scalar`] and [`ScalarOwned`].
 ///
 /// [`Scalar`]: crate::Scalar
+/// [`ScalarOwned`]: crate::ScalarOwned
 macro_rules! define_yaml_scalar_conversion_ops (
-    () => (
+    (owned) => (
+define_yaml_scalar_conversion_ops!(base);
+define_as_ref_mut!(as_string_mut, &mut String, String);
+define_as_ref_mut!(as_str_mut,    &mut str,    String);
+    );
+
+    (borrowing) => (
+define_yaml_scalar_conversion_ops!(base);
+define_as_ref!(as_cow,         &Cow<'input, str>,     String);
+define_as_ref_mut!(as_cow_mut, &mut Cow<'input, str>, String);
+define_into!(into_cow,         Cow<'input, str>,      String);
+define_as_ref_mut_pattern!(as_str_mut,    &mut str => Self::String(ref mut v) => Some(v.to_mut()));
+    );
+
+    (base) => ( // Methods common to the owned and borrowing variants.
 // ---------- SCALAR CONVERSIONS ----------
 define_as!(as_bool,           bool,              Boolean);
 define_as!(as_integer,        i64,               Integer);
 define_as!(as_floating_point, f64,               FloatingPoint);
 
 define_as_ref!(as_str,        &str,              String);
-define_as_ref!(as_cow,        &Cow<'input, str>, String);
 
 define_as_ref_mut!(as_bool_mut,           &mut bool,             Boolean);
 define_as_ref_mut!(as_integer_mut,        &mut i64,              Integer);
 define_as_ref_mut!(as_floating_point_mut, &mut f64,              FloatingPoint);
-define_as_ref_mut!(as_cow_mut,            &mut Cow<'input, str>, String);
 
-define_as_ref_mut_pattern!(as_str_mut,    &mut str => Self::String(ref mut v) => Some(v.to_mut()));
 
 define_into!(into_boolean, bool,             Boolean);
 define_into!(into_i64,     i64,              Integer);
 define_into!(into_f64,     f64,              FloatingPoint);
 define_into!(into_string,  String,           String);
-define_into!(into_cow,     Cow<'input, str>, String);
 
 // ---------- VARIANT TESTING ----------
 define_is!(is_null,           Self::Null);

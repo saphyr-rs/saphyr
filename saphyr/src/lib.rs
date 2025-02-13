@@ -59,7 +59,7 @@ pub use crate::annotated::{
 };
 pub use crate::emitter::YamlEmitter;
 pub use crate::loader::{LoadableYamlNode, YamlLoader};
-pub use crate::scalar::Scalar;
+pub use crate::scalar::{Scalar, ScalarOwned};
 pub use crate::yaml::{Mapping, Sequence, Yaml, YamlIter};
 
 #[cfg(feature = "encoding")]
