@@ -1,4 +1,4 @@
-use saphyr::{Scalar, Yaml, YamlEmitter};
+use saphyr::{LoadableYamlNode, Scalar, Yaml, YamlEmitter};
 
 fn roundtrip(original: &Yaml) {
     let mut emitted = String::new();

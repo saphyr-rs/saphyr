@@ -21,7 +21,7 @@
 //! Parse a string into `Vec<Yaml>` and then serialize it as a YAML string.
 //!
 //! ```
-//! use saphyr::{Yaml, YamlEmitter};
+//! use saphyr::{LoadableYamlNode, Yaml, YamlEmitter};
 //!
 //! let docs = Yaml::load_from_str("[1, 2, 3]").unwrap();
 //! let doc = &docs[0]; // select the first YAML document

@@ -4,7 +4,7 @@ use std::{borrow::Cow, ops::ControlFlow};
 
 use encoding_rs::{Decoder, DecoderResult, Encoding};
 
-use crate::{loader::LoadError, Yaml};
+use crate::{loader::LoadError, LoadableYamlNode, Yaml};
 
 /// The signature of the function to call when using [`YAMLDecodingTrap::Call`].
 ///

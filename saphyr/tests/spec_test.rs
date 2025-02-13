@@ -1,4 +1,4 @@
-use saphyr::{Mapping, Scalar, Yaml, YamlEmitter};
+use saphyr::{LoadableYamlNode, Mapping, Scalar, Yaml, YamlEmitter};
 
 #[test]
 fn test_mapvec_legal() {

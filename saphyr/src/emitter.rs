@@ -2,8 +2,11 @@
 
 use saphyr_parser::Tag;
 
-use crate::yaml::{Mapping, Yaml};
-use crate::{char_traits, Scalar};
+use crate::{
+    char_traits,
+    yaml::{Mapping, Yaml},
+    Scalar,
+};
 use std::convert::From;
 use std::error::Error;
 use std::fmt::{self, Display};
@@ -38,7 +41,7 @@ impl From<fmt::Error> for EmitError {
 /// The YAML serializer.
 ///
 /// ```
-/// # use saphyr::{Yaml, YamlEmitter};
+/// # use saphyr::{LoadableYamlNode, Yaml, YamlEmitter};
 /// let input_string = "a: b\nc: d";
 /// let yaml = Yaml::load_from_str(input_string).unwrap();
 ///
@@ -161,7 +164,7 @@ impl<'a> YamlEmitter<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// use saphyr::{Yaml, YamlEmitter};
+    /// use saphyr::{LoadableYamlNode, Yaml, YamlEmitter};
     ///
     /// let input = r#"{foo: "bar!\nbar!", baz: 42}"#;
     /// let parsed = Yaml::load_from_str(input).unwrap();
@@ -431,9 +434,7 @@ fn need_quotes(string: &str) -> bool {
 
 #[cfg(test)]
 mod test {
-    use crate::Yaml;
-
-    use super::YamlEmitter;
+    use crate::{LoadableYamlNode, Yaml, YamlEmitter};
 
     #[test]
     fn test_multiline_string() {

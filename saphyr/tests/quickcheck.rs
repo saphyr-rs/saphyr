@@ -3,7 +3,7 @@ extern crate quickcheck;
 
 use quickcheck::TestResult;
 
-use saphyr::{Scalar, Yaml, YamlEmitter};
+use saphyr::{LoadableYamlNode, Scalar, Yaml, YamlEmitter};
 
 quickcheck! {
     fn test_check_weird_keys(xs: Vec<String>) -> TestResult {

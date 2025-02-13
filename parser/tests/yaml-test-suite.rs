@@ -2,7 +2,7 @@ use std::fs::{self, DirEntry};
 
 use libtest_mimic::{run_tests, Arguments, Outcome, Test};
 
-use saphyr::{Mapping, Scalar, Yaml};
+use saphyr::{LoadableYamlNode, Mapping, Scalar, Yaml};
 use saphyr_parser::{
     Event, Marker, Parser, ScalarStyle, ScanError, Span, SpannedEventReceiver, Tag,
 };

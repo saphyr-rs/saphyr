@@ -1,4 +1,4 @@
-use saphyr::{MarkedYaml, Scalar, Yaml, YamlData};
+use saphyr::{LoadableYamlNode, MarkedYaml, Scalar, Yaml, YamlData};
 
 fn get_yaml_mapping() -> Yaml<'static> {
     let s = "

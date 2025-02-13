@@ -3,7 +3,7 @@
 use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 
 use hashlink::LinkedHashMap;
-use saphyr_parser::{Event, ScanError, Span, SpannedEventReceiver};
+use saphyr_parser::{BufferedInput, Event, Input, Parser, ScanError, Span, SpannedEventReceiver};
 
 use crate::{Mapping, Yaml};
 
@@ -95,11 +95,70 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
     #[must_use]
     fn take(&mut self) -> Self;
 
-    /// Provide the marker for the node (builder-style).
+    /// Provide the span for the node (builder-style).
     #[inline]
     #[must_use]
     fn with_span(self, _: Span) -> Self {
         self
+    }
+
+    /// Load the given string as an array of YAML documents.
+    ///
+    /// The `source` is interpreted as YAML documents and is parsed. Parsing succeeds if and only
+    /// if all documents are parsed successfully. An error in a latter document prevents the former
+    /// from being returned.
+    ///
+    /// Most often, only one document is loaded in a YAML string. In this case, only the first element
+    /// of the returned `Vec` will be used. Otherwise, each element in the `Vec` is a document:
+    ///
+    /// ```
+    /// use saphyr::{LoadableYamlNode, Scalar, Yaml};
+    ///
+    /// let docs = Yaml::load_from_str(r#"
+    /// First document
+    /// ---
+    /// - Second document
+    /// "#).unwrap();
+    /// let first_document = &docs[0]; // Select the first YAML document
+    /// // The document is a string containing "First document".
+    /// assert_eq!(*first_document, Yaml::Value(Scalar::String("First document".into())));
+    ///
+    /// let second_document = &docs[1]; // Select the second YAML document
+    /// // The document is an array containing a single string, "Second document".
+    /// assert_eq!(second_document[0], Yaml::Value(Scalar::String("Second document".into())));
+    /// ```
+    ///
+    /// # Errors
+    /// Returns [`ScanError`] when loading fails.
+    fn load_from_str(source: &str) -> Result<Vec<Self>, ScanError> {
+        Self::load_from_iter(source.chars())
+    }
+
+    /// Load the contents of the given iterator as an array of YAML documents.
+    ///
+    /// See [`load_from_str`] for details.
+    ///
+    /// # Errors
+    /// Returns [`ScanError`] when loading fails.
+    ///
+    /// [`load_from_str`]: LoadableYamlNode::load_from_str
+    fn load_from_iter<I: Iterator<Item = char>>(source: I) -> Result<Vec<Self>, ScanError> {
+        let mut parser = Parser::new(BufferedInput::new(source));
+        Self::load_from_parser(&mut parser)
+    }
+
+    /// Load the contents from the specified [`Parser`] as an array of YAML documents.
+    ///
+    /// See [`load_from_str`] for details.
+    ///
+    /// # Errors
+    /// Returns [`ScanError`] when loading fails.
+    ///
+    /// [`load_from_str`]: LoadableYamlNode::load_from_str
+    fn load_from_parser<I: Input>(parser: &mut Parser<'input, I>) -> Result<Vec<Self>, ScanError> {
+        let mut loader = YamlLoader::default();
+        parser.load(&mut loader, true)?;
+        Ok(loader.into_documents())
     }
 }
 

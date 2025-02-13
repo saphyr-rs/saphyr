@@ -1,7 +1,7 @@
 #![allow(clippy::bool_assert_comparison)]
 #![allow(clippy::float_cmp)]
 
-use saphyr::{Scalar, Yaml, YamlEmitter};
+use saphyr::{LoadableYamlNode, Scalar, Yaml, YamlEmitter};
 
 #[test]
 fn test_api() {

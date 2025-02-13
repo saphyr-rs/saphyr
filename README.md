@@ -9,7 +9,7 @@ high-level crate, providing quick-and-easy YAML importing, exporting and object
 manipulation.
 
 ```rs
-use saphyr::{Yaml, YamlEmitter};
+use saphyr::{LoadableYamlNode, Yaml, YamlEmitter};
 
 let docs = Yaml::load_from_str("[1, 2, 3]").unwrap();
 let doc = &docs[0]; // select the first YAML document

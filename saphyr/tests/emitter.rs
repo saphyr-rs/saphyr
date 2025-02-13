@@ -1,4 +1,4 @@
-use saphyr::{Yaml, YamlEmitter};
+use saphyr::{LoadableYamlNode, Yaml, YamlEmitter};
 
 #[allow(clippy::similar_names)]
 #[test]

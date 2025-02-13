@@ -1,4 +1,4 @@
-use saphyr::Yaml;
+use saphyr::{LoadableYamlNode, Yaml};
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;

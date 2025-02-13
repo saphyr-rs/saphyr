@@ -25,6 +25,9 @@
 - Rename `from_str` to `value_from_str` to better highlight it:
   - Doesn't load a YAML document
   - Doesn't always load into a YAML string
+- `load_from_*` functions now belong to the `LoadableYamlNode` trait to avoid
+  implementing them in each YAML node type. It is now required to import
+  `LoadableYamlNode` to use these functions (LSPs should have a fixit for it).
 
 **Features**:
 - Add the following convenience methods to the YAML objects:

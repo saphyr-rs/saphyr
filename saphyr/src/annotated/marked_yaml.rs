@@ -3,9 +3,9 @@
 //! This is set aside so as to not clutter `annotated.rs`.
 
 use hashlink::LinkedHashMap;
-use saphyr_parser::{BufferedInput, Input, Parser, ScanError, Span};
+use saphyr_parser::Span;
 
-use crate::{LoadableYamlNode, Yaml, YamlData, YamlLoader};
+use crate::{LoadableYamlNode, Yaml, YamlData};
 
 /// A YAML node with [`Span`]s pointing to the start of the node.
 ///
@@ -24,43 +24,6 @@ pub struct MarkedYaml<'input> {
     pub span: Span,
     /// The YAML contents of the node.
     pub data: YamlData<'input, MarkedYaml<'input>>,
-}
-
-impl<'input> MarkedYaml<'input> {
-    /// Load the given string as an array of YAML documents.
-    ///
-    /// See [`Yaml::load_from_str`] for more details.
-    ///
-    /// # Errors
-    /// Returns `ScanError` when loading fails.
-    pub fn load_from_str(source: &str) -> Result<Vec<Self>, ScanError> {
-        Self::load_from_iter(source.chars())
-    }
-
-    /// Load the contents of the given iterator as an array of YAML documents.
-    ///
-    /// See [`Yaml::load_from_iter`] for more details.
-    ///
-    /// # Errors
-    /// Returns `ScanError` when loading fails.
-    pub fn load_from_iter<I: Iterator<Item = char>>(source: I) -> Result<Vec<Self>, ScanError> {
-        let mut parser = Parser::new(BufferedInput::new(source));
-        Self::load_from_parser(&mut parser)
-    }
-
-    /// Load the contents from the specified [`Parser`] as an array of YAML documents.
-    ///
-    /// See [`Yaml::load_from_parser`] for more details.
-    ///
-    /// # Errors
-    /// Returns `ScanError` when loading fails.
-    pub fn load_from_parser<I: Input>(
-        parser: &mut Parser<'input, I>,
-    ) -> Result<Vec<Self>, ScanError> {
-        let mut loader = YamlLoader::<Self>::default();
-        parser.load(&mut loader, true)?;
-        Ok(loader.into_documents())
-    }
 }
 
 impl super::AnnotatedNode for MarkedYaml<'_> {
