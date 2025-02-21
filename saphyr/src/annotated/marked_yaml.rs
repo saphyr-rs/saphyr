@@ -87,34 +87,37 @@ impl<'input> MarkedYaml<'input> {
         )
     }
 
-    pub fn get<I: Index>(&self, index: I) -> Option<&Self> {
+    pub fn get<I: Index + 'static>(&self, index: I) -> Option<&Self> {
         index.index_into(self)
     }
 }
 
 pub trait Index {
-    fn index_into<'v>(&self, v: &'v MarkedYaml) -> Option<&'v MarkedYaml>;
+    fn index_into<'n, 'v>(self, v: &'v MarkedYaml<'n>) -> Option<&'v MarkedYaml<'n>>;
 }
 
 impl Index for usize {
-    fn index_into<'v>(&self, v: &'v MarkedYaml) -> Option<&'v MarkedYaml> {
-        v.data.as_vec().and_then(|elements| elements.get(*self))
+    fn index_into<'n, 'v>(self, v: &'v MarkedYaml<'n>) -> Option<&'v MarkedYaml<'n>> {
+        v.data.as_vec().and_then(|elements| elements.get(self))
     }
 }
 
-impl Index for str {
-    fn index_into<'v>(&self, v: &'v MarkedYaml) -> Option<&'v MarkedYaml> {
-        let key = MarkedYaml::from_bare_yaml(Yaml::String(self.to_string()));
-        v.data.as_hash().and_then(|elements| elements.get(&key))
+impl Index for &'static str {
+    fn index_into<'n, 'v>(self, v: &'v MarkedYaml<'n>) -> Option<&'v MarkedYaml<'n>> {
+        let key = MarkedYaml::value_from_str(self);
+        v.data
+            .as_mapping()
+            .and_then(move |elements| elements.get(&key))
     }
 }
 
 impl<'a, I> Index for &'a I
 where
-    I: ?Sized + Index,
+    I: Index + Clone,
 {
-    fn index_into<'v>(&self, v: &'v MarkedYaml) -> Option<&'v MarkedYaml> {
-        (**self).index_into(v)
+    fn index_into<'v, 'n>(self, v: &'v MarkedYaml<'n>) -> Option<&'v MarkedYaml<'n>> {
+        let other = self.clone();
+        other.index_into(v)
     }
 }
 

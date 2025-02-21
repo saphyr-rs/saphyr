@@ -1,7 +1,8 @@
 //! YAML serialization helpers.
 
+use crate::char_traits;
+use crate::MarkedYaml;
 use crate::{
-    char_traits,
     yaml::{Mapping, Yaml},
     Scalar,
 };
@@ -125,6 +126,50 @@ fn escape_str(wr: &mut dyn fmt::Write, v: &str) -> Result<(), fmt::Error> {
     Ok(())
 }
 
+pub trait Emittable {
+    fn node(&self) -> Yaml;
+}
+
+impl<E> Emittable for &E
+where
+    E: ?Sized + Emittable,
+{
+    fn node(&self) -> Yaml {
+        (**self).node()
+    }
+}
+
+impl Emittable for Yaml<'_> {
+    fn node(&self) -> Yaml {
+        Yaml::clone(self)
+    }
+}
+
+impl Emittable for MarkedYaml<'_> {
+    fn node(&self) -> Yaml {
+        to_yaml(self)
+    }
+}
+
+pub fn to_yaml<'a>(input: &'a MarkedYaml) -> Yaml<'a> {
+    match &input.data {
+        crate::YamlData::Tagged(tag, node) => Yaml::Tagged(tag.clone(), Box::new(to_yaml(node))),
+        crate::YamlData::Representation(content, style, tag) => {
+            Yaml::Representation(content.clone(), *style, tag.clone())
+        }
+        crate::YamlData::Value(v) => Yaml::Value(v.clone()),
+        crate::YamlData::Sequence(vec) => Yaml::Sequence(vec.iter().map(to_yaml).collect()),
+        crate::YamlData::Mapping(linked_hash_map) => Yaml::Mapping(
+            linked_hash_map
+                .iter()
+                .map(|(k, v)| (to_yaml(k), to_yaml(v)))
+                .collect(),
+        ),
+        crate::YamlData::Alias(a) => Yaml::Alias(*a),
+        crate::YamlData::BadValue => Yaml::BadValue,
+    }
+}
+
 impl<'a> YamlEmitter<'a> {
     /// Create a new emitter serializing into `writer`.
     pub fn new(writer: &'a mut dyn fmt::Write) -> Self {
@@ -194,11 +239,12 @@ impl<'a> YamlEmitter<'a> {
     /// Dump Yaml to an output stream.
     /// # Errors
     /// Returns `EmitError` when an error occurs.
-    pub fn dump(&mut self, doc: &Yaml) -> EmitResult {
+    pub fn dump<Y: Emittable>(&mut self, doc: &Y) -> EmitResult {
         // write DocumentStart
         writeln!(self.writer, "---")?;
         self.level = -1;
-        self.emit_node(doc)
+        let node = doc.node();
+        self.emit_node(&node)
     }
 
     fn write_indent(&mut self) -> EmitResult {
@@ -343,7 +389,7 @@ impl<'a> YamlEmitter<'a> {
                     write!(self.writer, ":")?;
                     self.emit_val(true, v)?;
                 } else {
-                    self.emit_node(k)?;
+                    self.emit_node(&k)?;
                     write!(self.writer, ":")?;
                     self.emit_val(false, v)?;
                 }
@@ -383,7 +429,7 @@ impl<'a> YamlEmitter<'a> {
             }
             _ => {
                 write!(self.writer, " ")?;
-                self.emit_node(val)
+                self.emit_node(&val)
             }
         }
     }
