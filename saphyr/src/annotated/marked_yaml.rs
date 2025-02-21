@@ -87,6 +87,10 @@ impl<'input> MarkedYaml<'input> {
         )
     }
 
+    /// Index into a YAML sequence or map.
+    /// A string index can be used to access a value in a map, and a usize index can be used to access an element of an sequence.
+    ///
+    /// Original implementation is from `serde_yaml` [get](https://docs.rs/serde_yaml/latest/serde_yaml/value/enum.Value.html#method.get)
     pub fn get<I: Index + 'static>(&self, index: I) -> Option<&Self> {
         index.index_into(self)
     }
@@ -102,16 +106,20 @@ impl Index for usize {
     }
 }
 
-impl Index for &'static str {
+impl Index for &str {
     fn index_into<'n, 'v>(self, v: &'v MarkedYaml<'n>) -> Option<&'v MarkedYaml<'n>> {
-        let key = MarkedYaml::value_from_str(self);
-        v.data
-            .as_mapping()
-            .and_then(move |elements| elements.get(&key))
+        self.to_string().index_into(v)
     }
 }
 
-impl<'a, I> Index for &'a I
+impl Index for String {
+    fn index_into<'n, 'v>(self, v: &'v MarkedYaml<'n>) -> Option<&'v MarkedYaml<'n>> {
+        let key = MarkedYaml::scalar_from_string(self);
+        v.data.as_mapping().and_then(|elements| elements.get(&key))
+    }
+}
+
+impl<I> Index for &I
 where
     I: Index + Clone,
 {
