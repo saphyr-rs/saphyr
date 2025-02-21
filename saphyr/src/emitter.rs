@@ -239,7 +239,8 @@ impl<'a> YamlEmitter<'a> {
         // write DocumentStart
         writeln!(self.writer, "---")?;
         self.level = -1;
-        self.emit_node(doc)
+        self.emit_node(doc)?;
+        writeln!(self.writer).map_err(EmitError::FmtError)
     }
 
     fn write_indent(&mut self) -> EmitResult {
