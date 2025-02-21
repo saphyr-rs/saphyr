@@ -1,7 +1,7 @@
 //! YAML serialization helpers.
 
-use crate::char_traits;
 use crate::yaml::{Hash, Yaml};
+use crate::{char_traits, MarkedYaml};
 use std::convert::From;
 use std::error::Error;
 use std::fmt::{self, Display};
@@ -122,6 +122,50 @@ fn escape_str(wr: &mut dyn fmt::Write, v: &str) -> Result<(), fmt::Error> {
     Ok(())
 }
 
+pub trait Emittable {
+    fn node(&self) -> Yaml;
+}
+
+impl<E> Emittable for &E
+where
+    E: ?Sized + Emittable,
+{
+    fn node(&self) -> Yaml {
+        (**self).node()
+    }
+}
+
+impl Emittable for Yaml {
+    fn node(&self) -> Yaml {
+        Yaml::clone(self)
+    }
+}
+
+impl Emittable for MarkedYaml {
+    fn node(&self) -> Yaml {
+        to_yaml(self)
+    }
+}
+
+pub fn to_yaml(input: &MarkedYaml) -> Yaml {
+    match &input.data {
+        crate::YamlData::Real(r) => Yaml::Real(r.to_string()),
+        crate::YamlData::Integer(i) => Yaml::Integer(*i),
+        crate::YamlData::String(s) => Yaml::String(s.to_string()),
+        crate::YamlData::Boolean(b) => Yaml::Boolean(*b),
+        crate::YamlData::Array(vec) => Yaml::Array(vec.iter().map(to_yaml).collect()),
+        crate::YamlData::Hash(linked_hash_map) => Yaml::Hash(
+            linked_hash_map
+                .iter()
+                .map(|(k, v)| (to_yaml(k), to_yaml(v)))
+                .collect(),
+        ),
+        crate::YamlData::Alias(a) => Yaml::Alias(*a),
+        crate::YamlData::Null => Yaml::Null,
+        crate::YamlData::BadValue => Yaml::BadValue,
+    }
+}
+
 impl<'a> YamlEmitter<'a> {
     /// Create a new emitter serializing into `writer`.
     pub fn new(writer: &'a mut dyn fmt::Write) -> Self {
@@ -191,7 +235,7 @@ impl<'a> YamlEmitter<'a> {
     /// Dump Yaml to an output stream.
     /// # Errors
     /// Returns `EmitError` when an error occurs.
-    pub fn dump(&mut self, doc: &Yaml) -> EmitResult {
+    pub fn dump<Y: Emittable>(&mut self, doc: &Y) -> EmitResult {
         // write DocumentStart
         writeln!(self.writer, "---")?;
         self.level = -1;
@@ -210,8 +254,8 @@ impl<'a> YamlEmitter<'a> {
         Ok(())
     }
 
-    fn emit_node(&mut self, node: &Yaml) -> EmitResult {
-        match *node {
+    fn emit_node<Y: Emittable>(&mut self, node: &Y) -> EmitResult {
+        match node.node() {
             Yaml::Array(ref v) => self.emit_array(v),
             Yaml::Hash(ref h) => self.emit_hash(h),
             Yaml::String(ref v) => {
@@ -309,7 +353,7 @@ impl<'a> YamlEmitter<'a> {
                     write!(self.writer, ":")?;
                     self.emit_val(true, v)?;
                 } else {
-                    self.emit_node(k)?;
+                    self.emit_node(&k)?;
                     write!(self.writer, ":")?;
                     self.emit_val(false, v)?;
                 }
@@ -349,7 +393,7 @@ impl<'a> YamlEmitter<'a> {
             }
             _ => {
                 write!(self.writer, " ")?;
-                self.emit_node(val)
+                self.emit_node(&val)
             }
         }
     }
