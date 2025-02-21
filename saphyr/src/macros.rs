@@ -701,6 +701,16 @@ impl $(<$($generic),+>)? IndexMut<usize> for $yaml $( where $($whereclause)+ )? 
         }
     }
 }
+
+#[allow(clippy::needless_lifetimes)]
+impl $(< $( $generic ),+ >)? crate::index::SafelyIndex<$nodetype> for $yaml $(where $($whereclause)+)? {
+    fn get(&self, key: impl Into<crate::index::Accessor>) -> Option<&$nodetype> {
+        match key.into() {
+            crate::index::Accessor::Field(f) => self.as_mapping_get(f.as_str()),
+            crate::index::Accessor::Index(i) => self.as_sequence_get(i),
+        }
+    }
+}
     );
 );
 

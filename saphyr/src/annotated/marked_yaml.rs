@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use hashlink::LinkedHashMap;
 use saphyr_parser::{Marker, ScalarStyle, Span, Tag};
 
-use crate::{LoadableYamlNode, Scalar, Yaml, YamlData};
+use crate::{Accessor, LoadableYamlNode, SafelyIndex, Scalar, Yaml, YamlData};
 
 /// A YAML node with [`Span`]s pointing to the start of the node.
 ///
@@ -117,6 +117,15 @@ impl Eq for MarkedYaml<'_> {}
 impl std::hash::Hash for MarkedYaml<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.data.hash(state);
+    }
+}
+
+impl SafelyIndex for MarkedYaml<'_> {
+    fn get(&self, key: impl Into<crate::Accessor>) -> Option<&Self> {
+        match key.into() {
+            Accessor::Field(f) => self.data.as_mapping_get(f.as_str()),
+            Accessor::Index(i) => self.data.as_sequence_get(i),
+        }
     }
 }
 
