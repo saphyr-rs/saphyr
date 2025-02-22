@@ -54,6 +54,8 @@ define_is!(is_string,         Self::String(_));
 ///  - `is_*` introspection methods
 ///  - `or` and `borrowed_or` methods
 ///  - `contains_mapping_key`, `as_mapping_get`, `as_mapping_get_mut`
+///  - `as_sequence_get` and `as_sequence_get_mut`
+///  - `parse_representation` and `parse_representation_recursive`
 ///  - `value_from_*` methods
 ///
 /// This also calls `define_yaml_object_index_traits_impl`, which creates the [`Index`] and
@@ -64,6 +66,7 @@ define_is!(is_string,         Self::String(_));
 /// [`Index`]: std::ops::Index
 /// [`IndexMut`]: std::ops::IndexMut
 macro_rules! define_yaml_object_impl (
+    // ============================ OWNED VARIANT ============================
     (
         $yaml:ty,
         < $( $generic:tt ),+ >,
@@ -71,54 +74,54 @@ macro_rules! define_yaml_object_impl (
         mappingtype = $mappingtype:ty,
         sequencetype = $sequencetype:ty,
         nodetype = $nodetype:ty,
-        selfname = $selfname:literal
+        scalartype = { $scalartype:tt },
+        selfname = $selfname:literal,
+        owned
     ) => (
+        define_yaml_object_impl!(
+            $yaml,
+            < $($generic),+>,
+            $(where { $($whereclause)+ }, )?
+            mappingtype = $mappingtype,
+            sequencetype = $sequencetype,
+            nodetype = $nodetype,
+            scalartype = { $scalartype },
+            selfname = $selfname,
+            base
+        );
 impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
-    // ---------- SCALAR CONVERSIONS ----------
-    define_as_pattern!(as_bool,                       bool                  => Self::Value(Scalar::Boolean(v))               => Some(v.into()));
-    define_as_pattern!(as_integer,                    i64                   => Self::Value(Scalar::Integer(v))               => Some(v.into()));
-    define_as_pattern!(as_floating_point,             f64                   => Self::Value(Scalar::FloatingPoint(v))         => Some(v.into()));
-    define_as_ref_pattern!(as_cow,                    &Cow<'input, str>     => Self::Value(Scalar::String(ref v))            => Some(v));
-    define_as_ref_pattern!(as_str,                    &str                  => Self::Value(Scalar::String(v))                => Some(v));
+    define_as_ref_mut_pattern!(as_str_mut,            &mut str              => Self::Value($scalartype::String(ref mut v))        => Some(v.as_mut()));
+}
+    );
 
-    define_as_ref_mut_pattern!(as_bool_mut,           &mut bool             => Self::Value(Scalar::Boolean(ref mut v))       => Some(v));
-    define_as_ref_mut_pattern!(as_integer_mut,        &mut i64              => Self::Value(Scalar::Integer(ref mut v))       => Some(v));
-    define_as_ref_mut_pattern!(as_floating_point_mut, &mut f64              => Self::Value(Scalar::FloatingPoint(ref mut v)) => Some(v));
-    define_as_ref_mut_pattern!(as_cow_mut,            &mut Cow<'input, str> => Self::Value(Scalar::String(ref mut v))        => Some(v));
-    define_as_ref_mut_pattern!(as_str_mut,            &mut str              => Self::Value(Scalar::String(ref mut v))        => Some(v.to_mut()));
-
-    define_into_pattern!(into_bool,                   bool                  => Self::Value(Scalar::Boolean(v))               => Some(v));
-    define_into_pattern!(into_integer,                i64                   => Self::Value(Scalar::Integer(v))               => Some(v));
-    define_into_pattern!(into_floating_point,         f64                   => Self::Value(Scalar::FloatingPoint(v))         => Some(v.into()));
-    define_into_pattern!(into_cow,                    Cow<'input, str>      => Self::Value(Scalar::String(v))                => Some(v));
-    define_into_pattern!(into_string,                 String                => Self::Value(Scalar::String(v))                => Some(v.into()));
-
-    // ---------- MAPPING / SEQUENCE CONVERSIONS ----------
-    define_as_ref!(as_mapping,          &$mappingtype,      Mapping);
-    define_as_ref!(as_sequence,         &$sequencetype,     Sequence);
-    define_as_ref!(as_vec,              &$sequencetype,     Sequence);
-
-    define_as_ref_mut!(as_mapping_mut,  &mut $mappingtype,  Mapping);
-    define_as_ref_mut!(as_sequence_mut, &mut $sequencetype, Sequence);
-    define_as_ref_mut!(as_vec_mut,      &mut $sequencetype, Sequence);
-
-    define_into!(into_mapping,          $mappingtype,       Mapping);
-    define_into!(into_vec,              $sequencetype,      Sequence);
-    define_into!(into_sequence,         $sequencetype,      Sequence);
-
-    // ---------- VARIANT TESTING ----------
-    define_is!(is_boolean,        Self::Value(Scalar::Boolean(_)));
-    define_is!(is_integer,        Self::Value(Scalar::Integer(_)));
-    define_is!(is_null,           Self::Value(Scalar::Null));
-    define_is!(is_floating_point, Self::Value(Scalar::FloatingPoint(_)));
-    define_is!(is_string,         Self::Value(Scalar::String(_)));
-
-    define_is!(is_sequence,       Self::Sequence(_));
-    define_is!(is_badvalue,       Self::BadValue);
-    define_is!(is_mapping,        Self::Mapping(_));
-    define_is!(is_alias,          Self::Alias(_));
-    define_is!(is_representation, Self::Representation(..));
-    define_is!(is_value,          Self::Value(_));
+    // ============================ BORROWED VARIANT ============================
+    (
+        $yaml:ty,
+        < $( $generic:tt ),+ >,
+        $( where { $($whereclause:tt)+ }, )?
+        mappingtype = $mappingtype:ty,
+        sequencetype = $sequencetype:ty,
+        nodetype = $nodetype:ty,
+        scalartype = { $scalartype:tt },
+        selfname = $selfname:literal,
+        borrowing
+    ) => (
+        define_yaml_object_impl!(
+            $yaml,
+            < $($generic),+>,
+            $(where { $($whereclause)+ }, )?
+            mappingtype = $mappingtype,
+            sequencetype = $sequencetype,
+            nodetype = $nodetype,
+            scalartype = { $scalartype },
+            selfname = $selfname,
+            base
+        );
+impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
+    define_as_ref_pattern!(as_cow,                    &Cow<'input, str>     => Self::Value($scalartype::String(ref v))            => Some(v));
+    define_as_ref_mut_pattern!(as_cow_mut,            &mut Cow<'input, str> => Self::Value($scalartype::String(ref mut v))        => Some(v));
+    define_into_pattern!(into_cow,                    Cow<'input, str>      => Self::Value($scalartype::String(v))                => Some(v));
+    define_as_ref_mut_pattern!(as_str_mut,            &mut str              => Self::Value($scalartype::String(ref mut v))        => Some(v.to_mut()));
 
     /// Convert a string to a scalar node.
     ///
@@ -174,6 +177,63 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     ) -> Self {
         Scalar::parse_from_cow_and_metadata(v, style, tag).map_or(Self::BadValue, Self::Value)
     }
+}
+    );
+
+    // ============================ COMMON TO BOTH ============================
+    (
+        $yaml:ty,
+        < $( $generic:tt ),+ >,
+        $( where { $($whereclause:tt)+ }, )?
+        mappingtype = $mappingtype:ty,
+        sequencetype = $sequencetype:ty,
+        nodetype = $nodetype:ty,
+        scalartype = { $scalartype:tt },
+        selfname = $selfname:literal,
+        base
+    ) => (
+impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
+    // ---------- SCALAR CONVERSIONS ----------
+    define_as_pattern!(as_bool,                       bool                  => Self::Value($scalartype::Boolean(v))               => Some(v.into()));
+    define_as_pattern!(as_integer,                    i64                   => Self::Value($scalartype::Integer(v))               => Some(v.into()));
+    define_as_pattern!(as_floating_point,             f64                   => Self::Value($scalartype::FloatingPoint(v))         => Some(v.into()));
+    define_as_ref_pattern!(as_str,                    &str                  => Self::Value($scalartype::String(v))                => Some(v));
+
+    define_as_ref_mut_pattern!(as_bool_mut,           &mut bool             => Self::Value($scalartype::Boolean(ref mut v))       => Some(v));
+    define_as_ref_mut_pattern!(as_integer_mut,        &mut i64              => Self::Value($scalartype::Integer(ref mut v))       => Some(v));
+    define_as_ref_mut_pattern!(as_floating_point_mut, &mut f64              => Self::Value($scalartype::FloatingPoint(ref mut v)) => Some(v));
+
+    define_into_pattern!(into_bool,                   bool                  => Self::Value($scalartype::Boolean(v))               => Some(v));
+    define_into_pattern!(into_integer,                i64                   => Self::Value($scalartype::Integer(v))               => Some(v));
+    define_into_pattern!(into_floating_point,         f64                   => Self::Value($scalartype::FloatingPoint(v))         => Some(v.into()));
+    define_into_pattern!(into_string,                 String                => Self::Value($scalartype::String(v))                => Some(v.into()));
+
+    // ---------- MAPPING / SEQUENCE CONVERSIONS ----------
+    define_as_ref!(as_mapping,          &$mappingtype,      Mapping);
+    define_as_ref!(as_sequence,         &$sequencetype,     Sequence);
+    define_as_ref!(as_vec,              &$sequencetype,     Sequence);
+
+    define_as_ref_mut!(as_mapping_mut,  &mut $mappingtype,  Mapping);
+    define_as_ref_mut!(as_sequence_mut, &mut $sequencetype, Sequence);
+    define_as_ref_mut!(as_vec_mut,      &mut $sequencetype, Sequence);
+
+    define_into!(into_mapping,          $mappingtype,       Mapping);
+    define_into!(into_vec,              $sequencetype,      Sequence);
+    define_into!(into_sequence,         $sequencetype,      Sequence);
+
+    // ---------- VARIANT TESTING ----------
+    define_is!(is_boolean,        Self::Value($scalartype::Boolean(_)));
+    define_is!(is_integer,        Self::Value($scalartype::Integer(_)));
+    define_is!(is_null,           Self::Value($scalartype::Null));
+    define_is!(is_floating_point, Self::Value($scalartype::FloatingPoint(_)));
+    define_is!(is_string,         Self::Value($scalartype::String(_)));
+
+    define_is!(is_sequence,       Self::Sequence(_));
+    define_is!(is_badvalue,       Self::BadValue);
+    define_is!(is_mapping,        Self::Mapping(_));
+    define_is!(is_alias,          Self::Alias(_));
+    define_is!(is_representation, Self::Representation(..));
+    define_is!(is_value,          Self::Value(_));
 
     /// If `self` is of the [`Self::Representation`] variant, parse it to the value.
     ///
@@ -188,7 +248,7 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
         match self.take() {
             Self::Representation(value, style, tag) => {
                 if let Some(scalar) =
-                    Scalar::parse_from_cow_and_metadata(value, style, tag.as_ref())
+                    $scalartype::parse_from_cow_and_metadata(value.into(), style, tag.as_ref())
                 {
                     *self = Self::Value(scalar);
                     true
@@ -273,7 +333,7 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     #[must_use]
     pub fn or(self, other: Self) -> Self {
         match self {
-            Self::BadValue | Self::Value(Scalar::Null) => other,
+            Self::BadValue | Self::Value($scalartype::Null) => other,
             this => this,
         }
     }
@@ -284,7 +344,7 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     #[must_use]
     pub fn borrowed_or<'a>(&'a self, other: &'a Self) -> &'a Self {
         match self {
-            Self::BadValue | Self::Value(Scalar::Null) => other,
+            Self::BadValue | Self::Value($scalartype::Null) => other,
             this => this,
         }
     }
@@ -376,6 +436,7 @@ define_yaml_object_index_traits_impl!(
     mappingtype = $mappingtype,
     sequencetype = $sequencetype,
     nodetype = $nodetype,
+    scalartype = { $scalartype },
     selfname = $selfname
 );
     );
@@ -395,6 +456,7 @@ macro_rules! define_yaml_object_index_traits_impl (
         mappingtype = $mappingtype:ty,
         sequencetype = $sequencetype:ty,
         nodetype = $nodetype:ty,
+        scalartype = { $scalartype:tt },
         selfname = $selfname:literal
     ) => (
 impl<'key, $($generic),+ > Index<&'key str> for $yaml $( where $($whereclause)+ )? {
@@ -453,6 +515,8 @@ impl<$($generic),+> Index<usize> for $yaml $( where $($whereclause)+ )? {
     /// does not contain [`Scalar::Integer`]`(idx)` as a key.
     ///
     /// This function also panics if `self` is not a [`$t::Sequence`] nor a [`$t::Mapping`].
+    ///
+    /// [`Scalar::Integer`]: `crate::Scalar::Integer`
     fn index(&self, idx: usize) -> &$nodetype {
         match self {
             Self::Sequence(sequence) => sequence
@@ -463,7 +527,7 @@ impl<$($generic),+> Index<usize> for $yaml $( where $($whereclause)+ )? {
                     panic!("Attempt to index {} mapping with overflowing index", $selfname)
                 });
                 mapping
-                    .get(&Self::Value(Scalar::Integer(key)).into())
+                    .get(&Self::Value($scalartype::Integer(key)).into())
                     .unwrap_or_else(|| panic!("Key '{idx}' not found in {} mapping", $selfname))
             }
             _ => {
@@ -486,6 +550,8 @@ impl<$($generic),+> IndexMut<usize> for $yaml $( where $($whereclause)+ )? {
     /// not contain [`Scalar::Integer`]`(idx)` as a key.
     ///
     /// This function also panics if `self` is not a [`$t::Sequence`] nor a [`$t::Mapping`].
+    ///
+    /// [`Scalar::Integer`]: `crate::Scalar::Integer`
     fn index_mut(&mut self, idx: usize) -> &mut $nodetype {
         match self {
             Self::Sequence(sequence) => sequence
@@ -496,7 +562,7 @@ impl<$($generic),+> IndexMut<usize> for $yaml $( where $($whereclause)+ )? {
                     panic!("Attempt to index {} mapping with overflowing index", $selfname)
                 });
                 mapping
-                    .get_mut(&Self::Value(Scalar::Integer(key)).into())
+                    .get_mut(&Self::Value($scalartype::Integer(key)).into())
                     .unwrap_or_else(|| panic!("Key {idx} not found in {} mapping", $selfname))
             }
             _ => {

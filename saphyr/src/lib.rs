@@ -55,7 +55,7 @@ mod yaml;
 // Re-export main components.
 pub use crate::annotated::{
     marked_yaml::MarkedYaml, AnnotatedMapping, AnnotatedNode, AnnotatedSequence, AnnotatedYamlIter,
-    YamlData,
+    YamlData, YamlDataOwned,
 };
 pub use crate::emitter::YamlEmitter;
 pub use crate::loader::{LoadableYamlNode, YamlLoader};

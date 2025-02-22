@@ -120,7 +120,9 @@ define_yaml_object_impl!(
     mappingtype = AnnotatedMapping<'input, Node>,
     sequencetype = AnnotatedSequence<Node>,
     nodetype = Node,
-    selfname = "YamlData"
+    scalartype = { Scalar },
+    selfname = "YamlData",
+    borrowing
 );
 
 impl<'input, Node> YamlData<'input, Node>
@@ -147,7 +149,7 @@ where
         use std::hash::Hash;
 
         match self {
-            YamlData::Mapping(mapping) => {
+            Self::Mapping(mapping) => {
                 let needle = Node::HashKey::<'a>::from(YamlData::Value(Scalar::String(key.into())));
 
                 // In order to work around `needle`'s lifetime being different from `h`'s, we need

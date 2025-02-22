@@ -108,7 +108,9 @@ define_yaml_object_impl!(
     mappingtype = Mapping<'input>,
     sequencetype = Sequence<'input>,
     nodetype = Self,
-    selfname = "YAML"
+    scalartype = { Scalar },
+    selfname = "YAML",
+    borrowing
 );
 
 impl Yaml<'_> {

@@ -41,6 +41,8 @@
   values in mappings, with the caveats listed in the crate description (#18).
   The `OrderedFloat`s are kept within the `Scalar` object and conversion
   methods do not expose them.
+- Add `YamlDataOwned`, an owned version of `YamlData` for when lifetimes are
+  not required.
 
 ## v0.0.3
 
