@@ -45,7 +45,8 @@ impl From<fmt::Error> for EmitError {
 ///
 /// assert_eq!(output, r#"---
 /// a: b
-/// c: d"#);
+/// c: d
+/// "#);
 /// ```
 #[allow(clippy::module_name_repetitions)]
 pub struct YamlEmitter<'a> {
@@ -218,7 +219,8 @@ impl<'a> YamlEmitter<'a> {
     /// foo: |-
     ///   bar!
     ///   bar!
-    /// baz: 42");
+    /// baz: 42
+    /// ");
     /// ```
     ///
     /// [literal style]: https://yaml.org/spec/1.2/spec.html#id2795688
