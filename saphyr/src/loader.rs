@@ -1,13 +1,13 @@
 //! The default loader.
 
+use core::panic;
 use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData, sync::Arc};
 
+use crate::{Mapping, Yaml};
 use hashlink::LinkedHashMap;
 use saphyr_parser::{
     BufferedInput, Event, Input, Marker, Parser, ScanError, Span, SpannedEventReceiver, Tag,
 };
-
-use crate::{Mapping, Yaml};
 
 /// Main structure for parsing YAML.
 ///
@@ -27,6 +27,7 @@ where
     // (current node, anchor_id, tag) tuple
     doc_stack: Vec<(Node, usize, Option<Cow<'input, Tag>>)>,
     key_stack: Vec<Node>,
+    marker_stack: Vec<MarkerState>,
     anchor_map: BTreeMap<usize, Node>,
     marker: PhantomData<&'input u32>,
     /// See [`Self::early_parse()`]
@@ -209,6 +210,12 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
     }
 }
 
+#[derive(Debug)]
+enum MarkerState {
+    MappingStarted(Marker),
+    SequenceStarted(Marker),
+}
+
 impl<'input, Node> YamlLoader<'input, Node>
 where
     Node: LoadableYamlNode<'input>,
@@ -255,13 +262,34 @@ where
                 }
             }
             Event::SequenceStart(aid, tag) => {
+                self.marker_stack
+                    .push(MarkerState::SequenceStarted(span.start));
                 self.doc_stack.push((
                     Node::from_bare_yaml(Yaml::Sequence(Vec::new())).with_start_marker(mark),
                     aid,
                     tag,
                 ));
             }
+            Event::SequenceEnd => {
+                let actual_span = match self.marker_stack.pop() {
+                    Some(MarkerState::SequenceStarted(start)) => Span::new(start, span.end),
+                    other => panic!("unexpected element on marker_stack {other:?}"),
+                };
+                if ev == Event::MappingEnd {
+                    self.key_stack.pop().unwrap();
+                }
+                let (mut node, anchor_id, tag) = self.doc_stack.pop().unwrap();
+                node = node.with_span(actual_span);
+                if let Some(tag) = tag.clone() {
+                    if !tag.is_yaml_core_schema() {
+                        node = node.into_tagged(tag);
+                    }
+                }
+                self.insert_new_node(node, anchor_id, tag);
+            }
             Event::MappingStart(aid, tag) => {
+                self.marker_stack
+                    .push(MarkerState::MappingStarted(span.start));
                 self.doc_stack.push((
                     Node::from_bare_yaml(Yaml::Mapping(Mapping::new())).with_start_marker(mark),
                     aid,
@@ -269,18 +297,22 @@ where
                 ));
                 self.key_stack.push(Node::from_bare_yaml(Yaml::BadValue));
             }
-            Event::MappingEnd | Event::SequenceEnd => {
+            Event::MappingEnd => {
+                let actual_span = match self.marker_stack.pop() {
+                    Some(MarkerState::MappingStarted(start)) => Span::new(start, span.end),
+                    other => panic!("unexpected element on marker_stack {other:?}"),
+                };
                 if ev == Event::MappingEnd {
                     self.key_stack.pop().unwrap();
                 }
                 let (mut node, anchor_id, tag) = self.doc_stack.pop().unwrap();
-                node = node.with_end_marker(mark);
-                if let Some(tag) = tag {
+                node = node.with_span(actual_span);
+                if let Some(tag) = tag.clone() {
                     if !tag.is_yaml_core_schema() {
                         node = node.into_tagged(tag);
                     }
                 }
-                self.insert_new_node(node, anchor_id, None);
+                self.insert_new_node(node, anchor_id, tag);
             }
             Event::Scalar(v, style, aid, tag) => {
                 let node = if self.early_parse {
@@ -348,6 +380,7 @@ where
             anchor_map: BTreeMap::new(),
             marker: PhantomData,
             early_parse: true,
+            marker_stack: vec![],
         }
     }
 }
