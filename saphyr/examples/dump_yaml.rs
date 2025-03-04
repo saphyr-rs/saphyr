@@ -1,4 +1,4 @@
-use saphyr::Yaml;
+use saphyr::{MarkedYaml, YamlData};
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
@@ -9,14 +9,14 @@ fn print_indent(indent: usize) {
     }
 }
 
-fn dump_node(doc: &Yaml, indent: usize) {
-    match *doc {
-        Yaml::Array(ref v) => {
+fn dump_node(node: &MarkedYaml, indent: usize) {
+    match node.data {
+        YamlData::Array(ref v) => {
             for x in v {
                 dump_node(x, indent + 1);
             }
         }
-        Yaml::Hash(ref h) => {
+        YamlData::Hash(ref h) => {
             for (k, v) in h {
                 print_indent(indent);
                 println!("{k:?}:");
@@ -25,7 +25,6 @@ fn dump_node(doc: &Yaml, indent: usize) {
         }
         _ => {
             print_indent(indent);
-            println!("{doc:?}");
         }
     }
 }
@@ -36,7 +35,7 @@ fn main() {
     let mut s = String::new();
     f.read_to_string(&mut s).unwrap();
 
-    let docs = Yaml::load_from_str(&s).unwrap();
+    let docs = MarkedYaml::load_from_str(&s).unwrap();
     for doc in &docs {
         println!("---");
         dump_node(doc, 0);

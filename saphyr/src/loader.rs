@@ -1,9 +1,10 @@
 //! The default loader.
 
+use core::panic;
 use std::{collections::BTreeMap, sync::Arc};
 
 use hashlink::LinkedHashMap;
-use saphyr_parser::{Event, ScanError, Span, SpannedEventReceiver, TScalarStyle, Tag};
+use saphyr_parser::{Event, Marker, ScanError, Span, SpannedEventReceiver, TScalarStyle, Tag};
 
 use crate::{Hash, Yaml};
 
@@ -25,7 +26,14 @@ where
     // (current node, anchor_id) tuple
     doc_stack: Vec<(Node, usize)>,
     key_stack: Vec<Node>,
+    marker_stack: Vec<MarkerState>,
     anchor_map: BTreeMap<usize, Node>,
+}
+
+#[derive(Debug)]
+enum MarkerState {
+    MappingStarted(Marker),
+    SequenceStarted(Marker),
 }
 
 // For some reason, rustc wants `Node: Default` if I `#[derive(Default)]`.
@@ -38,6 +46,7 @@ where
             docs: vec![],
             doc_stack: vec![],
             key_stack: vec![],
+            marker_stack: vec![],
             anchor_map: BTreeMap::new(),
         }
     }
@@ -63,16 +72,26 @@ where
                 }
             }
             Event::SequenceStart(aid, _) => {
+                self.marker_stack
+                    .push(MarkerState::SequenceStarted(span.start));
                 self.doc_stack.push((
                     Node::from_bare_yaml(Yaml::Array(Vec::new())).with_span(span),
                     aid,
                 ));
             }
             Event::SequenceEnd => {
-                let node = self.doc_stack.pop().unwrap();
-                self.insert_new_node(node);
+                let actual_span = match self.marker_stack.pop() {
+                    Some(MarkerState::SequenceStarted(start)) => Span::new(start, span.end),
+                    other => panic!("unexpected element on marker_stack {other:?}"),
+                };
+
+                let (node, i) = self.doc_stack.pop().unwrap();
+                let node = node.with_span(actual_span);
+                self.insert_new_node((node, i));
             }
             Event::MappingStart(aid, _) => {
+                self.marker_stack
+                    .push(MarkerState::MappingStarted(span.start));
                 self.doc_stack.push((
                     Node::from_bare_yaml(Yaml::Hash(Hash::new())).with_span(span),
                     aid,
@@ -80,9 +99,14 @@ where
                 self.key_stack.push(Node::from_bare_yaml(Yaml::BadValue));
             }
             Event::MappingEnd => {
+                let actual_span = match self.marker_stack.pop() {
+                    Some(MarkerState::MappingStarted(start)) => Span::new(start, span.end),
+                    other => panic!("unexpected element on marker_stack {other:?}"),
+                };
                 self.key_stack.pop().unwrap();
-                let node = self.doc_stack.pop().unwrap();
-                self.insert_new_node(node);
+                let (node, i) = self.doc_stack.pop().unwrap();
+                let node = node.with_span(actual_span);
+                self.insert_new_node((node, i));
             }
             Event::Scalar(v, style, aid, tag) => {
                 let node = if style != TScalarStyle::Plain {
