@@ -87,6 +87,44 @@ impl Index for str {
     }
 }
 
+impl Index for MarkedYaml {
+    fn index_into<'v>(&self, v: &'v MarkedYaml) -> Option<&'v MarkedYaml> {
+        match &v.data {
+            YamlData::Array(vec) => {
+                if let Some(num) = self.data.as_i64() {
+                    vec.get(num as usize)
+                } else {
+                    None
+                }
+            }
+            YamlData::Hash(nodes) => nodes.get(self),
+            _ => None,
+        }
+    }
+}
+
+impl Index for YamlData<MarkedYaml> {
+    fn index_into<'v>(&self, v: &'v MarkedYaml) -> Option<&'v MarkedYaml> {
+        match &v.data {
+            YamlData::Array(vec) => {
+                if let Some(num) = self.as_i64() {
+                    vec.get(num as usize)
+                } else {
+                    None
+                }
+            }
+            YamlData::Hash(nodes) => {
+                let this = MarkedYaml {
+                    span: Span::default(),
+                    data: self.clone(),
+                };
+                nodes.get(&this)
+            }
+            _ => None,
+        }
+    }
+}
+
 impl Index for String {
     fn index_into<'v>(&self, v: &'v MarkedYaml) -> Option<&'v MarkedYaml> {
         let key = MarkedYaml::from_bare_yaml(Yaml::String(self.clone()));
