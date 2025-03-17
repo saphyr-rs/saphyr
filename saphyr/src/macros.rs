@@ -1,3 +1,5 @@
+//! Internal helpers for generating code.
+
 /// Generate common conversion methods for scalar variants of YAML enums.
 ///
 /// This is used by [`Scalar`] and [`ScalarOwned`].

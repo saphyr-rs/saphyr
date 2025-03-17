@@ -1,3 +1,5 @@
+//! Wrapper around a [YAML scalar](https://yaml.org/spec/1.2.2/#23-scalars).
+
 use std::borrow::Cow;
 
 use ordered_float::OrderedFloat;
