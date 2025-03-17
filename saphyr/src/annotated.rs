@@ -18,6 +18,7 @@
 //! [`Yaml`]: crate::Yaml
 
 pub mod marked_yaml;
+pub mod marked_yaml_owned;
 pub mod yaml_data;
 pub mod yaml_data_owned;
 

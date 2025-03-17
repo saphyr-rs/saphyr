@@ -43,6 +43,8 @@
   methods do not expose them.
 - Add `YamlDataOwned`, an owned version of `YamlData` for when lifetimes are
   not required.
+- Add `MarkedYamlOwned`, an owned version of `MarkedYaml` for when lifetimes
+  are not required.
 
 ## v0.0.3
 
