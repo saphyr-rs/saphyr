@@ -304,7 +304,7 @@ pub(crate) fn parse_f64(v: &str) -> Option<f64> {
     match v {
         ".inf" | ".Inf" | ".INF" | "+.inf" | "+.Inf" | "+.INF" => Some(f64::INFINITY),
         "-.inf" | "-.Inf" | "-.INF" => Some(f64::NEG_INFINITY),
-        ".nan" | "NaN" | ".NAN" => Some(f64::NAN),
+        ".nan" | ".NaN" | ".NAN" => Some(f64::NAN),
         _ => v.parse::<f64>().ok(),
     }
 }
