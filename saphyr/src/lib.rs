@@ -7,12 +7,7 @@
 //! # Usage
 //!
 //! This crate is [on github](https://github.com/saphyr-rs/saphyr) and can be used by adding
-//! `saphyr` to the dependencies in your project's `Cargo.toml`.
-//! ```toml
-//! [dependencies]
-//! saphyr = "0.0.3"
-//! ```
-//! or by using `cargo add` to get the latest version:
+//! `saphyr` to the dependencies in your project's `Cargo.toml`:
 //! ```sh
 //! cargo add saphyr
 //! ```

@@ -13,11 +13,10 @@
 //! # Usage
 //!
 //! This crate is [on github](https://github.com/saphyr-rs/saphyr-parser) and can be used by adding
-//! `saphyr-parser` to the dependencies in your project's `Cargo.toml`.
+//! `saphyr-parser` to the dependencies in your project's `Cargo.toml`:
 //!
-//! ```toml
-//! [dependencies]
-//! saphyr-parser = "0.0.3"
+//! ```sh
+//! cargo add saphyr-parser
 //! ```
 //!
 //! # Features

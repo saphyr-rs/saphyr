@@ -2,6 +2,8 @@
 
 ## Upcoming
 
+## v0.0.4
+
 **Breaking Changes**:
 
 - Allow `Yaml` to borrow from the input.
