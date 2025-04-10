@@ -71,7 +71,7 @@ macro_rules! define_yaml_object_impl (
     // ============================ OWNED VARIANT ============================
     (
         $yaml:ty,
-        < $( $generic:tt ),+ >,
+        $( < $( $generic:tt ),+ >, )?
         $( where { $($whereclause:tt)+ }, )?
         mappingtype = $mappingtype:ty,
         sequencetype = $sequencetype:ty,
@@ -82,7 +82,7 @@ macro_rules! define_yaml_object_impl (
     ) => (
         define_yaml_object_impl!(
             $yaml,
-            < $($generic),+>,
+            $( < $($generic),+>, )?
             $(where { $($whereclause)+ }, )?
             mappingtype = $mappingtype,
             sequencetype = $sequencetype,
@@ -91,7 +91,7 @@ macro_rules! define_yaml_object_impl (
             selfname = $selfname,
             base
         );
-impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
+impl $(< $( $generic ),+ >)? $yaml $(where $($whereclause)+)? {
     define_as_ref_mut_pattern!(as_str_mut,            &mut str              => Self::Value($scalartype::String(ref mut v))        => Some(v.as_mut()));
 }
     );
@@ -185,7 +185,7 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     // ============================ COMMON TO BOTH ============================
     (
         $yaml:ty,
-        < $( $generic:tt ),+ >,
+        $( < $( $generic:tt ),+ >, )?
         $( where { $($whereclause:tt)+ }, )?
         mappingtype = $mappingtype:ty,
         sequencetype = $sequencetype:ty,
@@ -194,7 +194,7 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
         selfname = $selfname:literal,
         base
     ) => (
-impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
+impl $(< $( $generic ),+ >)? $yaml $(where $($whereclause)+)? {
     // ---------- SCALAR CONVERSIONS ----------
     define_as_pattern!(as_bool,                       bool                  => Self::Value($scalartype::Boolean(v))               => Some(v.into()));
     define_as_pattern!(as_integer,                    i64                   => Self::Value($scalartype::Integer(v))               => Some(v.into()));
@@ -433,7 +433,7 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
 
 define_yaml_object_index_traits_impl!(
     $yaml,
-    < $( $generic ),+ >,
+    $(< $( $generic ),+ >,)?
     $( where { $($whereclause)+ }, )?
     mappingtype = $mappingtype,
     sequencetype = $sequencetype,
@@ -453,7 +453,7 @@ define_yaml_object_index_traits_impl!(
 macro_rules! define_yaml_object_index_traits_impl (
     (
         $yaml:ty,
-        < $( $generic:tt ),+ >,
+        $(< $( $generic:tt ),+ >,)?
         $( where { $($whereclause:tt)+ }, )?
         mappingtype = $mappingtype:ty,
         sequencetype = $sequencetype:ty,
@@ -461,7 +461,7 @@ macro_rules! define_yaml_object_index_traits_impl (
         scalartype = { $scalartype:tt },
         selfname = $selfname:literal
     ) => (
-impl<'key, $($generic),+ > Index<&'key str> for $yaml $( where $($whereclause)+ )? {
+impl<'key $(, $($generic),+)? > Index<&'key str> for $yaml $( where $($whereclause)+ )? {
     type Output = $nodetype;
 
     /// Perform indexing if `self` is a mapping.
@@ -484,7 +484,7 @@ impl<'key, $($generic),+ > Index<&'key str> for $yaml $( where $($whereclause)+ 
     }
 }
 
-impl<'key, $($generic),+> IndexMut<&'key str> for $yaml $( where $($whereclause)+ )? {
+impl<'key $(, $($generic),+)?> IndexMut<&'key str> for $yaml $( where $($whereclause)+ )? {
     /// Perform indexing if `self` is a mapping.
     ///
     /// # Panics
@@ -505,7 +505,7 @@ impl<'key, $($generic),+> IndexMut<&'key str> for $yaml $( where $($whereclause)
     }
 }
 
-impl<$($generic),+> Index<usize> for $yaml $( where $($whereclause)+ )? {
+impl $(<$($generic),+>)? Index<usize> for $yaml $( where $($whereclause)+ )? {
     type Output = $nodetype;
 
     /// Perform indexing if `self` is a sequence or a mapping.
@@ -542,7 +542,7 @@ impl<$($generic),+> Index<usize> for $yaml $( where $($whereclause)+ )? {
     }
 }
 
-impl<$($generic),+> IndexMut<usize> for $yaml $( where $($whereclause)+ )? {
+impl $(<$($generic),+>)? IndexMut<usize> for $yaml $( where $($whereclause)+ )? {
     /// Perform indexing if `self` is a sequence or a mapping.
     ///
     /// # Panics

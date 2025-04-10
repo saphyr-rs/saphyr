@@ -45,6 +45,8 @@
   not required.
 - Add `MarkedYamlOwned`, an owned version of `MarkedYaml` for when lifetimes
   are not required.
+- Add `YamlOwned`, an owned version of `Yaml` which corresponds to what `Yaml`
+  was prior to this version.
 
 ## v0.0.3
 
