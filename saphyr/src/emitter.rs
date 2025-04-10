@@ -257,7 +257,7 @@ impl<'a> YamlEmitter<'a> {
                     saphyr_parser::ScalarStyle::DoubleQuoted => write!(self.writer, "\"{v}\"")?,
                     saphyr_parser::ScalarStyle::Literal => todo!(),
                     saphyr_parser::ScalarStyle::Folded => todo!(),
-                };
+                }
                 Ok(())
             }
             // XXX(chenyh) Alias

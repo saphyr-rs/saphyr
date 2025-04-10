@@ -213,12 +213,12 @@ impl<'input> SpannedEventReceiver<'input> for EventReporter<'input> {
             Event::DocumentEnd => "-DOC".into(),
 
             Event::SequenceStart(idx, tag) => {
-                format!("+SEQ{}{}", format_index(idx), format_tag(&tag))
+                format!("+SEQ{}{}", format_index(idx), format_tag(tag.as_ref()))
             }
             Event::SequenceEnd => "-SEQ".into(),
 
             Event::MappingStart(idx, tag) => {
-                format!("+MAP{}{}", format_index(idx), format_tag(&tag))
+                format!("+MAP{}{}", format_index(idx), format_tag(tag.as_ref()))
             }
             Event::MappingEnd => "-MAP".into(),
 
@@ -231,10 +231,9 @@ impl<'input> SpannedEventReceiver<'input> for EventReporter<'input> {
                     ScalarStyle::Folded => ">",
                 };
                 format!(
-                    "=VAL{}{} {}{}",
+                    "=VAL{}{} {kind}{}",
                     format_index(idx),
-                    format_tag(tag),
-                    kind,
+                    format_tag(tag.as_ref()),
                     escape_text(text)
                 )
             }
@@ -267,7 +266,7 @@ fn escape_text(text: &str) -> String {
     text
 }
 
-fn format_tag(tag: &Option<Tag>) -> String {
+fn format_tag(tag: Option<&Tag>) -> String {
     if let Some(tag) = tag {
         format!(" <{}{}>", tag.handle, tag.suffix)
     } else {
@@ -342,7 +341,7 @@ fn expected_events(expected_tree: &str) -> Vec<String> {
                     .iter()
                     .enumerate()
                     .filter(|(_, v)| v == &name)
-                    .last()
+                    .next_back()
                     .unwrap()
                     .0;
                 s = s.replace(&s[start..], &format!("*{}", idx + 1));
