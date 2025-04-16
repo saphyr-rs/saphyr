@@ -242,3 +242,15 @@ impl ScalarOwned {
         Scalar::parse_from_cow(v).into_owned()
     }
 }
+
+impl<'input> From<&'input ScalarOwned> for Scalar<'input> {
+    fn from(value: &'input ScalarOwned) -> Self {
+        match value {
+            ScalarOwned::Null => Scalar::Null,
+            ScalarOwned::Boolean(bool) => Scalar::Boolean(*bool),
+            ScalarOwned::Integer(int) => Scalar::Integer(*int),
+            ScalarOwned::FloatingPoint(ordered_float) => Scalar::FloatingPoint(*ordered_float),
+            ScalarOwned::String(str) => Scalar::String(Cow::Borrowed(str)),
+        }
+    }
+}
