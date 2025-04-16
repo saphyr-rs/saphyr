@@ -53,8 +53,8 @@ pub use crate::annotated::{
     marked_yaml::MarkedYaml, marked_yaml_owned::MarkedYamlOwned, AnnotatedMapping, AnnotatedNode,
     AnnotatedNodeOwned, AnnotatedSequence, AnnotatedYamlIter, YamlData, YamlDataOwned,
 };
-pub use crate::emitter::YamlEmitter;
-pub use crate::loader::{LoadableYamlNode, YamlLoader};
+pub use crate::emitter::{EmitError, YamlEmitter};
+pub use crate::loader::{LoadError, LoadableYamlNode, YamlLoader};
 pub use crate::scalar::{Scalar, ScalarOwned};
 pub use crate::yaml::{Mapping, Sequence, Yaml, YamlIter};
 pub use crate::yaml_owned::{MappingOwned, SequenceOwned, YamlOwned, YamlOwnedIter};
