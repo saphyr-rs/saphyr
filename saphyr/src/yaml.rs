@@ -12,7 +12,7 @@ use std::{
 use hashlink::LinkedHashMap;
 use saphyr_parser::{ScalarStyle, Tag};
 
-use crate::{LoadableYamlNode, Scalar};
+use crate::{LoadableYamlNode, Scalar, YamlOwned};
 
 /// A YAML node is stored as this `Yaml` enumeration, which provides an easy way to
 /// access your YAML document.
@@ -215,4 +215,29 @@ fn hash_str_as_yaml_string<H: Hasher>(key: &str, mut hasher: H) -> u64 {
     let key = Yaml::Value(Scalar::String(key.into()));
     key.hash(&mut hasher);
     hasher.finish()
+}
+
+impl<'input> From<&'input YamlOwned> for Yaml<'input> {
+    fn from(value: &'input YamlOwned) -> Self {
+        match value {
+            YamlOwned::Representation(str, scalar_style, tag) => {
+                Yaml::Representation(Cow::Borrowed(str), *scalar_style, tag.clone())
+            }
+            YamlOwned::Value(scalar_owned) => Yaml::Value(scalar_owned.into()),
+            YamlOwned::Sequence(yaml_owneds) => Yaml::Sequence(
+                yaml_owneds
+                    .iter()
+                    .map(Into::into)
+                    .collect::<Vec<Yaml<'input>>>(),
+            ),
+            YamlOwned::Mapping(linked_hash_map) => Yaml::Mapping(
+                linked_hash_map
+                    .iter()
+                    .map(|(key, value)| (key.into(), value.into()))
+                    .collect::<Mapping>(),
+            ),
+            YamlOwned::Alias(usize) => Yaml::Alias(*usize),
+            YamlOwned::BadValue => Yaml::BadValue,
+        }
+    }
 }
