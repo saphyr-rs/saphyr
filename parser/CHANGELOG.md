@@ -2,6 +2,11 @@
 
 ## Upcoming
 
+**Fixes**:
+
+- 8ef76dcc: Fix `Marker`s for `null` and empty values.
+- Fix `Span`s for collections to correctly mark the end of the collection.
+
 ## v0.0.4
 
 **Breaking Changes**:

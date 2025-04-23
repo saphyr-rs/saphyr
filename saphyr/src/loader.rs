@@ -3,7 +3,9 @@
 use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 
 use hashlink::LinkedHashMap;
-use saphyr_parser::{BufferedInput, Event, Input, Parser, ScanError, Span, SpannedEventReceiver};
+use saphyr_parser::{
+    BufferedInput, Event, Input, Marker, Parser, ScanError, Span, SpannedEventReceiver,
+};
 
 use crate::{Mapping, Yaml};
 
@@ -96,9 +98,38 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
     fn take(&mut self) -> Self;
 
     /// Provide the span for the node (builder-style).
+    ///
+    /// Either [`with_span`] is used (typically for scalars) or both [`with_start_marker`] and
+    /// [`with_end_marker`] are used (typically for collections).
+    ///
+    /// [`with_span`]: `LoadableYamlNode::with_span`
+    /// [`with_start_marker`]: `LoadableYamlNode::with_start_marker`
+    /// [`with_end_marker`]: `LoadableYamlNode::with_end_marker`
     #[inline]
     #[must_use]
     fn with_span(self, _: Span) -> Self {
+        self
+    }
+
+    /// Provide the start-marker for the node (builder-style).
+    ///
+    /// If this method is used by the loader, a call to [`with_end_marker`] will follow later.
+    ///
+    /// [`with_end_marker`]: `LoadableYamlNode::with_end_marker`
+    #[inline]
+    #[must_use]
+    fn with_start_marker(self, _: Marker) -> Self {
+        self
+    }
+
+    /// Provide the end-marker for the node (builder-style).
+    ///
+    /// This method is called after a call to [`with_start_marker`].
+    ///
+    /// [`with_start_marker`]: `LoadableYamlNode::with_start_marker`
+    #[inline]
+    #[must_use]
+    fn with_end_marker(self, _: Marker) -> Self {
         self
     }
 
@@ -192,6 +223,7 @@ where
     Node: LoadableYamlNode<'input>,
 {
     fn on_event(&mut self, ev: Event<'input>, span: Span) {
+        let mark = span.start;
         match ev {
             Event::DocumentStart(_) | Event::Nothing | Event::StreamStart | Event::StreamEnd => {
                 // do nothing
@@ -208,24 +240,26 @@ where
             }
             Event::SequenceStart(aid, _) => {
                 self.doc_stack.push((
-                    Node::from_bare_yaml(Yaml::Sequence(Vec::new())).with_span(span),
+                    Node::from_bare_yaml(Yaml::Sequence(Vec::new())).with_start_marker(mark),
                     aid,
                 ));
             }
             Event::SequenceEnd => {
-                let node = self.doc_stack.pop().unwrap();
+                let mut node = self.doc_stack.pop().unwrap();
+                node.0 = node.0.with_end_marker(mark);
                 self.insert_new_node(node);
             }
             Event::MappingStart(aid, _) => {
                 self.doc_stack.push((
-                    Node::from_bare_yaml(Yaml::Mapping(Mapping::new())).with_span(span),
+                    Node::from_bare_yaml(Yaml::Mapping(Mapping::new())).with_start_marker(mark),
                     aid,
                 ));
                 self.key_stack.push(Node::from_bare_yaml(Yaml::BadValue));
             }
             Event::MappingEnd => {
                 self.key_stack.pop().unwrap();
-                let node = self.doc_stack.pop().unwrap();
+                let mut node = self.doc_stack.pop().unwrap();
+                node.0 = node.0.with_end_marker(mark);
                 self.insert_new_node(node);
             }
             Event::Scalar(v, style, aid, tag) => {

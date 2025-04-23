@@ -5,7 +5,7 @@
 use std::borrow::Cow;
 
 use hashlink::LinkedHashMap;
-use saphyr_parser::{ScalarStyle, Span, Tag};
+use saphyr_parser::{Marker, ScalarStyle, Span, Tag};
 
 use crate::{LoadableYamlNode, Scalar, Yaml, YamlData};
 
@@ -173,6 +173,16 @@ impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
 
     fn with_span(mut self, span: Span) -> Self {
         self.span = span;
+        self
+    }
+
+    fn with_start_marker(mut self, mark: Marker) -> Self {
+        self.span.start = mark;
+        self
+    }
+
+    fn with_end_marker(mut self, mark: Marker) -> Self {
+        self.span.end = mark;
         self
     }
 }
