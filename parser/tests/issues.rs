@@ -344,6 +344,7 @@ fn test_issue22() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn test_issue37() {
     // MarkedYaml: Empty scalars get the span of the next value.
     // With the fix they get the position of the ":" for block maps and the "-" for block arrays.
@@ -360,47 +361,46 @@ fn test_issue37() {
     - ~
     - null
     ";
+
     assert_eq!(
-            run_parser_with_span(s).unwrap(),
-            [
-                (Event::StreamStart, Span::new(Marker::new(0, 1, 0), Marker::new(0, 1, 0))),
-                (Event::DocumentStart(true), Span::new(Marker::new(0, 1, 0), Marker::new(3, 1, 3))),
-                (Event::MappingStart(0, None), Span::new(Marker::new(8, 2, 4), Marker::new(8, 2, 4))),
-                (Event::Scalar("hash_block_null_value".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(8, 2, 4), Marker::new(29, 2, 25))),
+        run_parser_with_span(s).unwrap(),
+        [
+            (Event::StreamStart,                                                          Span::new(Marker::new(0, 1, 0), Marker::new(0, 1, 0))),
+            (Event::DocumentStart(true),                                                  Span::new(Marker::new(0, 1, 0), Marker::new(3, 1, 3))),
+            (Event::MappingStart(0, None),                                                Span::new(Marker::new(8, 2, 4), Marker::new(8, 2, 4))),
+            (Event::Scalar("hash_block_null_value".into(), ScalarStyle::Plain, 0, None),  Span::new(Marker::new(8, 2, 4), Marker::new(29, 2, 25))),
 
-                // This had the span Span::new(Marker::new(31, 2, 27), Marker::new(31, 2, 27)) so wrongfully pointing to the next key.
-                (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(29, 2, 25), Marker::new(29, 2, 25))),
+            (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),                      Span::new(Marker::new(29, 2, 25), Marker::new(29, 2, 25))),
 
-                (Event::Scalar("hash_flow".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(35, 3, 4), Marker::new(44, 3, 13))),
-                (Event::MappingStart(0, None), Span::new(Marker::new(46, 3, 15), Marker::new(47, 3, 16))),
-                (Event::Scalar("hash_flow_null_value".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(47, 3, 16), Marker::new(67, 3, 36))),
-                (Event::Scalar("null".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(69, 3, 38), Marker::new(73, 3, 42))),
-                (Event::MappingEnd, Span::new(Marker::new(73, 3, 42), Marker::new(74, 3, 43))),
-                (Event::Scalar("array_block_null_value".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(79, 4, 4), Marker::new(101, 4, 26))),
-                (Event::SequenceStart(0, None), Span::new(Marker::new(109, 5, 6), Marker::new(109, 5, 6))),
+            (Event::Scalar("hash_flow".into(), ScalarStyle::Plain, 0, None),              Span::new(Marker::new(35, 3, 4), Marker::new(44, 3, 13))),
+            (Event::MappingStart(0, None),                                                Span::new(Marker::new(46, 3, 15), Marker::new(47, 3, 16))),
+            (Event::Scalar("hash_flow_null_value".into(), ScalarStyle::Plain, 0, None),   Span::new(Marker::new(47, 3, 16), Marker::new(67, 3, 36))),
+            (Event::Scalar("null".into(), ScalarStyle::Plain, 0, None),                   Span::new(Marker::new(69, 3, 38), Marker::new(73, 3, 42))),
+            (Event::MappingEnd,                                                           Span::new(Marker::new(73, 3, 42), Marker::new(74, 3, 43))),
+            (Event::Scalar("array_block_null_value".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(79, 4, 4), Marker::new(101, 4, 26))),
+            (Event::SequenceStart(0, None),                                               Span::new(Marker::new(109, 5, 6), Marker::new(109, 5, 6))),
 
-                // This had the span Span::new(Marker::new(119, 6, 8), Marker::new(119, 6, 8)) so wrongfully pointing to the next item.
-                (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(110, 5, 7), Marker::new(110, 5, 7))),
+            (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),                      Span::new(Marker::new(110, 5, 7), Marker::new(110, 5, 7))),
 
-                (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(119, 6, 8), Marker::new(120, 6, 9))),
-                (Event::Scalar("null".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(129, 7, 8), Marker::new(133, 7, 12))),
-                (Event::SequenceEnd, Span::new(Marker::new(138, 8, 4), Marker::new(138, 8, 4))),
-                (Event::Scalar("array_flow_null_value".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(138, 8, 4), Marker::new(159, 8, 25))),
-                (Event::SequenceStart(0, None), Span::new(Marker::new(161, 8, 27), Marker::new(162, 8, 28))),
-                (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(162, 8, 28), Marker::new(163, 8, 29))),
-                (Event::Scalar("null".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(165, 8, 31), Marker::new(169, 8, 35))),
-                (Event::SequenceEnd, Span::new(Marker::new(169, 8, 35), Marker::new(170, 8, 36))),
-                (Event::Scalar("indentless_array_block_null_value".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(175, 9, 4), Marker::new(208, 9, 37))),
-                (Event::SequenceStart(0, None), Span::new(Marker::new(215, 10, 5), Marker::new(215, 10, 5))),
+            (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),                                 Span::new(Marker::new(119, 6, 8), Marker::new(120, 6, 9))),
+            (Event::Scalar("null".into(), ScalarStyle::Plain, 0, None),                              Span::new(Marker::new(129, 7, 8), Marker::new(133, 7, 12))),
+            (Event::SequenceEnd,                                                                     Span::new(Marker::new(138, 8, 4), Marker::new(138, 8, 4))),
+            (Event::Scalar("array_flow_null_value".into(), ScalarStyle::Plain, 0, None),             Span::new(Marker::new(138, 8, 4), Marker::new(159, 8, 25))),
+            (Event::SequenceStart(0, None),                                                          Span::new(Marker::new(161, 8, 27), Marker::new(162, 8, 28))),
+            (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),                                 Span::new(Marker::new(162, 8, 28), Marker::new(163, 8, 29))),
+            (Event::Scalar("null".into(), ScalarStyle::Plain, 0, None),                              Span::new(Marker::new(165, 8, 31), Marker::new(169, 8, 35))),
+            (Event::SequenceEnd,                                                                     Span::new(Marker::new(169, 8, 35), Marker::new(170, 8, 36))),
+            (Event::Scalar("indentless_array_block_null_value".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(175, 9, 4), Marker::new(208, 9, 37))),
+            (Event::SequenceStart(0, None),                                                          Span::new(Marker::new(215, 10, 5), Marker::new(215, 10, 5))),
 
-                // This had the span Span::new(Marker::new(222, 11, 6), Marker::new(222, 11, 6)) so wrongfully pointing to the next item.
-                (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(215, 10, 5), Marker::new(215, 10, 5))),
+            (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),    Span::new(Marker::new(215, 10, 5), Marker::new(215, 10, 5))),
 
-                (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(222, 11, 6), Marker::new(223, 11, 7))),
-                (Event::Scalar("null".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(230, 12, 6), Marker::new(234, 12, 10))),
-                (Event::SequenceEnd, Span::new(Marker::new(239, 14, 0), Marker::new(239, 14, 0))),
-                (Event::MappingEnd, Span::new(Marker::new(239, 14, 0), Marker::new(239, 14, 0))),
-                (Event::DocumentEnd, Span::new(Marker::new(239, 14, 0), Marker::new(239, 14, 0))),
-                (Event::StreamEnd, Span::new(Marker::new(239, 14, 0), Marker::new(239, 14, 0)))]
-    )
+            (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),    Span::new(Marker::new(222, 11, 6), Marker::new(223, 11, 7))),
+            (Event::Scalar("null".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(230, 12, 6), Marker::new(234, 12, 10))),
+            (Event::SequenceEnd,                                        Span::new(Marker::new(239, 14, 0), Marker::new(239, 14, 0))),
+            (Event::MappingEnd,                                         Span::new(Marker::new(239, 14, 0), Marker::new(239, 14, 0))),
+            (Event::DocumentEnd,                                        Span::new(Marker::new(239, 14, 0), Marker::new(239, 14, 0))),
+            (Event::StreamEnd,                                          Span::new(Marker::new(239, 14, 0), Marker::new(239, 14, 0)))
+        ]
+    );
 }
