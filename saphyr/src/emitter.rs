@@ -7,6 +7,7 @@ use crate::{
     yaml::{Mapping, Yaml},
     Scalar,
 };
+use std::borrow::Cow;
 use std::convert::From;
 use std::error::Error;
 use std::fmt::{self, Display};
@@ -244,10 +245,16 @@ impl<'a> YamlEmitter<'a> {
             Yaml::Value(Scalar::FloatingPoint(ref v)) => Ok(write!(self.writer, "{v}")?),
             Yaml::Value(Scalar::Null) | Yaml::BadValue => Ok(write!(self.writer, "~")?),
             Yaml::Representation(ref v, style, ref tag) => {
-                if let Some(Tag {
-                    ref handle,
-                    ref suffix,
-                }) = tag
+                if let Some(
+                    Cow::Owned(Tag {
+                        ref handle,
+                        ref suffix,
+                    })
+                    | Cow::Borrowed(Tag {
+                        ref handle,
+                        ref suffix,
+                    }),
+                ) = tag
                 {
                     write!(self.writer, "{handle}!{suffix} ")?;
                 }

@@ -58,7 +58,7 @@ where
     /// [`is_boolean`]: YamlData::is_boolean
     /// [`as_integer`]: YamlData::as_integer
     /// [`into_floating_point`]: YamlData::into_floating_point
-    Representation(Cow<'input, str>, ScalarStyle, Option<Tag>),
+    Representation(Cow<'input, str>, ScalarStyle, Option<Cow<'input, Tag>>),
     /// The resolved value from the representation.
     Value(Scalar<'input>),
     /// YAML sequence, can be accessed as a `Vec`.
