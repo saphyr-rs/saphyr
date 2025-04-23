@@ -4,6 +4,7 @@
 
 **Breaking Changes**:
 
+- No longer parse any capitalization of `inf`, or `infinity` as `f64::INFINITY`
 - Parse `.NaN` as float instead of `NaN`.
 
 ## v0.0.4
