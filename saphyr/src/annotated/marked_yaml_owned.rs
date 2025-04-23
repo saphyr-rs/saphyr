@@ -139,7 +139,7 @@ impl LoadableYamlNode<'_> for MarkedYamlOwned {
                 Yaml::Alias(x) => YamlDataOwned::Alias(x),
                 Yaml::BadValue => YamlDataOwned::BadValue,
                 Yaml::Representation(v, style, tag) => {
-                    YamlDataOwned::Representation(v.to_string(), style, tag)
+                    YamlDataOwned::Representation(v.to_string(), style, tag.map(Cow::into_owned))
                 }
                 Yaml::Value(x) => YamlDataOwned::Value(x.into_owned()),
             },

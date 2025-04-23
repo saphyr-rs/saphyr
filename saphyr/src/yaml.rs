@@ -48,7 +48,7 @@ pub enum Yaml<'input> {
     /// [`is_boolean`]: Yaml::is_boolean
     /// [`as_integer`]: Yaml::as_integer
     /// [`into_floating_point`]: Yaml::into_floating_point
-    Representation(Cow<'input, str>, ScalarStyle, Option<Tag>),
+    Representation(Cow<'input, str>, ScalarStyle, Option<Cow<'input, Tag>>),
     /// The resolved value from the representation.
     Value(Scalar<'input>),
     /// YAML sequence, can be accessed as a `Vec`.
@@ -220,9 +220,11 @@ fn hash_str_as_yaml_string<H: Hasher>(key: &str, mut hasher: H) -> u64 {
 impl<'input> From<&'input YamlOwned> for Yaml<'input> {
     fn from(value: &'input YamlOwned) -> Self {
         match value {
-            YamlOwned::Representation(str, scalar_style, tag) => {
-                Yaml::Representation(Cow::Borrowed(str), *scalar_style, tag.clone())
-            }
+            YamlOwned::Representation(str, scalar_style, tag) => Yaml::Representation(
+                Cow::Borrowed(str),
+                *scalar_style,
+                tag.as_ref().map(Cow::Borrowed),
+            ),
             YamlOwned::Value(scalar_owned) => Yaml::Value(scalar_owned.into()),
             YamlOwned::Sequence(yaml_owneds) => Yaml::Sequence(
                 yaml_owneds

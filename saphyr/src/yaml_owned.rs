@@ -3,6 +3,7 @@
 #![allow(clippy::module_name_repetitions)]
 
 use std::{
+    borrow::Cow,
     hash::{BuildHasher, Hasher},
     ops::{Index, IndexMut},
 };
@@ -156,7 +157,7 @@ impl LoadableYamlNode<'_> for YamlOwned {
             Yaml::Mapping(_) => Self::Mapping(MappingOwned::new()),
 
             Yaml::Representation(cow, scalar_style, tag) => {
-                Self::Representation(cow.into(), scalar_style, tag)
+                Self::Representation(cow.into(), scalar_style, tag.map(Cow::into_owned))
             }
             Yaml::Value(scalar) => Self::Value(scalar.into_owned()),
             Yaml::Alias(x) => Self::Alias(x),
