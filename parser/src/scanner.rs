@@ -117,6 +117,18 @@ impl Span {
             end: mark,
         }
     }
+
+    /// Return the length of the span (in characters).
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.end.index - self.start.index
+    }
+
+    /// Return whether the [`Span`] has a length of zero.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 /// An error that occurred while scanning.

@@ -7,6 +7,7 @@ Due to dependency management, only some of them are available as binaries from t
 | `dump_events` | `cargo run --bin dump_events -- [...]` |
 | `run_bench` | `cargo run --bin run_bench -- [...]` |
 | `time_parse` | `cargo run --bin time_parse -- [...]` |
+| `walk` | `cargo run --bin walk -- [...]` |
 
 ## `dump_events`
 This is a debugging helper for the parser. It outputs events emitted by the parser for a given file. This can be paired with the `SAPHYR_DEBUG` environment variable to have an in-depth overview of which steps the scanner and the parser are taking.
@@ -208,3 +209,10 @@ While loading a larger file could output the following:
 $> cargo run --release --bin time_parse -- bench_yaml/big.yaml
 Loaded 220MiB in 1.612677853s
 ```
+
+## `walk`
+A simple REPL to visualize spans of a YAML file.
+
+Synopsis: `walk input.yaml`
+
+For commands, refer to `read_action` in `walk.rs`.

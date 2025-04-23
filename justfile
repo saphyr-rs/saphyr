@@ -9,6 +9,7 @@ before_commit:
   cargo test --doc
   cargo build --release --package gen_large_yaml --bin gen_large_yaml --manifest-path bench/tools/gen_large_yaml/Cargo.toml
   cargo build --release --package bench_compare --bin bench_compare --manifest-path bench/tools/bench_compare/Cargo.toml
+  cargo build --release --package walk --bin walk --manifest-path parser/tools/walk/Cargo.toml
   just check_doc
 
 check_doc:

@@ -1,5 +1,5 @@
 [package]
-name = "saphyr-parser"
+name = "walk"
 readme = "README.md"
 authors = { workspace = true }
 categories = { workspace = true }
@@ -16,29 +16,8 @@ version = { workspace = true }
 debug_prints = []
 
 [dependencies]
-arraydeque = { workspace = true }
 hashlink = { workspace = true }
-
-[dev-dependencies]
-libtest-mimic = { workspace = true }
 miette = { workspace = true }
-quickcheck = { workspace = true }
 rustyline = { workspace = true }
 saphyr = { workspace = true }
 thiserror = { workspace = true }
-
-[[test]]
-name = "yaml-test-suite"
-harness = false
-
-[[bin]]
-name = "dump_events"
-path = "tools/dump_events.rs"
-
-[[bin]]
-name = "time_parser"
-path = "tools/time_parse.rs"
-
-[[bin]]
-name = "run_parser"
-path = "tools/run_bench.rs"
