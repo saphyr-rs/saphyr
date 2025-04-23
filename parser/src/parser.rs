@@ -916,9 +916,9 @@ impl<'input, T: Input> Parser<'input, T> {
         'input: 'a,
     {
         match *self.peek_token()? {
-            Token(_, TokenType::Value) => {
+            Token(mark, TokenType::Value) => {
                 self.skip();
-                if let Token(mark, TokenType::Key | TokenType::Value | TokenType::BlockEnd) =
+                if let Token(_, TokenType::Key | TokenType::Value | TokenType::BlockEnd) =
                     *self.peek_token()?
                 {
                     self.state = State::BlockMappingKey;
@@ -1074,23 +1074,24 @@ impl<'input, T: Input> Parser<'input, T> {
         'input: 'a,
     {
         match *self.peek_token()? {
-            Token(_, TokenType::BlockEntry) => (),
+            Token(mark, TokenType::BlockEntry) => {
+                self.skip();
+                if let Token(
+                    _,
+                    TokenType::BlockEntry | TokenType::Key | TokenType::Value | TokenType::BlockEnd,
+                ) = *self.peek_token()?
+                {
+                    self.state = State::IndentlessSequenceEntry;
+                    Ok((Event::empty_scalar(), mark))
+                } else {
+                    self.push_state(State::IndentlessSequenceEntry);
+                    self.parse_node(true, false)
+                }
+            }
             Token(mark, _) => {
                 self.pop_state();
-                return Ok((Event::SequenceEnd, mark));
+                Ok((Event::SequenceEnd, mark))
             }
-        }
-        self.skip();
-        if let Token(
-            mark,
-            TokenType::BlockEntry | TokenType::Key | TokenType::Value | TokenType::BlockEnd,
-        ) = *self.peek_token()?
-        {
-            self.state = State::IndentlessSequenceEntry;
-            Ok((Event::empty_scalar(), mark))
-        } else {
-            self.push_state(State::IndentlessSequenceEntry);
-            self.parse_node(true, false)
         }
     }
 
@@ -1110,11 +1111,9 @@ impl<'input, T: Input> Parser<'input, T> {
                 self.skip();
                 Ok((Event::SequenceEnd, mark))
             }
-            Token(_, TokenType::BlockEntry) => {
+            Token(mark, TokenType::BlockEntry) => {
                 self.skip();
-                if let Token(mark, TokenType::BlockEntry | TokenType::BlockEnd) =
-                    *self.peek_token()?
-                {
+                if let Token(_, TokenType::BlockEntry | TokenType::BlockEnd) = *self.peek_token()? {
                     self.state = State::BlockSequenceEntry;
                     Ok((Event::empty_scalar(), mark))
                 } else {
