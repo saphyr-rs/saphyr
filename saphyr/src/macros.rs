@@ -93,6 +93,32 @@ macro_rules! define_yaml_object_impl (
         );
 impl $(< $( $generic ),+ >)? $yaml $(where $($whereclause)+)? {
     define_as_ref_mut_pattern!(as_str_mut,            &mut str              => Self::Value($scalartype::String(ref mut v))        => Some(v.as_mut()));
+
+    /// If `self` is of the [`Self::Representation`] variant, parse it to the value.
+    ///
+    /// If `self` was [`Self::Value`], [`Self::Sequence`], [`Self::Mapping`] or [`Self::Alias`]
+    /// upon calling, this function does nothing and returns `true`.
+    ///
+    /// If parsing fails, `*self` is assigned [`Self::BadValue`].
+    ///
+    /// # Return
+    /// Returns `true` if `self` is successfully parsed, `false` otherwise.
+    pub fn parse_representation(&mut self) -> bool {
+        match self.take() {
+            Self::Representation(value, style, tag) => {
+                if let Some(scalar) =
+                    $scalartype::parse_from_cow_and_metadata(value.into(), style, tag.as_ref())
+                {
+                    *self = Self::Value(scalar);
+                    true
+                } else {
+                    *self = Self::BadValue;
+                    false
+                }
+            }
+            _ => true,
+        }
+    }
 }
     );
 
@@ -124,6 +150,32 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     define_as_ref_mut_pattern!(as_cow_mut,            &mut Cow<'input, str> => Self::Value($scalartype::String(ref mut v))        => Some(v));
     define_into_pattern!(into_cow,                    Cow<'input, str>      => Self::Value($scalartype::String(v))                => Some(v));
     define_as_ref_mut_pattern!(as_str_mut,            &mut str              => Self::Value($scalartype::String(ref mut v))        => Some(v.to_mut()));
+
+    /// If `self` is of the [`Self::Representation`] variant, parse it to the value.
+    ///
+    /// If `self` was [`Self::Value`], [`Self::Sequence`], [`Self::Mapping`] or [`Self::Alias`]
+    /// upon calling, this function does nothing and returns `true`.
+    ///
+    /// If parsing fails, `*self` is assigned [`Self::BadValue`].
+    ///
+    /// # Return
+    /// Returns `true` if `self` is successfully parsed, `false` otherwise.
+    pub fn parse_representation(&mut self) -> bool {
+        match self.take() {
+            Self::Representation(value, style, tag) => {
+                if let Some(scalar) =
+                    $scalartype::parse_from_cow_and_metadata(value.into(), style, tag.as_ref().map(|v| &**v))
+                {
+                    *self = Self::Value(scalar);
+                    true
+                } else {
+                    *self = Self::BadValue;
+                    false
+                }
+            }
+            _ => true,
+        }
+    }
 
     /// Convert a string to a scalar node.
     ///
@@ -177,7 +229,7 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
         style: ScalarStyle,
         tag: Option<&Tag>,
     ) -> Self {
-        Scalar::parse_from_cow_and_metadata(v, style, tag.map(Cow::Borrowed).as_ref()).map_or(Self::BadValue, Self::Value)
+        Scalar::parse_from_cow_and_metadata(v, style, tag).map_or(Self::BadValue, Self::Value)
     }
 }
     );
@@ -236,32 +288,6 @@ impl $(< $( $generic ),+ >)? $yaml $(where $($whereclause)+)? {
     define_is!(is_alias,          Self::Alias(_));
     define_is!(is_representation, Self::Representation(..));
     define_is!(is_value,          Self::Value(_));
-
-    /// If `self` is of the [`Self::Representation`] variant, parse it to the value.
-    ///
-    /// If `self` was [`Self::Value`], [`Self::Sequence`], [`Self::Mapping`] or [`Self::Alias`]
-    /// upon calling, this function does nothing and returns `true`.
-    ///
-    /// If parsing fails, `*self` is assigned [`Self::BadValue`].
-    ///
-    /// # Return
-    /// Returns `true` if `self` is successfully parsed, `false` otherwise.
-    pub fn parse_representation(&mut self) -> bool {
-        match self.take() {
-            Self::Representation(value, style, tag) => {
-                if let Some(scalar) =
-                    $scalartype::parse_from_cow_and_metadata(value.into(), style, tag.as_ref())
-                {
-                    *self = Self::Value(scalar);
-                    true
-                } else {
-                    *self = Self::BadValue;
-                    false
-                }
-            }
-            _ => true,
-        }
-    }
 
     /// Call [`Self::parse_representation`] on `self` and children nodes.
     ///

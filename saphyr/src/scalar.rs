@@ -107,21 +107,15 @@ impl<'input> Scalar<'input> {
     pub fn parse_from_cow_and_metadata(
         v: Cow<'input, str>,
         style: ScalarStyle,
-        tag: Option<&Cow<Tag>>,
+        tag: Option<&Tag>,
     ) -> Option<Self> {
         if style != ScalarStyle::Plain {
             // Any quoted scalar is a string.
             Some(Self::String(v))
-        } else if let Some(
-            Cow::Owned(Tag {
-                ref handle,
-                ref suffix,
-            })
-            | Cow::Borrowed(Tag {
-                ref handle,
-                ref suffix,
-            }),
-        ) = tag
+        } else if let Some(Tag {
+            ref handle,
+            ref suffix,
+        }) = tag
         {
             if handle == "tag:yaml.org,2002:" {
                 match suffix.as_ref() {
@@ -233,8 +227,7 @@ impl ScalarOwned {
         style: ScalarStyle,
         tag: Option<&Tag>,
     ) -> Option<Self> {
-        Scalar::parse_from_cow_and_metadata(v, style, tag.map(Cow::Borrowed).as_ref())
-            .map(Scalar::into_owned)
+        Scalar::parse_from_cow_and_metadata(v, style, tag).map(Scalar::into_owned)
     }
 
     /// Parse a scalar node representation into a [`ScalarOwned`].
