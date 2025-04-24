@@ -66,13 +66,18 @@ pub enum Event<'input> {
         usize,
     ),
     /// Value, style, `anchor_id`, tag
-    Scalar(Cow<'input, str>, ScalarStyle, usize, Option<Tag>),
+    Scalar(
+        Cow<'input, str>,
+        ScalarStyle,
+        usize,
+        Option<Cow<'input, Tag>>,
+    ),
     /// The start of a YAML sequence (array).
     SequenceStart(
         /// The anchor ID of the start of the sequence.
         usize,
         /// An optional tag
-        Option<Tag>,
+        Option<Cow<'input, Tag>>,
     ),
     /// The end of a YAML sequence (array).
     SequenceEnd,
@@ -81,7 +86,7 @@ pub enum Event<'input> {
         /// The anchor ID of the start of the mapping.
         usize,
         /// An optional tag
-        Option<Tag>,
+        Option<Cow<'input, Tag>>,
     ),
     /// The end of a YAML mapping (object, hash).
     MappingEnd,
@@ -102,7 +107,7 @@ impl Display for Tag {
     }
 }
 
-impl Event<'_> {
+impl<'input> Event<'input> {
     /// Create an empty scalar.
     fn empty_scalar() -> Self {
         // a null scalar
@@ -110,7 +115,7 @@ impl Event<'_> {
     }
 
     /// Create an empty scalar with the given anchor.
-    fn empty_scalar_with_anchor(anchor: usize, tag: Option<Tag>) -> Self {
+    fn empty_scalar_with_anchor(anchor: usize, tag: Option<Cow<'input, Tag>>) -> Self {
         Event::Scalar(Cow::default(), ScalarStyle::Plain, anchor, tag)
     }
 }
@@ -1178,52 +1183,57 @@ impl<'input, T: Input> Parser<'input, T> {
     }
 
     /// Resolve a tag from the handle and the suffix.
-    fn resolve_tag(&self, span: Span, handle: &str, suffix: String) -> Result<Tag, ScanError> {
-        if handle == "!!" {
+    fn resolve_tag(
+        &self,
+        span: Span,
+        handle: &str,
+        suffix: String,
+    ) -> Result<Cow<'input, Tag>, ScanError> {
+        let tag = if handle == "!!" {
             // "!!" is a shorthand for "tag:yaml.org,2002:". However, that default can be
             // overridden.
-            Ok(Tag {
+            Tag {
                 handle: self
                     .tags
                     .get("!!")
                     .map_or_else(|| "tag:yaml.org,2002:".to_string(), ToString::to_string),
                 suffix,
-            })
+            }
         } else if handle.is_empty() && suffix == "!" {
             // "!" introduces a local tag. Local tags may have their prefix overridden.
             match self.tags.get("") {
-                Some(prefix) => Ok(Tag {
+                Some(prefix) => Tag {
                     handle: prefix.to_string(),
                     suffix,
-                }),
-                None => Ok(Tag {
+                },
+                None => Tag {
                     handle: String::new(),
                     suffix,
-                }),
+                },
             }
         } else {
             // Lookup handle in our tag directives.
             let prefix = self.tags.get(handle);
             if let Some(prefix) = prefix {
-                Ok(Tag {
+                Tag {
                     handle: prefix.to_string(),
                     suffix,
-                })
+                }
             } else {
                 // Otherwise, it may be a local handle. With a local handle, the handle is set to
                 // "!" and the suffix to whatever follows it ("!foo" -> ("!", "foo")).
                 // If the handle is of the form "!foo!", this cannot be a local handle and we need
                 // to error.
                 if handle.len() >= 2 && handle.starts_with('!') && handle.ends_with('!') {
-                    Err(ScanError::new_str(span.start, "the handle wasn't declared"))
-                } else {
-                    Ok(Tag {
-                        handle: handle.to_string(),
-                        suffix,
-                    })
+                    return Err(ScanError::new_str(span.start, "the handle wasn't declared"));
+                }
+                Tag {
+                    handle: handle.to_string(),
+                    suffix,
                 }
             }
-        }
+        };
+        Ok(Cow::Owned(tag))
     }
 }
 

@@ -1,4 +1,7 @@
-use std::fs::{self, DirEntry};
+use std::{
+    borrow::Cow,
+    fs::{self, DirEntry},
+};
 
 use libtest_mimic::{run_tests, Arguments, Outcome, Test};
 
@@ -213,12 +216,12 @@ impl<'input> SpannedEventReceiver<'input> for EventReporter<'input> {
             Event::DocumentEnd => "-DOC".into(),
 
             Event::SequenceStart(idx, tag) => {
-                format!("+SEQ{}{}", format_index(idx), format_tag(tag.as_ref()))
+                format!("+SEQ{}{}", format_index(idx), format_tag(&tag))
             }
             Event::SequenceEnd => "-SEQ".into(),
 
             Event::MappingStart(idx, tag) => {
-                format!("+MAP{}{}", format_index(idx), format_tag(tag.as_ref()))
+                format!("+MAP{}{}", format_index(idx), format_tag(&tag))
             }
             Event::MappingEnd => "-MAP".into(),
 
@@ -233,7 +236,7 @@ impl<'input> SpannedEventReceiver<'input> for EventReporter<'input> {
                 format!(
                     "=VAL{}{} {kind}{}",
                     format_index(idx),
-                    format_tag(tag.as_ref()),
+                    format_tag(tag),
                     escape_text(text)
                 )
             }
@@ -266,8 +269,8 @@ fn escape_text(text: &str) -> String {
     text
 }
 
-fn format_tag(tag: Option<&Tag>) -> String {
-    if let Some(tag) = tag {
+fn format_tag(tag: &Option<Cow<'_, Tag>>) -> String {
+    if let Some(tag) = tag.as_ref().map(Cow::as_ref) {
         format!(" <{}{}>", tag.handle, tag.suffix)
     } else {
         String::new()

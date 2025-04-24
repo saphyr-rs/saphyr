@@ -73,7 +73,7 @@ impl<'input> MarkedYaml<'input> {
     pub fn value_from_cow_and_metadata(
         v: Cow<'input, str>,
         style: ScalarStyle,
-        tag: Option<&Tag>,
+        tag: Option<&Cow<'input, Tag>>,
     ) -> Self {
         Scalar::parse_from_cow_and_metadata(v, style, tag).map_or_else(
             || Self {

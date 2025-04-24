@@ -79,7 +79,7 @@ impl MarkedYamlOwned {
     pub fn value_from_cow_and_metadata(
         v: Cow<'_, str>,
         style: ScalarStyle,
-        tag: Option<&Tag>,
+        tag: Option<&Cow<'_, Tag>>,
     ) -> Self {
         ScalarOwned::parse_from_cow_and_metadata(v, style, tag).map_or_else(
             || Self {

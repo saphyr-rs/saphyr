@@ -69,12 +69,13 @@ impl<'input> Scalar<'input> {
     /// # Return
     /// Returns the parsed [`Scalar`].
     ///
-    /// If `tag` is not [`None`] and `v` cannot be parsed as that specific tag, this function returns
-    /// `None`.
+    /// If `tag` is not [`None`] and `v` cannot be parsed as that specific tag, this function
+    /// returns `None`.
     ///
     /// # Examples
     /// ```
     /// # use saphyr::{Scalar, ScalarStyle, Tag};
+    /// use std::borrow::Cow::Owned;
     /// assert_eq!(
     ///     Scalar::parse_from_cow_and_metadata("123".into(), ScalarStyle::Plain, None),
     ///     Some(Scalar::Integer(123))
@@ -83,7 +84,7 @@ impl<'input> Scalar<'input> {
     ///     Scalar::parse_from_cow_and_metadata(
     ///         "123".into(),
     ///         ScalarStyle::Plain,
-    ///         Some(&Tag { handle: "tag:yaml.org,2002:".into(), suffix: "str".into() })
+    ///         Some(&Owned(Tag { handle: "tag:yaml.org,2002:".into(), suffix: "str".into() }))
     ///     ),
     ///     Some(Scalar::String("123".into()))
     /// );
@@ -91,7 +92,7 @@ impl<'input> Scalar<'input> {
     ///     Scalar::parse_from_cow_and_metadata(
     ///         "not a number".into(),
     ///         ScalarStyle::Plain,
-    ///         Some(&Tag { handle: "tag:yaml.org,2002:".into(), suffix: "int".into() })
+    ///         Some(&Owned(Tag { handle: "tag:yaml.org,2002:".into(), suffix: "int".into() }))
     ///     ),
     ///     None
     /// );
@@ -99,7 +100,7 @@ impl<'input> Scalar<'input> {
     ///     Scalar::parse_from_cow_and_metadata(
     ///         "No".into(),
     ///         ScalarStyle::Plain,
-    ///         Some(&Tag { handle: "tag:yaml.org,2002:".into(), suffix: "bool".into() })
+    ///         Some(&Owned(Tag { handle: "tag:yaml.org,2002:".into(), suffix: "bool".into() }))
     ///     ),
     ///     None
     /// );
@@ -107,7 +108,7 @@ impl<'input> Scalar<'input> {
     pub fn parse_from_cow_and_metadata(
         v: Cow<'input, str>,
         style: ScalarStyle,
-        tag: Option<&Tag>,
+        tag: Option<&Cow<'input, Tag>>,
     ) -> Option<Self> {
         if style != ScalarStyle::Plain {
             // Any quoted scalar is a string.
@@ -115,7 +116,7 @@ impl<'input> Scalar<'input> {
         } else if let Some(Tag {
             ref handle,
             ref suffix,
-        }) = tag
+        }) = tag.map(Cow::as_ref)
         {
             if handle == "tag:yaml.org,2002:" {
                 match suffix.as_ref() {
@@ -225,7 +226,7 @@ impl ScalarOwned {
     pub fn parse_from_cow_and_metadata(
         v: Cow<'_, str>,
         style: ScalarStyle,
-        tag: Option<&Tag>,
+        tag: Option<&Cow<'_, Tag>>,
     ) -> Option<Self> {
         Scalar::parse_from_cow_and_metadata(v, style, tag).map(Scalar::into_owned)
     }

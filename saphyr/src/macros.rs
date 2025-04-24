@@ -107,7 +107,7 @@ impl $(< $( $generic ),+ >)? $yaml $(where $($whereclause)+)? {
         match self.take() {
             Self::Representation(value, style, tag) => {
                 if let Some(scalar) =
-                    $scalartype::parse_from_cow_and_metadata(value.into(), style, tag.as_ref())
+                    $scalartype::parse_from_cow_and_metadata(value.into(), style, tag.map(std::borrow::Cow::Owned).as_ref())
                 {
                     *self = Self::Value(scalar);
                     true
@@ -164,7 +164,7 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
         match self.take() {
             Self::Representation(value, style, tag) => {
                 if let Some(scalar) =
-                    $scalartype::parse_from_cow_and_metadata(value.into(), style, tag.as_ref().map(|v| &**v))
+                    $scalartype::parse_from_cow_and_metadata(value.into(), style, tag.as_ref())
                 {
                     *self = Self::Value(scalar);
                     true
@@ -227,7 +227,7 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
     pub fn value_from_cow_and_metadata(
         v: Cow<'input, str>,
         style: ScalarStyle,
-        tag: Option<&Tag>,
+        tag: Option<&Cow<'input, Tag>>,
     ) -> Self {
         Scalar::parse_from_cow_and_metadata(v, style, tag).map_or(Self::BadValue, Self::Value)
     }

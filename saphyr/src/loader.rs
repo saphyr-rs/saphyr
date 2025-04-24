@@ -1,6 +1,6 @@
 //! The default loader.
 
-use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData, sync::Arc};
+use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 
 use hashlink::LinkedHashMap;
 use saphyr_parser::{
@@ -266,7 +266,7 @@ where
                 let node = if self.early_parse {
                     Yaml::value_from_cow_and_metadata(v, style, tag.as_ref())
                 } else {
-                    Yaml::Representation(v, style, tag.map(Cow::Owned))
+                    Yaml::Representation(v, style, tag)
                 };
                 self.insert_new_node((Node::from_bare_yaml(node).with_span(span), aid));
             }
