@@ -75,7 +75,7 @@ impl<'input> MarkedYaml<'input> {
         style: ScalarStyle,
         tag: Option<&Tag>,
     ) -> Self {
-        Scalar::parse_from_cow_and_metadata(v, style, tag.map(Cow::Borrowed).as_ref()).map_or_else(
+        Scalar::parse_from_cow_and_metadata(v, style, tag).map_or_else(
             || Self {
                 data: YamlData::BadValue,
                 span: Span::default(),
