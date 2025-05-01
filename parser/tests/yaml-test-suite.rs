@@ -1,10 +1,13 @@
-use std::fs::{self, DirEntry};
+use std::{
+    borrow::Cow,
+    fs::{self, DirEntry},
+};
 
 use libtest_mimic::{run_tests, Arguments, Outcome, Test};
 
-use saphyr::{Hash, Yaml};
+use saphyr::{LoadableYamlNode, Mapping, Scalar, Yaml};
 use saphyr_parser::{
-    Event, Marker, Parser, ScanError, Span, SpannedEventReceiver, TScalarStyle, Tag,
+    Event, Marker, Parser, ScalarStyle, ScanError, Span, SpannedEventReceiver, Tag,
 };
 
 type Result<T, E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
@@ -99,7 +102,7 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
     let tests = tests[0].as_vec().ok_or("no test list found in file")?;
 
     let mut result = vec![];
-    let mut current_test = Hash::new();
+    let mut current_test = Mapping::new();
     for (idx, test_data) in tests.iter().enumerate() {
         let name = if tests.len() > 1 {
             format!("{test_name}-{idx:02}")
@@ -108,15 +111,15 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
         };
 
         // Test fields except `fail` are "inherited"
-        let test_data = test_data.as_hash().unwrap();
-        current_test.remove(&Yaml::String("fail".into()));
+        let test_data = test_data.as_mapping().unwrap();
+        current_test.remove(&Yaml::Value(Scalar::String("fail".into())));
         for (key, value) in test_data.clone() {
             current_test.insert(key, value);
         }
 
-        let current_test = Yaml::Hash(current_test.clone()); // Much better indexing
+        let current_test = Yaml::Mapping(current_test.clone()); // Much better indexing
 
-        if current_test["skip"] != Yaml::BadValue {
+        if current_test.contains_mapping_key("skip") {
             continue;
         }
 
@@ -129,7 +132,10 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Test<YamlTest>>> {
                 yaml_visual: current_test["yaml"].as_str().unwrap().to_string(),
                 yaml: visual_to_raw(current_test["yaml"].as_str().unwrap()),
                 expected_events: visual_to_raw(current_test["tree"].as_str().unwrap()),
-                expected_error: current_test["fail"].as_bool() == Some(true),
+                expected_error: current_test
+                    .as_mapping_get("fail")
+                    .map(|x| x.as_bool().unwrap_or(false))
+                    == Some(true),
             },
         });
     }
@@ -182,14 +188,14 @@ fn parse_to_events(source: &str) -> Result<EventReporter, ScanError> {
 
 #[derive(Default)]
 /// A [`SpannedEventReceiver`] checking for inconsistencies in event [`Spans`].
-pub struct EventReporter {
+pub struct EventReporter<'input> {
     pub events: Vec<String>,
-    last_span: Option<(Event, Span)>,
+    last_span: Option<(Event<'input>, Span)>,
     pub span_failures: Vec<(String, Span)>,
 }
 
-impl SpannedEventReceiver for EventReporter {
-    fn on_event(&mut self, ev: Event, span: Span) {
+impl<'input> SpannedEventReceiver<'input> for EventReporter<'input> {
+    fn on_event(&mut self, ev: Event<'input>, span: Span) {
         if let Some((last_ev, last_span)) = self.last_span.take() {
             if span.start.index() < last_span.start.index()
                 || span.end.index() < last_span.end.index()
@@ -221,17 +227,16 @@ impl SpannedEventReceiver for EventReporter {
 
             Event::Scalar(ref text, style, idx, ref tag) => {
                 let kind = match style {
-                    TScalarStyle::Plain => ":",
-                    TScalarStyle::SingleQuoted => "'",
-                    TScalarStyle::DoubleQuoted => r#"""#,
-                    TScalarStyle::Literal => "|",
-                    TScalarStyle::Folded => ">",
+                    ScalarStyle::Plain => ":",
+                    ScalarStyle::SingleQuoted => "'",
+                    ScalarStyle::DoubleQuoted => r#"""#,
+                    ScalarStyle::Literal => "|",
+                    ScalarStyle::Folded => ">",
                 };
                 format!(
-                    "=VAL{}{} {}{}",
+                    "=VAL{}{} {kind}{}",
                     format_index(idx),
                     format_tag(tag),
-                    kind,
                     escape_text(text)
                 )
             }
@@ -264,8 +269,8 @@ fn escape_text(text: &str) -> String {
     text
 }
 
-fn format_tag(tag: &Option<Tag>) -> String {
-    if let Some(tag) = tag {
+fn format_tag(tag: &Option<Cow<'_, Tag>>) -> String {
+    if let Some(tag) = tag.as_ref().map(Cow::as_ref) {
         format!(" <{}{}>", tag.handle, tag.suffix)
     } else {
         String::new()
@@ -339,7 +344,7 @@ fn expected_events(expected_tree: &str) -> Vec<String> {
                     .iter()
                     .enumerate()
                     .filter(|(_, v)| v == &name)
-                    .last()
+                    .next_back()
                     .unwrap()
                     .0;
                 s = s.replace(&s[start..], &format!("*{}", idx + 1));

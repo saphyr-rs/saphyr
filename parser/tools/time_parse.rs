@@ -7,8 +7,8 @@ use saphyr_parser::{Event, Parser, Span, SpannedEventReceiver};
 /// A sink which discards any event sent.
 struct NullSink {}
 
-impl SpannedEventReceiver for NullSink {
-    fn on_event(&mut self, _: Event, _: Span) {}
+impl<'a> SpannedEventReceiver<'a> for NullSink {
+    fn on_event(&mut self, _: Event<'a>, _: Span) {}
 }
 
 fn main() {

@@ -3,12 +3,12 @@ extern crate quickcheck;
 
 use quickcheck::TestResult;
 
-use saphyr::{Yaml, YamlEmitter};
+use saphyr::{LoadableYamlNode, Scalar, Yaml, YamlEmitter};
 
 quickcheck! {
     fn test_check_weird_keys(xs: Vec<String>) -> TestResult {
         let mut out_str = String::new();
-        let input = Yaml::Array(xs.into_iter().map(Yaml::String).collect());
+        let input = Yaml::Sequence(xs.into_iter().map(|x|Yaml::Value(Scalar::String(x.into()))).collect());
         {
             let mut emitter = YamlEmitter::new(&mut out_str);
             emitter.dump(&input).unwrap();

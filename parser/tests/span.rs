@@ -12,7 +12,7 @@ fn run_parser_and_deref_scalar_spans(input: &str) -> Result<Vec<(String, String)
             let start = x.1.start.index();
             let end = x.1.end.index();
             let input_s = input.chars().skip(start).take(end - start).collect();
-            events.push((s, input_s));
+            events.push((s.into(), input_s));
         }
     }
     Ok(events)

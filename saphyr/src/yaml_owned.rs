@@ -4,7 +4,6 @@
 
 use std::{
     borrow::Cow,
-    convert::TryFrom,
     hash::{BuildHasher, Hasher},
     ops::{Index, IndexMut},
 };
@@ -12,7 +11,7 @@ use std::{
 use hashlink::LinkedHashMap;
 use saphyr_parser::{ScalarStyle, Tag};
 
-use crate::{LoadableYamlNode, Scalar, YamlOwned};
+use crate::{LoadableYamlNode, ScalarOwned, Yaml};
 
 /// A YAML node is stored as this `Yaml` enumeration, which provides an easy way to
 /// access your YAML document.
@@ -31,7 +30,7 @@ use crate::{LoadableYamlNode, Scalar, YamlOwned};
 /// }
 /// ```
 #[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
-pub enum Yaml<'input> {
+pub enum YamlOwned {
     /// The raw string from the input.
     ///
     /// When the field is left in the [`Representation`] variant, methods that rely on the value
@@ -48,11 +47,11 @@ pub enum Yaml<'input> {
     /// [`is_boolean`]: Yaml::is_boolean
     /// [`as_integer`]: Yaml::as_integer
     /// [`into_floating_point`]: Yaml::into_floating_point
-    Representation(Cow<'input, str>, ScalarStyle, Option<Cow<'input, Tag>>),
+    Representation(String, ScalarStyle, Option<Tag>),
     /// The resolved value from the representation.
-    Value(Scalar<'input>),
+    Value(ScalarOwned),
     /// YAML sequence, can be accessed as a `Vec`.
-    Sequence(Sequence<'input>),
+    Sequence(SequenceOwned),
     /// YAML mapping, can be accessed as a [`LinkedHashMap`].
     ///
     /// Iteration order will match the order of insertion into the map and that of the document.
@@ -63,7 +62,7 @@ pub enum Yaml<'input> {
     /// representations.
     ///
     /// If keys use the [`Value`] variant, they will be compared by value. It is discouraged to use
-    /// floating point values as keys. [`Scalar`] uses [`OrderedFloat`] for hash and equality.
+    /// floating point values as keys. [`ScalarOwned`] uses [`OrderedFloat`] for hash and equality.
     /// Refer to their documentation for details on float comparisons.
     ///
     /// Comparison between [`Representation`] variants and [`Value`] variants will always fail.
@@ -84,36 +83,35 @@ pub enum Yaml<'input> {
     /// [`Value`]: Yaml::Value
     /// [scalar style]: ScalarStyle
     /// [`OrderedFloat`]: ordered_float::OrderedFloat
-    Mapping(Mapping<'input>),
+    Mapping(MappingOwned),
     /// Alias, not fully supported yet.
     Alias(usize),
     /// A variant used when parsing the representation of a scalar node fails.
     ///
     /// The YAML is syntactically valid, but its contents are incoherent. See
-    /// [`Scalar::parse_from_cow_and_metadata`] for details.
+    /// [`ScalarOwned::parse_from_cow_and_metadata`] for details.
     /// This variant is also used when stealing the contents of `self`, meaning `self` should no
     /// longer be used. See [`Self::take`] for details
     BadValue,
 }
 
-/// The type contained in the `Yaml::Sequence` variant.
-pub type Sequence<'input> = Vec<Yaml<'input>>;
-/// The type contained in the `Yaml::Mapping` variant.
-pub type Mapping<'input> = LinkedHashMap<Yaml<'input>, Yaml<'input>>;
+/// The type contained in the `YamlOwned::Sequence` variant.
+pub type SequenceOwned = Vec<YamlOwned>;
+/// The type contained in the `YamlOwned::Mapping` variant.
+pub type MappingOwned = LinkedHashMap<YamlOwned, YamlOwned>;
 
 // This defines most common operations on a YAML object. See macro definition for details.
 define_yaml_object_impl!(
-    Yaml<'input>,
-    <'input>,
-    mappingtype = Mapping<'input>,
-    sequencetype = Sequence<'input>,
+    YamlOwned,
+    mappingtype = MappingOwned,
+    sequencetype = SequenceOwned,
     nodetype = Self,
-    scalartype = { Scalar },
-    selfname = "YAML",
-    borrowing
+    scalartype = { ScalarOwned },
+    selfname = "YAMLOwned",
+    owned
 );
 
-impl Yaml<'_> {
+impl YamlOwned {
     /// Implementation detail for [`Self::as_mapping_get`], which is generated from a macro.
     #[must_use]
     fn as_mapping_get_impl(&self, key: &str) -> Option<&Self> {
@@ -149,11 +147,22 @@ impl Yaml<'_> {
     }
 }
 
-impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
+impl LoadableYamlNode<'_> for YamlOwned {
     type HashKey = Self;
 
-    fn from_bare_yaml(yaml: Yaml<'input>) -> Self {
-        yaml
+    fn from_bare_yaml(yaml: Yaml<'_>) -> Self {
+        match yaml {
+            // Sequence and Mapping will always have their container empty.
+            Yaml::Sequence(_) => Self::Sequence(vec![]),
+            Yaml::Mapping(_) => Self::Mapping(MappingOwned::new()),
+
+            Yaml::Representation(cow, scalar_style, tag) => {
+                Self::Representation(cow.into(), scalar_style, tag.map(Cow::into_owned))
+            }
+            Yaml::Value(scalar) => Self::Value(scalar.into_owned()),
+            Yaml::Alias(x) => Self::Alias(x),
+            Yaml::BadValue => Self::BadValue,
+        }
     }
 
     fn is_sequence(&self) -> bool {
@@ -179,67 +188,40 @@ impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
     }
 
     fn take(&mut self) -> Self {
-        let mut taken_out = Yaml::BadValue;
+        let mut taken_out = Self::BadValue;
         std::mem::swap(&mut taken_out, self);
         taken_out
     }
 }
 
-impl<'input> IntoIterator for Yaml<'input> {
-    type Item = Yaml<'input>;
-    type IntoIter = YamlIter<'input>;
+impl IntoIterator for YamlOwned {
+    type Item = Self;
+    type IntoIter = YamlOwnedIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        YamlIter {
+        YamlOwnedIter {
             yaml: self.into_vec().unwrap_or_default().into_iter(),
         }
     }
 }
 
-/// An iterator over a [`Yaml`] node.
-pub struct YamlIter<'input> {
-    yaml: std::vec::IntoIter<Yaml<'input>>,
+/// An iterator over a [`YamlOwned`] node.
+pub struct YamlOwnedIter {
+    yaml: std::vec::IntoIter<YamlOwned>,
 }
 
-impl<'input> Iterator for YamlIter<'input> {
-    type Item = Yaml<'input>;
+impl Iterator for YamlOwnedIter {
+    type Item = YamlOwned;
 
-    fn next(&mut self) -> Option<Yaml<'input>> {
+    fn next(&mut self) -> Option<YamlOwned> {
         self.yaml.next()
     }
 }
 
-/// Hash the given `str` as if it were a [`Scalar::String`] object.
+/// Hash the given `str` as if it were a [`ScalarOwned::String`] object.
 fn hash_str_as_yaml_string<H: Hasher>(key: &str, mut hasher: H) -> u64 {
     use std::hash::Hash;
-    let key = Yaml::Value(Scalar::String(key.into()));
+    let key = YamlOwned::Value(ScalarOwned::String(key.into()));
     key.hash(&mut hasher);
     hasher.finish()
-}
-
-impl<'input> From<&'input YamlOwned> for Yaml<'input> {
-    fn from(value: &'input YamlOwned) -> Self {
-        match value {
-            YamlOwned::Representation(str, scalar_style, tag) => Yaml::Representation(
-                Cow::Borrowed(str),
-                *scalar_style,
-                tag.as_ref().map(Cow::Borrowed),
-            ),
-            YamlOwned::Value(scalar_owned) => Yaml::Value(scalar_owned.into()),
-            YamlOwned::Sequence(yaml_owneds) => Yaml::Sequence(
-                yaml_owneds
-                    .iter()
-                    .map(Into::into)
-                    .collect::<Vec<Yaml<'input>>>(),
-            ),
-            YamlOwned::Mapping(linked_hash_map) => Yaml::Mapping(
-                linked_hash_map
-                    .iter()
-                    .map(|(key, value)| (key.into(), value.into()))
-                    .collect::<Mapping>(),
-            ),
-            YamlOwned::Alias(usize) => Yaml::Alias(*usize),
-            YamlOwned::BadValue => Yaml::BadValue,
-        }
-    }
 }

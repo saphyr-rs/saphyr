@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 use saphyr::{MarkedYaml, Yaml, YamlEmitter};
+||||||| 3143cd2
+use saphyr::{Yaml, YamlEmitter};
+=======
+use saphyr::{LoadableYamlNode, Yaml, YamlEmitter};
+>>>>>>> master
 
 #[allow(clippy::similar_names)]
 #[test]
@@ -263,7 +269,7 @@ e:
 }
 
 #[test]
-fn test_nested_arrays() {
+fn test_nested_sequences() {
     let s = r"---
 a:
   - b
@@ -287,7 +293,7 @@ a:
 }
 
 #[test]
-fn test_deeply_nested_arrays() {
+fn test_deeply_nested_sequences() {
     let s = r"---
 a:
   - b
@@ -312,7 +318,7 @@ a:
 }
 
 #[test]
-fn test_nested_hashes() {
+fn test_nested_mappings() {
     let s = r"---
 a:
   b:

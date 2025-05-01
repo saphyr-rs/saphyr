@@ -5,12 +5,12 @@ use std::io::prelude::*;
 use saphyr_parser::{Event, Parser, Span, SpannedEventReceiver};
 
 #[derive(Debug)]
-struct EventSink {
-    events: Vec<(Event, Span)>,
+struct EventSink<'a> {
+    events: Vec<(Event<'a>, Span)>,
 }
 
-impl SpannedEventReceiver for EventSink {
-    fn on_event(&mut self, ev: Event, span: Span) {
+impl<'a> SpannedEventReceiver<'a> for EventSink<'a> {
+    fn on_event(&mut self, ev: Event<'a>, span: Span) {
         eprintln!("      \x1B[;34m\u{21B3} {:?}\x1B[;m", &ev);
         self.events.push((ev, span));
     }

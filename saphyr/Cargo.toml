@@ -20,6 +20,7 @@ encoding = [ "dep:encoding_rs" ]
 arraydeque = { workspace = true }
 encoding_rs = { workspace = true, optional = true }
 hashlink = { workspace = true }
+ordered-float = { workspace = true }
 saphyr-parser = { workspace = true }
 
 [dev-dependencies]

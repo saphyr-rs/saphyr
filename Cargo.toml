@@ -4,6 +4,7 @@ lto = true
 [workspace]
 members = [
     "parser",
+    "parser/tools/walk",
     "saphyr",
     "bench",
     "bench/tools/gen_large_yaml",
@@ -18,7 +19,7 @@ authors = [
   "David Aguilar <davvid@gmail.com>",
   "Yuheng Chen <yuhengchen@sensetime.com>"
 ]
-version = "0.0.3"
+version = "0.0.4"
 documentation = "https://docs.rs/saphyr"
 keywords = [ "yaml", "parser" ]
 categories = [ "encoding", "parser-implementations" ]
@@ -32,12 +33,16 @@ rust-version = "1.70.0"
 [workspace.dependencies]
 arraydeque = "0.5.1"
 encoding_rs = { version = "0.8.33" }
-hashlink = "0.8"
+hashlink = "0.10"
 libtest-mimic = "0.3.0"
+miette = { version = "7.5.0", features = ["fancy"] }
+ordered-float = { version = "5.0", default-features = false }
 quickcheck = "1.0"
+rustyline = "15.0.0"
 saphyr = { path = "saphyr" }
 saphyr-bench = { path = "bench" }
 saphyr-parser = { path = "parser" }
+thiserror = "2.0.12"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

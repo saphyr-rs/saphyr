@@ -2,6 +2,59 @@
 
 ## Upcoming
 
+**Breaking Changes**:
+
+- No longer parse any capitalization of `inf`, or `infinity` as `f64::INFINITY`
+- Parse `.NaN` as float instead of `NaN`.
+
+## v0.0.4
+
+**Breaking Changes**:
+
+- Allow `Yaml` to borrow from the input.
+- All indexing traits now panic if the key is not found or the YAML variant is
+  incorrect. This helps in making the behavior of `[]` more consistent across
+  all operations.
+- Use `Mapping` instead of `Hash` to refer to YAML mappings.
+- Use `Sequence` instead of `Array` to refer to YAML sequences.
+  Methods to access sequences using `vec` instead of `array` still exist.
+  Another method using `sequence` has been added.
+- `as_f64` -> `as_floating_point`, `as_i64` -> `as_integer`
+- Reworked `Yaml` and `YamlData`
+  - They now have a `Value` and a `Representation` variants for scalars.
+    `Representation` holds the raw characters from the input (pre-parsing)
+    while `Value` holds the parsed value. In `foo: 3`, `Representation` would
+    hold `"foo"` and `"3"` (both as strings) while `Value` would hold `"foo"`
+    and `3`.
+  - The idea behind this is to allow lazy-parsing of scalar nodes and to give
+    more control about key duplication detection in mappings (e.g.: is `{ 0xB:
+    ~, 11: ~ }` considered a duplicate because `0xB == 11`?).
+- Rename `from_str` to `value_from_str` to better highlight it:
+  - Doesn't load a YAML document
+  - Doesn't always load into a YAML string
+- `load_from_*` functions now belong to the `LoadableYamlNode` trait to avoid
+  implementing them in each YAML node type. It is now required to import
+  `LoadableYamlNode` to use these functions (LSPs should have a fixit for it).
+
+**Features**:
+- Add the following convenience methods to the YAML objects:
+  - `contains_mapping_key`
+  - `as_mapping_get`
+  - `as_mapping_get_mut`
+- Add many more conversion methods (`as_*`, `as_*_mut`, `into_*`, ...).
+- Use
+  [`ordered-float`](https://docs.rs/ordered-float/latest/ordered_float/struct.OrderedFloat.html)
+  to store floating point values in scalars. This allows using floating point
+  values in mappings, with the caveats listed in the crate description (#18).
+  The `OrderedFloat`s are kept within the `Scalar` object and conversion
+  methods do not expose them.
+- Add `YamlDataOwned`, an owned version of `YamlData` for when lifetimes are
+  not required.
+- Add `MarkedYamlOwned`, an owned version of `MarkedYaml` for when lifetimes
+  are not required.
+- Add `YamlOwned`, an owned version of `Yaml` which corresponds to what `Yaml`
+  was prior to this version.
+
 ## v0.0.3
 
 Skipping version `v0.0.2` to align this crate's version with that of
@@ -16,7 +69,6 @@ Skipping version `v0.0.2` to align this crate's version with that of
 - Make `LoadError` `Clone` by storing an `Arc<std::io::Error>` instead of the
   error directly.
 
-
 **Features**:
 
 - ([#19](https://github.com/Ethiraric/yaml-rust2/pull/19)) `Yaml` now
@@ -28,7 +80,7 @@ Skipping version `v0.0.2` to align this crate's version with that of
     `Yaml::Hash` for `&'a str`
 
 - Use cargo features
-  
+
   This allows for more fine-grained control over MSRV and to completely remove
   debug code from the library when it is consumed.
 

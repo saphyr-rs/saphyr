@@ -4,7 +4,7 @@ use std::{borrow::Cow, ops::ControlFlow};
 
 use encoding_rs::{Decoder, DecoderResult, Encoding};
 
-use crate::{loader::LoadError, Yaml};
+use crate::{loader::LoadError, LoadableYamlNode, Yaml};
 
 /// The signature of the function to call when using [`YAMLDecodingTrap::Call`].
 ///
@@ -46,7 +46,8 @@ pub enum YAMLDecodingTrap {
     Call(YAMLDecodingTrapFn),
 }
 
-/// `YamlDecoder` is a `YamlLoader` builder that allows you to supply your own encoding error trap.
+/// A [`YamlLoader`] builder that allows you to supply your own encoding error trap.
+///
 /// For example, to read a YAML file while ignoring Unicode decoding errors you can set the
 /// `encoding_trap` to `encoding::DecoderTrap::Ignore`.
 /// ```rust
@@ -57,11 +58,14 @@ pub enum YAMLDecodingTrap {
 /// b: 2.2
 /// c: [1, 2]
 /// ";
-/// let out = YamlDecoder::read(string as &[u8])
+/// let mut decoder = YamlDecoder::read(string as &[u8]);
+/// let out = decoder
 ///     .encoding_trap(YAMLDecodingTrap::Ignore)
 ///     .decode()
 ///     .unwrap();
 /// ```
+///
+/// [`YamlLoader`]: crate::YamlLoader
 pub struct YamlDecoder<T: std::io::Read> {
     /// The input stream.
     source: T,
@@ -197,6 +201,8 @@ fn detect_utf16_endianness(b: &[u8]) -> &'static Encoding {
 
 #[cfg(test)]
 mod test {
+    use crate::Scalar;
+
     use super::{YAMLDecodingTrap, Yaml, YamlDecoder};
 
     #[test]
@@ -206,12 +212,13 @@ a: 1
 b: 2.2
 c: [1, 2]
 ";
-        let out = YamlDecoder::read(s as &[u8]).decode().unwrap();
+        let mut decoder = YamlDecoder::read(s as &[u8]);
+        let out = decoder.decode().unwrap();
         let doc = &out[0];
-        assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
-        assert!((doc["b"].as_f64().unwrap() - 2.2f64).abs() <= f64::EPSILON);
-        assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
-        assert!(doc["d"][0].is_badvalue());
+        assert_eq!(doc["a"].as_integer().unwrap(), 1i64);
+        assert!((doc["b"].as_floating_point().unwrap() - 2.2f64).abs() <= f64::EPSILON);
+        assert_eq!(doc["c"][1].as_integer().unwrap(), 2i64);
+        assert!(!doc.contains_mapping_key("d"));
     }
 
     #[test]
@@ -221,13 +228,14 @@ c: [1, 2]
 \x00b\x00:\x00 \x002\x00.\x002\x00
 \x00c\x00:\x00 \x00[\x001\x00,\x00 \x002\x00]\x00
 \x00";
-        let out = YamlDecoder::read(s as &[u8]).decode().unwrap();
+        let mut decoder = YamlDecoder::read(s as &[u8]);
+        let out = decoder.decode().unwrap();
         let doc = &out[0];
         println!("GOT: {doc:?}");
-        assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
-        assert!((doc["b"].as_f64().unwrap() - 2.2f64) <= f64::EPSILON);
-        assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
-        assert!(doc["d"][0].is_badvalue());
+        assert_eq!(doc["a"].as_integer().unwrap(), 1i64);
+        assert!((doc["b"].as_floating_point().unwrap() - 2.2f64) <= f64::EPSILON);
+        assert_eq!(doc["c"][1].as_integer().unwrap(), 2i64);
+        assert!(!doc.contains_mapping_key("d"));
     }
 
     #[test]
@@ -237,13 +245,14 @@ c: [1, 2]
 \x00b\x00:\x00 \x002\x00.\x002\x00
 \x00c\x00:\x00 \x00[\x001\x00,\x00 \x002\x00]\x00
 ";
-        let out = YamlDecoder::read(s as &[u8]).decode().unwrap();
+        let mut decoder = YamlDecoder::read(s as &[u8]);
+        let out = decoder.decode().unwrap();
         let doc = &out[0];
         println!("GOT: {doc:?}");
-        assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
-        assert!((doc["b"].as_f64().unwrap() - 2.2f64).abs() <= f64::EPSILON);
-        assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
-        assert!(doc["d"][0].is_badvalue());
+        assert_eq!(doc["a"].as_integer().unwrap(), 1i64);
+        assert!((doc["b"].as_floating_point().unwrap() - 2.2f64).abs() <= f64::EPSILON);
+        assert_eq!(doc["c"][1].as_integer().unwrap(), 2i64);
+        assert!(!doc.contains_mapping_key("d"));
     }
 
     #[test]
@@ -253,13 +262,14 @@ c: [1, 2]
 \x00b\x00:\x00 \x002\x00.\x002\x00
 \x00c\x00:\x00 \x00[\x001\x00,\x00 \x002\x00]\x00
 \x00";
-        let out = YamlDecoder::read(s as &[u8]).decode().unwrap();
+        let mut decoder = YamlDecoder::read(s as &[u8]);
+        let out = decoder.decode().unwrap();
         let doc = &out[0];
         println!("GOT: {doc:?}");
-        assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
-        assert!((doc["b"].as_f64().unwrap() - 2.2f64).abs() <= f64::EPSILON);
-        assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
-        assert!(doc["d"][0].is_badvalue());
+        assert_eq!(doc["a"].as_integer().unwrap(), 1i64);
+        assert!((doc["b"].as_floating_point().unwrap() - 2.2f64).abs() <= f64::EPSILON);
+        assert_eq!(doc["c"][1].as_integer().unwrap(), 2i64);
+        assert!(!doc.contains_mapping_key("d"));
     }
 
     #[test]
@@ -269,21 +279,28 @@ a\xa9: 1
 b: 2.2
 c: [1, 2]
 ";
-        let out = YamlDecoder::read(s as &[u8])
+        let mut decoder = YamlDecoder::read(s as &[u8]);
+        let out = decoder
             .encoding_trap(YAMLDecodingTrap::Ignore)
             .decode()
             .unwrap();
         let doc = &out[0];
         println!("GOT: {doc:?}");
-        assert_eq!(doc["a"].as_i64().unwrap(), 1i64);
-        assert!((doc["b"].as_f64().unwrap() - 2.2f64).abs() <= f64::EPSILON);
-        assert_eq!(doc["c"][1].as_i64().unwrap(), 2i64);
-        assert!(doc["d"][0].is_badvalue());
+        assert_eq!(doc["a"].as_integer().unwrap(), 1i64);
+        assert!((doc["b"].as_floating_point().unwrap() - 2.2f64).abs() <= f64::EPSILON);
+        assert_eq!(doc["c"][1].as_integer().unwrap(), 2i64);
+        assert!(!doc.contains_mapping_key("d"));
     }
 
     #[test]
     fn test_or() {
-        assert_eq!(Yaml::Null.or(Yaml::Integer(3)), Yaml::Integer(3));
-        assert_eq!(Yaml::Integer(3).or(Yaml::Integer(7)), Yaml::Integer(3));
+        assert_eq!(
+            Yaml::Value(Scalar::Null).or(Yaml::Value(Scalar::Integer(3))),
+            Yaml::Value(Scalar::Integer(3))
+        );
+        assert_eq!(
+            Yaml::Value(Scalar::Integer(3)).or(Yaml::Value(Scalar::Integer(7))),
+            Yaml::Value(Scalar::Integer(3))
+        );
     }
 }

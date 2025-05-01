@@ -1,7 +1,13 @@
 //! YAML serialization helpers.
 
-use crate::yaml::{Hash, Yaml};
-use crate::{char_traits, MarkedYaml};
+use saphyr_parser::Tag;
+
+use crate::{
+    char_traits,
+    yaml::{Mapping, Yaml},
+    MarkedYaml, Scalar,
+};
+use std::borrow::Cow;
 use std::convert::From;
 use std::error::Error;
 use std::fmt::{self, Display};
@@ -36,7 +42,7 @@ impl From<fmt::Error> for EmitError {
 /// The YAML serializer.
 ///
 /// ```
-/// # use saphyr::{Yaml, YamlEmitter};
+/// # use saphyr::{LoadableYamlNode, Yaml, YamlEmitter};
 /// let input_string = "a: b\nc: d";
 /// let yaml = Yaml::load_from_str(input_string).unwrap();
 ///
@@ -136,34 +142,33 @@ where
     }
 }
 
-impl Emittable for Yaml {
+impl Emittable for Yaml<'_> {
     fn node(&self) -> Yaml {
         Yaml::clone(self)
     }
 }
 
-impl Emittable for MarkedYaml {
+impl Emittable for MarkedYaml<'_> {
     fn node(&self) -> Yaml {
         to_yaml(self)
     }
 }
 
-pub fn to_yaml(input: &MarkedYaml) -> Yaml {
+pub fn to_yaml<'a>(input: &MarkedYaml<'a>) -> Yaml<'a> {
     match &input.data {
-        crate::YamlData::Real(r) => Yaml::Real(r.to_string()),
-        crate::YamlData::Integer(i) => Yaml::Integer(*i),
-        crate::YamlData::String(s) => Yaml::String(s.to_string()),
-        crate::YamlData::Boolean(b) => Yaml::Boolean(*b),
-        crate::YamlData::Array(vec) => Yaml::Array(vec.iter().map(to_yaml).collect()),
-        crate::YamlData::Hash(linked_hash_map) => Yaml::Hash(
+        crate::YamlData::Value(n) => Yaml::Value(n.clone()),
+        crate::YamlData::Sequence(vec) => Yaml::Sequence(vec.iter().map(to_yaml).collect()),
+        crate::YamlData::Mapping(linked_hash_map) => Yaml::Mapping(
             linked_hash_map
                 .iter()
                 .map(|(k, v)| (to_yaml(k), to_yaml(v)))
                 .collect(),
         ),
         crate::YamlData::Alias(a) => Yaml::Alias(*a),
-        crate::YamlData::Null => Yaml::Null,
         crate::YamlData::BadValue => Yaml::BadValue,
+        crate::YamlData::Representation(s, style, maybe_tag) => {
+            Yaml::Representation(s.clone(), *style, maybe_tag.clone())
+        }
     }
 }
 
@@ -204,7 +209,7 @@ impl<'a> YamlEmitter<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// use saphyr::{Yaml, YamlEmitter};
+    /// use saphyr::{LoadableYamlNode, Yaml, YamlEmitter};
     ///
     /// let input = r#"{foo: "bar!\nbar!", baz: 42}"#;
     /// let parsed = Yaml::load_from_str(input).unwrap();
@@ -259,9 +264,9 @@ impl<'a> YamlEmitter<'a> {
 
     fn emit_node<Y: Emittable>(&mut self, node: &Y) -> EmitResult {
         match node.node() {
-            Yaml::Array(ref v) => self.emit_array(v),
-            Yaml::Hash(ref h) => self.emit_hash(h),
-            Yaml::String(ref v) => {
+            Yaml::Sequence(ref v) => self.emit_sequence(v),
+            Yaml::Mapping(ref h) => self.emit_mapping(h),
+            Yaml::Value(Scalar::String(ref v)) => {
                 if self.multiline_strings
                     && v.contains('\n')
                     && char_traits::is_valid_literal_block_scalar(v)
@@ -274,7 +279,7 @@ impl<'a> YamlEmitter<'a> {
                 }
                 Ok(())
             }
-            Yaml::Boolean(v) => {
+            Yaml::Value(Scalar::Boolean(v)) => {
                 if v {
                     self.writer.write_str("true")?;
                 } else {
@@ -282,16 +287,30 @@ impl<'a> YamlEmitter<'a> {
                 }
                 Ok(())
             }
-            Yaml::Integer(v) => {
-                write!(self.writer, "{v}")?;
-                Ok(())
-            }
-            Yaml::Real(ref v) => {
-                write!(self.writer, "{v}")?;
-                Ok(())
-            }
-            Yaml::Null | Yaml::BadValue => {
-                write!(self.writer, "~")?;
+            Yaml::Value(Scalar::Integer(v)) => Ok(write!(self.writer, "{v}")?),
+            Yaml::Value(Scalar::FloatingPoint(ref v)) => Ok(write!(self.writer, "{v}")?),
+            Yaml::Value(Scalar::Null) | Yaml::BadValue => Ok(write!(self.writer, "~")?),
+            Yaml::Representation(ref v, style, ref tag) => {
+                if let Some(
+                    Cow::Owned(Tag {
+                        ref handle,
+                        ref suffix,
+                    })
+                    | Cow::Borrowed(Tag {
+                        ref handle,
+                        ref suffix,
+                    }),
+                ) = tag
+                {
+                    write!(self.writer, "{handle}!{suffix} ")?;
+                }
+                match style {
+                    saphyr_parser::ScalarStyle::Plain => write!(self.writer, "{v}")?,
+                    saphyr_parser::ScalarStyle::SingleQuoted => write!(self.writer, "'{v}'")?,
+                    saphyr_parser::ScalarStyle::DoubleQuoted => write!(self.writer, "\"{v}\"")?,
+                    saphyr_parser::ScalarStyle::Literal => todo!(),
+                    saphyr_parser::ScalarStyle::Folded => todo!(),
+                }
                 Ok(())
             }
             // XXX(chenyh) Alias
@@ -319,7 +338,7 @@ impl<'a> YamlEmitter<'a> {
         Ok(())
     }
 
-    fn emit_array(&mut self, v: &[Yaml]) -> EmitResult {
+    fn emit_sequence(&mut self, v: &[Yaml]) -> EmitResult {
         if v.is_empty() {
             write!(self.writer, "[]")?;
         } else {
@@ -337,13 +356,13 @@ impl<'a> YamlEmitter<'a> {
         Ok(())
     }
 
-    fn emit_hash(&mut self, h: &Hash) -> EmitResult {
+    fn emit_mapping(&mut self, h: &Mapping) -> EmitResult {
         if h.is_empty() {
             self.writer.write_str("{}")?;
         } else {
             self.level += 1;
             for (cnt, (k, v)) in h.iter().enumerate() {
-                let complex_key = matches!(*k, Yaml::Hash(_) | Yaml::Array(_));
+                let complex_key = matches!(k, Yaml::Mapping(_) | Yaml::Sequence(_));
                 if cnt > 0 {
                     writeln!(self.writer)?;
                     self.write_indent()?;
@@ -372,7 +391,7 @@ impl<'a> YamlEmitter<'a> {
     /// and short enough to respect the compact flag.
     fn emit_val(&mut self, inline: bool, val: &Yaml) -> EmitResult {
         match *val {
-            Yaml::Array(ref v) => {
+            Yaml::Sequence(ref v) => {
                 if (inline && self.compact) || v.is_empty() {
                     write!(self.writer, " ")?;
                 } else {
@@ -381,9 +400,9 @@ impl<'a> YamlEmitter<'a> {
                     self.write_indent()?;
                     self.level -= 1;
                 }
-                self.emit_array(v)
+                self.emit_sequence(v)
             }
-            Yaml::Hash(ref h) => {
+            Yaml::Mapping(ref h) => {
                 if (inline && self.compact) || h.is_empty() {
                     write!(self.writer, " ")?;
                 } else {
@@ -392,7 +411,7 @@ impl<'a> YamlEmitter<'a> {
                     self.write_indent()?;
                     self.level -= 1;
                 }
-                self.emit_hash(h)
+                self.emit_mapping(h)
             }
             _ => {
                 write!(self.writer, " ")?;
@@ -468,9 +487,7 @@ fn need_quotes(string: &str) -> bool {
 
 #[cfg(test)]
 mod test {
-    use crate::Yaml;
-
-    use super::YamlEmitter;
+    use crate::{LoadableYamlNode, Yaml, YamlEmitter};
 
     #[test]
     fn test_multiline_string() {
