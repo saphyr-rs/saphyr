@@ -1,10 +1,5 @@
-<<<<<<< HEAD
-use saphyr::{MarkedYaml, Yaml, YamlEmitter};
-||||||| 3143cd2
-use saphyr::{Yaml, YamlEmitter};
-=======
-use saphyr::{LoadableYamlNode, Yaml, YamlEmitter};
->>>>>>> master
+use saphyr::{LoadableYamlNode, YamlEmitter};
+use saphyr::{MarkedYaml, Yaml};
 
 #[allow(clippy::similar_names)]
 #[test]
