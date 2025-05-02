@@ -4,8 +4,9 @@ use crate::char_traits;
 use crate::MarkedYaml;
 use crate::{
     yaml::{Mapping, Yaml},
-    Scalar,
+    MarkedYamlOwned, Scalar, ScalarOwned,
 };
+use std::borrow::Cow;
 use std::convert::From;
 use std::error::Error;
 use std::fmt::{self, Display};
@@ -152,7 +153,15 @@ impl Emittable for MarkedYaml<'_> {
     }
 }
 
-pub fn to_yaml<'a>(input: &'a MarkedYaml) -> Yaml<'a> {
+// pub fn to_yaml<'a>(input: &'a MarkedYaml) -> Yaml<'a> {
+// pub fn to_yaml<'a>(input: &MarkedYaml<'a>) -> Yaml<'a> {
+impl Emittable for MarkedYamlOwned {
+    fn node(&self) -> Yaml {
+        to_yaml2(self)
+    }
+}
+
+pub fn to_yaml<'a>(input: &MarkedYaml<'a>) -> Yaml<'a> {
     match &input.data {
         crate::YamlData::Tagged(tag, node) => Yaml::Tagged(tag.clone(), Box::new(to_yaml(node))),
         crate::YamlData::Representation(content, style, tag) => {
@@ -168,6 +177,38 @@ pub fn to_yaml<'a>(input: &'a MarkedYaml) -> Yaml<'a> {
         ),
         crate::YamlData::Alias(a) => Yaml::Alias(*a),
         crate::YamlData::BadValue => Yaml::BadValue,
+    }
+}
+pub fn to_yaml2(input: &MarkedYamlOwned) -> Yaml {
+    match &input.data {
+        crate::YamlDataOwned::Value(n) => Yaml::Value(to_scalar(n)),
+        crate::YamlDataOwned::Sequence(vec) => Yaml::Sequence(vec.iter().map(to_yaml2).collect()),
+        crate::YamlDataOwned::Mapping(linked_hash_map) => Yaml::Mapping(
+            linked_hash_map
+                .iter()
+                .map(|(k, v)| (to_yaml2(k), to_yaml2(v)))
+                .collect(),
+        ),
+        crate::YamlDataOwned::Alias(a) => Yaml::Alias(*a),
+        crate::YamlDataOwned::BadValue => Yaml::BadValue,
+        crate::YamlDataOwned::Representation(s, style, maybe_tag) => Yaml::Representation(
+            Cow::Borrowed(s),
+            *style,
+            maybe_tag.as_ref().map(|t| Cow::Owned(t.clone())),
+        ),
+        crate::YamlDataOwned::Tagged(tag, node) => {
+            Yaml::Tagged(Cow::Owned(tag.clone()), Box::new(to_yaml2(node)))
+        }
+    }
+}
+
+fn to_scalar(input: &ScalarOwned) -> Scalar<'_> {
+    match input {
+        ScalarOwned::Null => Scalar::Null,
+        ScalarOwned::Boolean(b) => Scalar::Boolean(*b),
+        ScalarOwned::Integer(i) => Scalar::Integer(*i),
+        ScalarOwned::FloatingPoint(ordered_float) => Scalar::FloatingPoint(*ordered_float),
+        ScalarOwned::String(s) => Scalar::String(Cow::Owned(s.clone())),
     }
 }
 
