@@ -9,6 +9,8 @@ use saphyr_parser::{ScalarStyle, Span, Tag};
 
 use crate::{LoadableYamlNode, ScalarOwned, Yaml, YamlDataOwned};
 
+use super::Indexable;
+
 /// A YAML node with [`Span`]s pointing to the start of the node.
 ///
 /// This structure does not implement functions to operate on the YAML object. To access those,
@@ -26,6 +28,12 @@ pub struct MarkedYamlOwned {
     pub span: Span,
     /// The YAML contents of the node.
     pub data: YamlDataOwned<MarkedYamlOwned>,
+}
+
+impl Indexable for MarkedYamlOwned {
+    fn get(&self, key: impl super::Index<Self>) -> Option<&Self> {
+        key.index_into(self)
+    }
 }
 
 impl MarkedYamlOwned {

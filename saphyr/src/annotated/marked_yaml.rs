@@ -9,6 +9,8 @@ use saphyr_parser::{Marker, ScalarStyle, Span, Tag};
 
 use crate::{LoadableYamlNode, Scalar, Yaml, YamlData};
 
+use super::{Index, Indexable};
+
 /// A YAML node with [`Span`]s pointing to the start of the node.
 ///
 /// This structure does not implement functions to operate on the YAML object. To access those,
@@ -86,93 +88,13 @@ impl<'input> MarkedYaml<'input> {
             },
         )
     }
+}
 
-    /// Index into a YAML sequence or map.
-    /// A string index can be used to access a value in a map, and a usize index can be used to access an element of an sequence.
-    ///
-    /// Original implementation is from `serde_yaml` [get](https://docs.rs/serde_yaml/latest/serde_yaml/value/enum.Value.html#method.get)
-    pub fn get<I: Index + 'input>(&self, index: I) -> Option<&Self> {
-        index.index_into(self)
+impl Indexable for MarkedYaml<'_> {
+    fn get(&self, key: impl Index<Self>) -> Option<&Self> {
+        key.index_into(self)
     }
 }
-
-pub trait Index {
-    fn index_into<'n, 'input>(self, v: &'n MarkedYaml<'input>) -> Option<&'n MarkedYaml<'input>>;
-}
-
-impl Index for usize {
-    fn index_into<'n, 'input>(self, v: &'n MarkedYaml<'input>) -> Option<&'n MarkedYaml<'input>> {
-        v.data.as_sequence_get(self)
-    }
-}
-
-impl Index for &str {
-    fn index_into<'n, 'input>(self, v: &'n MarkedYaml<'input>) -> Option<&'n MarkedYaml<'input>> {
-        v.get(self.to_string())
-    }
-}
-
-impl Index for MarkedYaml<'_> {
-    fn index_into<'n, 'm>(self, v: &'n MarkedYaml<'m>) -> Option<&'n MarkedYaml<'m>> {
-        if v.data.is_sequence() {
-            return if let Some(idx) = self.data.as_integer() {
-                v.data.as_sequence_get(idx as usize)
-            } else {
-                None
-            };
-        }
-        if v.data.is_mapping() {
-            return if let Some(key) = self.data.as_str() {
-                v.data.as_mapping_get(key)
-            } else {
-                None
-            };
-        }
-        None
-    }
-}
-
-// impl<'m> Index for YamlData<'m, MarkedYaml<'m>> {
-//     fn index_into<'v>(&self, v: &'v MarkedYaml) -> Option<&'v MarkedYaml> {
-//         match &v.data {
-//             YamlData::Sequence(vec) => {
-//                 if let Some(num) = self.as_integer() {
-//                     vec.get(num as usize)
-//                 } else {
-//                     None
-//                 }
-//             }
-//             YamlData::Mapping(_) => {
-//                 if let Some(key) = self.as_str() {
-//                     v.data.as_mapping_get(key).
-//                 } else {
-//                     None
-//                 }
-//             }
-//             _ => None,
-//         }
-//     }
-// }
-
-impl Index for String {
-    fn index_into<'v, 'input>(
-        self,
-        haystack: &'v MarkedYaml<'input>,
-    ) -> Option<&'v MarkedYaml<'input>> {
-        let needle = self.as_str();
-        haystack.data.as_mapping_get(needle)
-    }
-}
-
-// TODO:
-// impl<I> Index for &I
-// where
-//     I: ?Sized + Index,
-// {
-//     fn index_into<'v>(&self, v: &'v MarkedYaml) -> Option<&'v MarkedYaml> {
-//         self.index_into(v)
-//     }
-// }
 
 impl super::AnnotatedNode for MarkedYaml<'_> {
     type HashKey<'a> = MarkedYaml<'a>;
