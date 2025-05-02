@@ -61,6 +61,8 @@ pub mod yaml_data_owned;
 pub use yaml_data::{AnnotatedMapping, AnnotatedSequence, AnnotatedYamlIter, YamlData};
 pub use yaml_data_owned::{AnnotatedMappingOwned, AnnotatedSequenceOwned, YamlDataOwned};
 
+use crate::{LoadableYamlNode, MarkedYaml, MarkedYamlOwned};
+
 /// A trait allowing for introspection in the hash types of the [`YamlData::Mapping`] variant.
 ///
 /// This trait must be implemented by annotated YAML objects.
@@ -95,4 +97,68 @@ pub trait AnnotatedNodeOwned: std::hash::Hash + std::cmp::Eq {
 
     /// See [`YamlData::parse_representation_recursive`].
     fn parse_representation_recursive(&mut self) -> bool;
+}
+
+/// A trait to index into a structure with an `Index`
+pub trait Indexable: Sized {
+    /// something important
+    fn get(&self, key: impl Index<Self>) -> Option<&Self>;
+}
+
+/// A trait to denote a type that can be used for indexing YAML
+pub trait Index<Y> {
+    /// something important
+    fn index_into(self, yaml: &Y) -> Option<&Y>;
+}
+
+impl Index<MarkedYamlOwned> for usize {
+    fn index_into(self, yaml: &MarkedYamlOwned) -> Option<&MarkedYamlOwned> {
+        if yaml.is_sequence() {
+            yaml.data.as_sequence_get(self)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'input> Index<MarkedYaml<'input>> for usize {
+    fn index_into<'y>(self, yaml: &'y MarkedYaml<'input>) -> Option<&'y MarkedYaml<'input>> {
+        if yaml.is_sequence() {
+            yaml.data.as_sequence_get(self)
+        } else {
+            None
+        }
+    }
+}
+
+impl Index<MarkedYamlOwned> for &str {
+    fn index_into(self, yaml: &MarkedYamlOwned) -> Option<&MarkedYamlOwned> {
+        if yaml.is_mapping() {
+            yaml.data.as_mapping_get(self)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'input> Index<MarkedYaml<'input>> for &str {
+    fn index_into<'y>(self, yaml: &'y MarkedYaml<'input>) -> Option<&'y MarkedYaml<'input>> {
+        if yaml.is_mapping() {
+            yaml.data.as_mapping_get(self)
+        } else {
+            None
+        }
+    }
+}
+
+impl Index<MarkedYamlOwned> for String {
+    fn index_into(self, yaml: &MarkedYamlOwned) -> Option<&MarkedYamlOwned> {
+        self.as_str().index_into(yaml)
+    }
+}
+
+impl<'input> Index<MarkedYaml<'input>> for String {
+    fn index_into<'y>(self, yaml: &'y MarkedYaml<'input>) -> Option<&'y MarkedYaml<'input>> {
+        self.as_str().index_into(yaml)
+    }
 }

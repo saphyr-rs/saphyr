@@ -141,7 +141,7 @@ mod yaml_owned;
 pub use crate::annotated::{
     marked_yaml::MarkedYaml, marked_yaml_owned::MarkedYamlOwned, AnnotatedMapping,
     AnnotatedMappingOwned, AnnotatedNode, AnnotatedNodeOwned, AnnotatedSequence,
-    AnnotatedSequenceOwned, AnnotatedYamlIter, YamlData, YamlDataOwned,
+    AnnotatedSequenceOwned, AnnotatedYamlIter, Index, Indexable, YamlData, YamlDataOwned,
 };
 pub use crate::emitter::{EmitError, YamlEmitter};
 pub use crate::loader::{LoadError, LoadableYamlNode, YamlLoader};
