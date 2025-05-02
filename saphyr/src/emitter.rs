@@ -5,7 +5,7 @@ use saphyr_parser::Tag;
 use crate::{
     char_traits,
     yaml::{Mapping, Yaml},
-    MarkedYaml, Scalar,
+    MarkedYaml, MarkedYamlOwned, Scalar, ScalarOwned,
 };
 use std::borrow::Cow;
 use std::convert::From;
@@ -154,6 +154,12 @@ impl Emittable for MarkedYaml<'_> {
     }
 }
 
+impl Emittable for MarkedYamlOwned {
+    fn node(&self) -> Yaml {
+        to_yaml2(self)
+    }
+}
+
 pub fn to_yaml<'a>(input: &MarkedYaml<'a>) -> Yaml<'a> {
     match &input.data {
         crate::YamlData::Value(n) => Yaml::Value(n.clone()),
@@ -169,6 +175,35 @@ pub fn to_yaml<'a>(input: &MarkedYaml<'a>) -> Yaml<'a> {
         crate::YamlData::Representation(s, style, maybe_tag) => {
             Yaml::Representation(s.clone(), *style, maybe_tag.clone())
         }
+    }
+}
+pub fn to_yaml2(input: &MarkedYamlOwned) -> Yaml {
+    match &input.data {
+        crate::YamlDataOwned::Value(n) => Yaml::Value(to_scalar(n)),
+        crate::YamlDataOwned::Sequence(vec) => Yaml::Sequence(vec.iter().map(to_yaml2).collect()),
+        crate::YamlDataOwned::Mapping(linked_hash_map) => Yaml::Mapping(
+            linked_hash_map
+                .iter()
+                .map(|(k, v)| (to_yaml2(k), to_yaml2(v)))
+                .collect(),
+        ),
+        crate::YamlDataOwned::Alias(a) => Yaml::Alias(*a),
+        crate::YamlDataOwned::BadValue => Yaml::BadValue,
+        crate::YamlDataOwned::Representation(s, style, maybe_tag) => Yaml::Representation(
+            Cow::Borrowed(s),
+            *style,
+            maybe_tag.as_ref().map(|t| Cow::Owned(t.clone())),
+        ),
+    }
+}
+
+fn to_scalar(input: &ScalarOwned) -> Scalar<'_> {
+    match input {
+        ScalarOwned::Null => Scalar::Null,
+        ScalarOwned::Boolean(b) => Scalar::Boolean(*b),
+        ScalarOwned::Integer(i) => Scalar::Integer(*i),
+        ScalarOwned::FloatingPoint(ordered_float) => Scalar::FloatingPoint(*ordered_float),
+        ScalarOwned::String(s) => Scalar::String(Cow::Owned(s.clone())),
     }
 }
 
