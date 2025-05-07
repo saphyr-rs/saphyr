@@ -4,8 +4,18 @@
 
 **Breaking Changes**:
 
-- No longer parse any capitalization of `inf`, or `infinity` as `f64::INFINITY`
-- Parse `.NaN` as float instead of `NaN`.
+- 234c69c9..374d8920: Use `Cow`s for `Tag`s
+
+**Features**:
+
+- c0e8b8cc and f4ab7330: Add `From` implementations to convert between owned
+  and borrowed versions of `Yaml` and `Scalar`.
+
+**Fixes**:
+
+- 3bbe4232: No longer parse any capitalization of `inf`, or `infinity` as
+  `f64::INFINITY`
+- e88eeae3: Parse `.NaN` as float instead of `NaN`.
 
 ## v0.0.4
 

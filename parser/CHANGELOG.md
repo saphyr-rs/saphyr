@@ -2,6 +2,10 @@
 
 ## Upcoming
 
+**Breaking Changes**:
+
+- Emit `Cow<'input, Tag>` instead of `Tag` to avoid copies.
+
 **Fixes**:
 
 - 8ef76dcc: Fix `Marker`s for `null` and empty values.
