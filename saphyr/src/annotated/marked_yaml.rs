@@ -9,6 +9,8 @@ use saphyr_parser::{Marker, ScalarStyle, Span, Tag};
 
 use crate::{LoadableYamlNode, Scalar, Yaml, YamlData};
 
+use super::{Index, Indexable};
+
 /// A YAML node with [`Span`]s pointing to the start of the node.
 ///
 /// This structure does not implement functions to operate on the YAML object. To access those,
@@ -88,6 +90,12 @@ impl<'input> MarkedYaml<'input> {
     }
 }
 
+impl Indexable for MarkedYaml<'_> {
+    fn get(&self, key: impl Index<Self>) -> Option<&Self> {
+        key.index_into(self)
+    }
+}
+
 impl super::AnnotatedNode for MarkedYaml<'_> {
     type HashKey<'a> = MarkedYaml<'a>;
 
@@ -159,7 +167,7 @@ impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
     fn mapping_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
         self.data
             .as_mapping_mut()
-            .expect("Called mapping_mut on a non-hash")
+            .expect("Called mapping_mut on a non-Mapping")
     }
 
     fn take(&mut self) -> Self {

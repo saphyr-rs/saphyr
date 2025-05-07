@@ -5,7 +5,7 @@ use saphyr_parser::Tag;
 use crate::{
     char_traits,
     yaml::{Mapping, Yaml},
-    Scalar,
+    MarkedYaml, MarkedYamlOwned, Scalar, ScalarOwned,
 };
 use std::borrow::Cow;
 use std::convert::From;
@@ -51,7 +51,8 @@ impl From<fmt::Error> for EmitError {
 ///
 /// assert_eq!(output, r#"---
 /// a: b
-/// c: d"#);
+/// c: d
+/// "#);
 /// ```
 #[allow(clippy::module_name_repetitions)]
 pub struct YamlEmitter<'a> {
@@ -128,6 +129,84 @@ fn escape_str(wr: &mut dyn fmt::Write, v: &str) -> Result<(), fmt::Error> {
     Ok(())
 }
 
+pub trait Emittable {
+    fn node(&self) -> Yaml;
+}
+
+impl<E> Emittable for &E
+where
+    E: ?Sized + Emittable,
+{
+    fn node(&self) -> Yaml {
+        (**self).node()
+    }
+}
+
+impl Emittable for Yaml<'_> {
+    fn node(&self) -> Yaml {
+        Yaml::clone(self)
+    }
+}
+
+impl Emittable for MarkedYaml<'_> {
+    fn node(&self) -> Yaml {
+        to_yaml(self)
+    }
+}
+
+impl Emittable for MarkedYamlOwned {
+    fn node(&self) -> Yaml {
+        to_yaml2(self)
+    }
+}
+
+pub fn to_yaml<'a>(input: &MarkedYaml<'a>) -> Yaml<'a> {
+    match &input.data {
+        crate::YamlData::Value(n) => Yaml::Value(n.clone()),
+        crate::YamlData::Sequence(vec) => Yaml::Sequence(vec.iter().map(to_yaml).collect()),
+        crate::YamlData::Mapping(linked_hash_map) => Yaml::Mapping(
+            linked_hash_map
+                .iter()
+                .map(|(k, v)| (to_yaml(k), to_yaml(v)))
+                .collect(),
+        ),
+        crate::YamlData::Alias(a) => Yaml::Alias(*a),
+        crate::YamlData::BadValue => Yaml::BadValue,
+        crate::YamlData::Representation(s, style, maybe_tag) => {
+            Yaml::Representation(s.clone(), *style, maybe_tag.clone())
+        }
+    }
+}
+pub fn to_yaml2(input: &MarkedYamlOwned) -> Yaml {
+    match &input.data {
+        crate::YamlDataOwned::Value(n) => Yaml::Value(to_scalar(n)),
+        crate::YamlDataOwned::Sequence(vec) => Yaml::Sequence(vec.iter().map(to_yaml2).collect()),
+        crate::YamlDataOwned::Mapping(linked_hash_map) => Yaml::Mapping(
+            linked_hash_map
+                .iter()
+                .map(|(k, v)| (to_yaml2(k), to_yaml2(v)))
+                .collect(),
+        ),
+        crate::YamlDataOwned::Alias(a) => Yaml::Alias(*a),
+        crate::YamlDataOwned::BadValue => Yaml::BadValue,
+        crate::YamlDataOwned::Representation(s, style, maybe_tag) => Yaml::Representation(
+            Cow::Borrowed(s),
+            *style,
+            maybe_tag.as_ref().map(|t| Cow::Owned(t.clone())),
+        ),
+    }
+}
+
+fn to_scalar(input: &ScalarOwned) -> Scalar<'_> {
+    match input {
+        ScalarOwned::Null => Scalar::Null,
+        ScalarOwned::Boolean(b) => Scalar::Boolean(*b),
+        ScalarOwned::Integer(i) => Scalar::Integer(*i),
+        ScalarOwned::FloatingPoint(ordered_float) => Scalar::FloatingPoint(*ordered_float),
+        ScalarOwned::String(s) => Scalar::String(Cow::Owned(s.clone())),
+    }
+}
+
 impl<'a> YamlEmitter<'a> {
     /// Create a new emitter serializing into `writer`.
     pub fn new(writer: &'a mut dyn fmt::Write) -> Self {
@@ -180,7 +259,8 @@ impl<'a> YamlEmitter<'a> {
     /// foo: |-
     ///   bar!
     ///   bar!
-    /// baz: 42");
+    /// baz: 42
+    /// ");
     /// ```
     ///
     /// [literal style]: https://yaml.org/spec/1.2/spec.html#id2795688
@@ -197,11 +277,12 @@ impl<'a> YamlEmitter<'a> {
     /// Dump Yaml to an output stream.
     /// # Errors
     /// Returns `EmitError` when an error occurs.
-    pub fn dump(&mut self, doc: &Yaml) -> EmitResult {
+    pub fn dump<Y: Emittable>(&mut self, doc: &Y) -> EmitResult {
         // write DocumentStart
         writeln!(self.writer, "---")?;
         self.level = -1;
-        self.emit_node(doc)
+        self.emit_node(doc)?;
+        writeln!(self.writer).map_err(EmitError::FmtError)
     }
 
     fn write_indent(&mut self) -> EmitResult {
@@ -216,8 +297,8 @@ impl<'a> YamlEmitter<'a> {
         Ok(())
     }
 
-    fn emit_node(&mut self, node: &Yaml) -> EmitResult {
-        match *node {
+    fn emit_node<Y: Emittable>(&mut self, node: &Y) -> EmitResult {
+        match node.node() {
             Yaml::Sequence(ref v) => self.emit_sequence(v),
             Yaml::Mapping(ref h) => self.emit_mapping(h),
             Yaml::Value(Scalar::String(ref v)) => {
@@ -329,7 +410,7 @@ impl<'a> YamlEmitter<'a> {
                     write!(self.writer, ":")?;
                     self.emit_val(true, v)?;
                 } else {
-                    self.emit_node(k)?;
+                    self.emit_node(&k)?;
                     write!(self.writer, ":")?;
                     self.emit_val(false, v)?;
                 }
@@ -369,7 +450,7 @@ impl<'a> YamlEmitter<'a> {
             }
             _ => {
                 write!(self.writer, " ")?;
-                self.emit_node(val)
+                self.emit_node(&val)
             }
         }
     }

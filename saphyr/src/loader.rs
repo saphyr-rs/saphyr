@@ -1,5 +1,6 @@
 //! The default loader.
 
+use core::panic;
 use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 
 use hashlink::LinkedHashMap;
@@ -27,10 +28,17 @@ where
     // (current node, anchor_id) tuple
     doc_stack: Vec<(Node, usize)>,
     key_stack: Vec<Node>,
+    marker_stack: Vec<MarkerState>,
     anchor_map: BTreeMap<usize, Node>,
     marker: PhantomData<&'input u32>,
     /// See [`Self::early_parse()`]
     early_parse: bool,
+}
+
+#[derive(Debug)]
+enum MarkerState {
+    MappingStarted(Marker),
+    SequenceStarted(Marker),
 }
 
 /// A trait providing methods used by the [`YamlLoader`].
@@ -239,17 +247,26 @@ where
                 }
             }
             Event::SequenceStart(aid, _) => {
+                self.marker_stack
+                    .push(MarkerState::SequenceStarted(span.start));
                 self.doc_stack.push((
                     Node::from_bare_yaml(Yaml::Sequence(Vec::new())).with_start_marker(mark),
                     aid,
                 ));
             }
             Event::SequenceEnd => {
-                let mut node = self.doc_stack.pop().unwrap();
-                node.0 = node.0.with_end_marker(mark);
-                self.insert_new_node(node);
+                let actual_span = match self.marker_stack.pop() {
+                    Some(MarkerState::SequenceStarted(start)) => Span::new(start, span.end),
+                    other => panic!("unexpected element on marker_stack {other:?}"),
+                };
+
+                let (node, i) = self.doc_stack.pop().unwrap();
+                let node = node.with_span(actual_span);
+                self.insert_new_node((node, i));
             }
             Event::MappingStart(aid, _) => {
+                self.marker_stack
+                    .push(MarkerState::MappingStarted(span.start));
                 self.doc_stack.push((
                     Node::from_bare_yaml(Yaml::Mapping(Mapping::new())).with_start_marker(mark),
                     aid,
@@ -257,10 +274,14 @@ where
                 self.key_stack.push(Node::from_bare_yaml(Yaml::BadValue));
             }
             Event::MappingEnd => {
+                let actual_span = match self.marker_stack.pop() {
+                    Some(MarkerState::MappingStarted(start)) => Span::new(start, span.end),
+                    other => panic!("unexpected element on marker_stack {other:?}"),
+                };
                 self.key_stack.pop().unwrap();
-                let mut node = self.doc_stack.pop().unwrap();
-                node.0 = node.0.with_end_marker(mark);
-                self.insert_new_node(node);
+                let (node, i) = self.doc_stack.pop().unwrap();
+                let node = node.with_span(actual_span);
+                self.insert_new_node((node, i));
             }
             Event::Scalar(v, style, aid, tag) => {
                 let node = if self.early_parse {
@@ -323,6 +344,7 @@ where
             key_stack: vec![],
             anchor_map: BTreeMap::new(),
             marker: PhantomData,
+            marker_stack: vec![],
             early_parse: true,
         }
     }
