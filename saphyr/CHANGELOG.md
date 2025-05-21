@@ -10,6 +10,8 @@
 
 - c0e8b8cc and f4ab7330: Add `From` implementations to convert between owned
   and borrowed versions of `Yaml` and `Scalar`.
+- `parse_core_schema_fp` for parsing floating point values according to the
+  YAML core schema.
 
 **Fixes**:
 

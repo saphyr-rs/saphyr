@@ -364,17 +364,3 @@ impl std::fmt::Display for LoadError {
         }
     }
 }
-
-// parse f64 as Core schema
-// See: https://github.com/chyh1990/yaml-rust/issues/51
-pub(crate) fn parse_f64(v: &str) -> Option<f64> {
-    match v {
-        ".inf" | ".Inf" | ".INF" | "+.inf" | "+.Inf" | "+.INF" => Some(f64::INFINITY),
-        "-.inf" | "-.Inf" | "-.INF" => Some(f64::NEG_INFINITY),
-        ".nan" | ".NaN" | ".NAN" => Some(f64::NAN),
-        // Test that `v` contains a digit so as not to pass in strings like `inf`,
-        // which rust will parse as a float.
-        _ if v.as_bytes().iter().any(u8::is_ascii_digit) => v.parse::<f64>().ok(),
-        _ => None,
-    }
-}

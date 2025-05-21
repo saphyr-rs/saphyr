@@ -5,8 +5,6 @@ use std::borrow::Cow;
 use ordered_float::OrderedFloat;
 use saphyr_parser::{ScalarStyle, Tag};
 
-use crate::loader::parse_f64;
-
 /// The resolved value of a scalar YAML node.
 ///
 /// Scalar nodes are any leaf nodes when parsing YAML. In the [10.1 Failsafe
@@ -122,7 +120,9 @@ impl<'input> Scalar<'input> {
                 match suffix.as_ref() {
                     "bool" => v.parse::<bool>().ok().map(Self::Boolean),
                     "int" => v.parse::<i64>().ok().map(Self::Integer),
-                    "float" => parse_f64(&v).map(OrderedFloat).map(Self::FloatingPoint),
+                    "float" => parse_core_schema_fp(&v)
+                        .map(OrderedFloat)
+                        .map(Self::FloatingPoint),
                     "null" => match v.as_ref() {
                         "~" | "null" => Some(Self::Null),
                         _ => None,
@@ -169,7 +169,7 @@ impl<'input> Scalar<'input> {
             _ => {
                 if let Ok(integer) = v.parse::<i64>() {
                     Self::Integer(integer)
-                } else if let Some(float) = parse_f64(&v) {
+                } else if let Some(float) = parse_core_schema_fp(&v) {
                     Self::FloatingPoint(float.into())
                 } else {
                     Self::String(v)
@@ -247,5 +247,26 @@ impl ScalarOwned {
 impl<'input> From<&'input ScalarOwned> for Scalar<'input> {
     fn from(value: &'input ScalarOwned) -> Self {
         value.as_scalar()
+    }
+}
+
+/// Parse the given string as a floating point according to the core schema.
+///
+/// See [10.2.1.4](https://yaml.org/spec/1.2.2/#10214-floating-point) for the floating point
+/// definition.
+///
+/// # Return
+/// Returns `Some` if parsing succeeding, `None` otherwise. This function is used in the process of
+/// parsing scalars, where failing to parse a scalar as a floating point is not an error. As such,
+/// this function purposefully does not return a `Result`.
+pub fn parse_core_schema_fp(v: &str) -> Option<f64> {
+    match v {
+        ".inf" | ".Inf" | ".INF" | "+.inf" | "+.Inf" | "+.INF" => Some(f64::INFINITY),
+        "-.inf" | "-.Inf" | "-.INF" => Some(f64::NEG_INFINITY),
+        ".nan" | ".NaN" | ".NAN" => Some(f64::NAN),
+        // Test that `v` contains a digit so as not to pass in strings like `inf`,
+        // which rust will parse as a float.
+        _ if v.as_bytes().iter().any(u8::is_ascii_digit) => v.parse::<f64>().ok(),
+        _ => None,
     }
 }
