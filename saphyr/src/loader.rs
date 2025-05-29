@@ -1,10 +1,10 @@
 //! The default loader.
 
-use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
+use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData, sync::Arc};
 
 use hashlink::LinkedHashMap;
 use saphyr_parser::{
-    BufferedInput, Event, Input, Marker, Parser, ScanError, Span, SpannedEventReceiver,
+    BufferedInput, Event, Input, Marker, Parser, ScanError, Span, SpannedEventReceiver, Tag,
 };
 
 use crate::{Mapping, Yaml};
@@ -24,8 +24,8 @@ where
     /// The different YAML documents that are loaded.
     docs: Vec<Node>,
     // states
-    // (current node, anchor_id) tuple
-    doc_stack: Vec<(Node, usize)>,
+    // (current node, anchor_id, tag) tuple
+    doc_stack: Vec<(Node, usize, Option<Cow<'input, Tag>>)>,
     key_stack: Vec<Node>,
     anchor_map: BTreeMap<usize, Node>,
     marker: PhantomData<&'input u32>,
@@ -73,9 +73,13 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
     fn from_bare_yaml(yaml: Yaml<'input>) -> Self;
 
     /// Return whether the YAML node is an array.
+    ///
+    /// If the YAML node is a tagged variant, this function must inspect the underlying node.
     fn is_sequence(&self) -> bool;
 
     /// Return whether the YAML node is a hash.
+    ///
+    /// If the YAML node is a tagged variant, this function must inspect the underlying node.
     fn is_mapping(&self) -> bool;
 
     /// Return whether the YAML node is `BadValue`.
@@ -83,15 +87,27 @@ pub trait LoadableYamlNode<'input>: Clone + std::hash::Hash + Eq {
 
     /// Retrieve the sequence variant of the YAML node.
     ///
+    /// If the YAML node is a tagged variant, this function must inspect the underlying node.
+    ///
     /// # Panics
     /// This function panics if `self` is not a sequence.
     fn sequence_mut(&mut self) -> &mut Vec<Self>;
 
     /// Retrieve the mapping variant of the YAML node.
     ///
+    /// If the YAML node is a tagged variant, this function must inspect the underlying node.
+    ///
     /// # Panics
     /// This function panics if `self` is not a mapping.
     fn mapping_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self>;
+
+    /// Turn `self` into a `Tagged` node, using the given tag.
+    ///
+    /// # Return
+    /// Returns a new instance of `Self` of `Tagged` variant with `tag` as the tag and `self` as
+    /// the value.
+    #[must_use]
+    fn into_tagged(self, tag: Cow<'input, Tag>) -> Self;
 
     /// Take the contained node out of `Self`, leaving a `BadValue` in its place.
     #[must_use]
@@ -238,44 +254,48 @@ where
                     _ => unreachable!(),
                 }
             }
-            Event::SequenceStart(aid, _) => {
+            Event::SequenceStart(aid, tag) => {
                 self.doc_stack.push((
                     Node::from_bare_yaml(Yaml::Sequence(Vec::new())).with_start_marker(mark),
                     aid,
+                    tag,
                 ));
             }
-            Event::SequenceEnd => {
-                let mut node = self.doc_stack.pop().unwrap();
-                node.0 = node.0.with_end_marker(mark);
-                self.insert_new_node(node);
-            }
-            Event::MappingStart(aid, _) => {
+            Event::MappingStart(aid, tag) => {
                 self.doc_stack.push((
                     Node::from_bare_yaml(Yaml::Mapping(Mapping::new())).with_start_marker(mark),
                     aid,
+                    tag,
                 ));
                 self.key_stack.push(Node::from_bare_yaml(Yaml::BadValue));
             }
-            Event::MappingEnd => {
-                self.key_stack.pop().unwrap();
-                let mut node = self.doc_stack.pop().unwrap();
-                node.0 = node.0.with_end_marker(mark);
-                self.insert_new_node(node);
+            Event::MappingEnd | Event::SequenceEnd => {
+                if ev == Event::MappingEnd {
+                    self.key_stack.pop().unwrap();
+                }
+                let (mut node, anchor_id, tag) = self.doc_stack.pop().unwrap();
+                node = node.with_end_marker(mark);
+                if let Some(tag) = tag {
+                    if !tag.is_yaml_core_schema() {
+                        node = node.into_tagged(tag);
+                    }
+                }
+                self.insert_new_node(node, anchor_id, None);
             }
             Event::Scalar(v, style, aid, tag) => {
                 let node = if self.early_parse {
                     Yaml::value_from_cow_and_metadata(v, style, tag.as_ref())
                 } else {
-                    Yaml::Representation(v, style, tag)
+                    Yaml::Representation(v, style, tag.clone())
                 };
-                self.insert_new_node((Node::from_bare_yaml(node).with_span(span), aid));
+                self.insert_new_node(Node::from_bare_yaml(node).with_span(span), aid, tag);
             }
             Event::Alias(id) => {
                 let n = match self.anchor_map.get(&id) {
                     Some(v) => v.clone(),
                     None => Node::from_bare_yaml(Yaml::BadValue),
                 };
-                self.insert_new_node((n.with_span(span), 0));
+                self.insert_new_node(n.with_span(span), 0, None);
             }
         }
     }
@@ -285,28 +305,32 @@ impl<'input, Node> YamlLoader<'input, Node>
 where
     Node: LoadableYamlNode<'input>,
 {
-    fn insert_new_node(&mut self, node: (Node, usize)) {
+    fn insert_new_node(&mut self, mut node: Node, anchor_id: usize, tag: Option<Cow<'input, Tag>>) {
         // valid anchor id starts from 1
-        if node.1 > 0 {
-            self.anchor_map.insert(node.1, node.0.clone());
+        if anchor_id > 0 {
+            self.anchor_map.insert(anchor_id, node.clone());
         }
-        if let Some(parent) = self.doc_stack.last_mut() {
-            let parent_node = &mut parent.0;
+        if let Some((parent_node, _, _)) = self.doc_stack.last_mut() {
+            if let Some(tag) = tag {
+                if (node.is_sequence() || node.is_mapping()) && !tag.is_yaml_core_schema() {
+                    node = node.into_tagged(tag);
+                }
+            }
             if parent_node.is_sequence() {
-                parent_node.sequence_mut().push(node.0);
+                parent_node.sequence_mut().push(node);
             } else if parent_node.is_mapping() {
                 let cur_key = self.key_stack.last_mut().unwrap();
                 if cur_key.is_badvalue() {
                     // current node is a key
-                    *cur_key = node.0;
+                    *cur_key = node;
                 } else {
                     // current node is a value
                     let hash = parent_node.mapping_mut();
-                    hash.insert(cur_key.take().into(), node.0);
+                    hash.insert(cur_key.take().into(), node);
                 }
             }
         } else {
-            self.doc_stack.push(node);
+            self.doc_stack.push((node, anchor_id, tag));
         }
     }
 }

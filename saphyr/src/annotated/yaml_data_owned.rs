@@ -42,6 +42,12 @@ where
     ///
     /// [`YamlData::Mapping`]: `crate::YamlData::Mapping`
     Mapping(AnnotatedMappingOwned<Node>),
+    /// A tagged node.
+    ///
+    /// See [`YamlData::Tagged`].
+    ///
+    /// [`YamlData::Tagged`]: `crate::YamlData::Tagged`
+    Tagged(Tag, Box<Node>),
     /// Alias, not fully supported yet.
     ///
     /// See [`YamlData::Alias`].

@@ -133,6 +133,9 @@ impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
                 Yaml::Alias(x) => YamlData::Alias(x),
                 Yaml::BadValue => YamlData::BadValue,
                 Yaml::Representation(v, style, tag) => YamlData::Representation(v, style, tag),
+                Yaml::Tagged(tag, node) => {
+                    YamlData::Tagged(tag, Box::new(Self::from_bare_yaml(*node)))
+                }
                 Yaml::Value(x) => YamlData::Value(x),
             },
         }
@@ -148,6 +151,13 @@ impl<'input> LoadableYamlNode<'input> for MarkedYaml<'input> {
 
     fn is_badvalue(&self) -> bool {
         self.data.is_badvalue()
+    }
+
+    fn into_tagged(self, tag: Cow<'input, Tag>) -> Self {
+        Self {
+            span: self.span,
+            data: YamlData::Tagged(tag, Box::new(self)),
+        }
     }
 
     fn sequence_mut(&mut self) -> &mut Vec<Self> {

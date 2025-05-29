@@ -119,6 +119,25 @@ impl $(< $( $generic ),+ >)? $yaml $(where $($whereclause)+)? {
             _ => true,
         }
     }
+
+    /// Retrieve the tag, if any.
+    ///
+    /// This may return `Some` only on [`Tagged`] variants and sometimes on [`Representation`]
+    /// variants (depending on the `None`ness of the tag).
+    ///
+    /// # Return
+    /// Returns a tag if the node has one, `None` otherwise.
+    ///
+    /// [`Tagged`]: Self::Tagged
+    /// [`Representation`]: Self::Representation
+    #[must_use]
+    pub fn get_tag(&self) -> Option<&Tag> {
+        match self {
+            Self::Tagged(tag, _) => Some(&tag),
+            Self::Representation(_, _, tag) => tag.as_ref(),
+            _ => None
+        }
+    }
 }
     );
 
@@ -229,7 +248,32 @@ impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
         style: ScalarStyle,
         tag: Option<&Cow<'input, Tag>>,
     ) -> Self {
-        Scalar::parse_from_cow_and_metadata(v, style, tag).map_or(Self::BadValue, Self::Value)
+        match tag {
+            Some(tag) if !tag.is_yaml_core_schema() => {
+                Self::Tagged(tag.clone(), Box::new(Self::value_from_cow_and_metadata(v, style, None).into()))
+            }
+            _ => Scalar::parse_from_cow_and_metadata(v, style, tag).map_or(Self::BadValue, Self::Value)
+        }
+    }
+
+    /// Retrieve the tag, if any.
+    ///
+    /// This may return `Some` only on [`Tagged`] variants and sometimes on [`Representation`]
+    /// variants (depending on the `None`ness of the tag).
+    ///
+    /// # Return
+    /// Returns a tag if the node has one, `None` otherwise.
+    ///
+    /// [`Tagged`]: Self::Tagged
+    /// [`Representation`]: Self::Representation
+    #[must_use]
+    pub fn get_tag(&self) -> Option<&Tag> {
+        use std::borrow::Borrow;
+        match self {
+            Self::Tagged(tag, _) => Some(tag.borrow()),
+            Self::Representation(_, _, tag) => tag.as_ref().map(Borrow::borrow),
+            _ => None
+        }
     }
 }
     );
@@ -288,6 +332,61 @@ impl $(< $( $generic ),+ >)? $yaml $(where $($whereclause)+)? {
     define_is!(is_alias,          Self::Alias(_));
     define_is!(is_representation, Self::Representation(..));
     define_is!(is_value,          Self::Value(_));
+    define_is!(is_tag_node,       Self::Tagged(..));
+
+    /// Retrieve the tagged node if `self` is of the [`Tagged`] variant.
+    ///
+    /// # Return
+    /// The underlying node (without the tag) if `self` is a [`Tagged`] variant, `None` otherwise.
+    ///
+    /// [`Tagged`]: Self::Tagged
+    #[must_use]
+    pub fn get_tagged_node(&self) -> Option<&$nodetype> {
+        if let Self::Tagged(_, node) = self {
+            Some(node.as_ref())
+        } else {
+            None
+        }
+    }
+
+    /// Retrieve the tagged node if `self` is of the [`Tagged`] variant.
+    ///
+    /// # Return
+    /// The underlying node (without the tag) if `self` is a [`Tagged`] variant, `None` otherwise.
+    ///
+    /// [`Tagged`]: Self::Tagged
+    #[must_use]
+    pub fn get_tagged_node_mut(&mut self) -> Option<&mut $nodetype> {
+        if let Self::Tagged(_, node) = self {
+            Some(node.as_mut())
+        } else {
+            None
+        }
+    }
+
+    /// Check whether the YAML enum is an empty sequence (`[]`) or empty mapping (`{}`).
+    ///
+    /// # Return
+    /// If the variant of `self` is `Self::Sequence(x)` with `x.is_empty()` or `Self::Mapping(x)`
+    /// with `y.is_empty()`, return `true`. If `self` is a non-empty sequence, a non-empty mapping,
+    /// or not a collection, return `false`.
+    #[must_use]
+    pub fn is_empty_collection(&self) -> bool {
+        matches!(self, Self::Sequence(x) if x.is_empty()) ||
+            matches!(self, Self::Mapping(x) if x.is_empty())
+    }
+
+    /// Check whether the YAML enum is a non-empty sequence or a non-empty mapping.
+    ///
+    /// # Return
+    /// If the variant of `self` is `Self::Sequence(x)` with `!x.is_empty()` or `Self::Mapping(x)`
+    /// with `!y.is_empty()`, return `true`. If `self` is an empty sequence, an empty mapping, or
+    /// not a collection, return `false`.
+    #[must_use]
+    pub fn is_non_empty_collection(&self) -> bool {
+        matches!(self, Self::Sequence(x) if !x.is_empty()) ||
+            matches!(self, Self::Mapping(x) if !x.is_empty())
+    }
 
     /// Call [`Self::parse_representation`] on `self` and children nodes.
     ///

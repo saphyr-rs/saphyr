@@ -64,16 +64,19 @@ impl<'input> Scalar<'input> {
 
     /// Parse a scalar node representation into a [`Scalar`].
     ///
+    /// If `tag` is not [`None`]:
+    ///   - If the handle is `tag:yaml.org,2022:`, attempt to parse as the given suffix. If parsing
+    ///     fails or the suffix is unknown, return [`None`].
+    ///   - If the handle is unknown, use the fallback parsing schema.
+    ///
     /// # Return
     /// Returns the parsed [`Scalar`].
-    ///
-    /// If `tag` is not [`None`] and `v` cannot be parsed as that specific tag, this function
-    /// returns `None`.
     ///
     /// # Examples
     /// ```
     /// # use saphyr::{Scalar, ScalarStyle, Tag};
     /// use std::borrow::Cow::Owned;
+    /// let yaml_handle = "tag:yaml.org,2002:".to_string();
     /// assert_eq!(
     ///     Scalar::parse_from_cow_and_metadata("123".into(), ScalarStyle::Plain, None),
     ///     Some(Scalar::Integer(123))
@@ -82,7 +85,7 @@ impl<'input> Scalar<'input> {
     ///     Scalar::parse_from_cow_and_metadata(
     ///         "123".into(),
     ///         ScalarStyle::Plain,
-    ///         Some(&Owned(Tag { handle: "tag:yaml.org,2002:".into(), suffix: "str".into() }))
+    ///         Some(&Owned(Tag { handle: yaml_handle.clone(), suffix: "str".into() }))
     ///     ),
     ///     Some(Scalar::String("123".into()))
     /// );
@@ -90,7 +93,7 @@ impl<'input> Scalar<'input> {
     ///     Scalar::parse_from_cow_and_metadata(
     ///         "not a number".into(),
     ///         ScalarStyle::Plain,
-    ///         Some(&Owned(Tag { handle: "tag:yaml.org,2002:".into(), suffix: "int".into() }))
+    ///         Some(&Owned(Tag { handle: yaml_handle.clone(), suffix: "int".into() }))
     ///     ),
     ///     None
     /// );
@@ -98,9 +101,33 @@ impl<'input> Scalar<'input> {
     ///     Scalar::parse_from_cow_and_metadata(
     ///         "No".into(),
     ///         ScalarStyle::Plain,
-    ///         Some(&Owned(Tag { handle: "tag:yaml.org,2002:".into(), suffix: "bool".into() }))
+    ///         Some(&Owned(Tag { handle: yaml_handle.clone(), suffix: "bool".into() }))
     ///     ),
     ///     None
+    /// );
+    /// assert_eq!(
+    ///     Scalar::parse_from_cow_and_metadata(
+    ///         "123".into(),
+    ///         ScalarStyle::Plain,
+    ///         Some(&Owned(Tag { handle: yaml_handle.clone(), suffix: "unknown".into() }))
+    ///     ),
+    ///     None
+    /// );
+    /// assert_eq!(
+    ///     Scalar::parse_from_cow_and_metadata(
+    ///         "123".into(),
+    ///         ScalarStyle::Plain,
+    ///         Some(&Owned(Tag { handle: "custom".into(), suffix: "a".into() }))
+    ///     ),
+    ///     Some(Scalar::Integer(123))
+    /// );
+    /// assert_eq!(
+    ///     Scalar::parse_from_cow_and_metadata(
+    ///         "123".into(),
+    ///         ScalarStyle::SingleQuoted, // Quotation forces interpretation as str.
+    ///         Some(&Owned(Tag { handle: "custom".into(), suffix: "a".into() }))
+    ///     ),
+    ///     Some(Scalar::String("123".into()))
     /// );
     /// ```
     pub fn parse_from_cow_and_metadata(
@@ -111,13 +138,9 @@ impl<'input> Scalar<'input> {
         if style != ScalarStyle::Plain {
             // Any quoted scalar is a string.
             Some(Self::String(v))
-        } else if let Some(Tag {
-            ref handle,
-            ref suffix,
-        }) = tag.map(Cow::as_ref)
-        {
-            if handle == "tag:yaml.org,2002:" {
-                match suffix.as_ref() {
+        } else if let Some(tag) = tag.map(Cow::as_ref) {
+            if tag.is_yaml_core_schema() {
+                match tag.suffix.as_ref() {
                     "bool" => v.parse::<bool>().ok().map(Self::Boolean),
                     "int" => v.parse::<i64>().ok().map(Self::Integer),
                     "float" => parse_core_schema_fp(&v)
@@ -127,13 +150,15 @@ impl<'input> Scalar<'input> {
                         "~" | "null" => Some(Self::Null),
                         _ => None,
                     },
-                    // If we have a tag we do not recognize, fallback to a string.
-                    // If the tag is `str`, this falls here as well.
-                    _ => Some(Self::String(v)),
+                    "str" => Some(Self::String(v)),
+                    // If we have a tag we do not recognize, return `None`.
+                    _ => None,
                 }
             } else {
-                // If we have a tag we do not recognize, fallback to a string.
-                Some(Self::String(v))
+                // If we have a tag we do not recognize, parse it regularly.
+                // This will sound more intuitive when instance reading tagged scalars like
+                // `!degree 50`.
+                Some(Self::parse_from_cow(v))
             }
         } else {
             // No tag means we have to guess.

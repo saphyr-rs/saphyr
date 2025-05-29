@@ -141,6 +141,9 @@ impl LoadableYamlNode<'_> for MarkedYamlOwned {
                 Yaml::Representation(v, style, tag) => {
                     YamlDataOwned::Representation(v.to_string(), style, tag.map(Cow::into_owned))
                 }
+                Yaml::Tagged(tag, node) => {
+                    YamlDataOwned::Tagged(tag.into_owned(), Box::new(Self::from_bare_yaml(*node)))
+                }
                 Yaml::Value(x) => YamlDataOwned::Value(x.into_owned()),
             },
         }
@@ -156,6 +159,13 @@ impl LoadableYamlNode<'_> for MarkedYamlOwned {
 
     fn is_badvalue(&self) -> bool {
         self.data.is_badvalue()
+    }
+
+    fn into_tagged(self, tag: Cow<'_, Tag>) -> Self {
+        Self {
+            span: self.span,
+            data: YamlDataOwned::Tagged(tag.into_owned(), Box::new(self)),
+        }
     }
 
     fn sequence_mut(&mut self) -> &mut Vec<Self> {

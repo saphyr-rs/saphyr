@@ -84,6 +84,10 @@ pub enum YamlOwned {
     /// [scalar style]: ScalarStyle
     /// [`OrderedFloat`]: ordered_float::OrderedFloat
     Mapping(MappingOwned),
+    /// A tagged node.
+    ///
+    /// Tags can be applied to any node, whether a scalar or a collection.
+    Tagged(Tag, Box<YamlOwned>),
     /// Alias, not fully supported yet.
     Alias(usize),
     /// A variant used when parsing the representation of a scalar node fails.
@@ -160,31 +164,56 @@ impl LoadableYamlNode<'_> for YamlOwned {
                 Self::Representation(cow.into(), scalar_style, tag.map(Cow::into_owned))
             }
             Yaml::Value(scalar) => Self::Value(scalar.into_owned()),
+            Yaml::Tagged(tag, mut node) => Self::Tagged(
+                tag.into_owned(),
+                Box::new(Self::from_bare_yaml(node.take())),
+            ),
             Yaml::Alias(x) => Self::Alias(x),
             Yaml::BadValue => Self::BadValue,
         }
     }
 
     fn is_sequence(&self) -> bool {
-        self.is_sequence()
+        self.is_sequence() || self.get_tagged_node().is_some_and(YamlOwned::is_sequence)
     }
 
     fn is_mapping(&self) -> bool {
-        self.is_mapping()
+        self.is_mapping() || self.get_tagged_node().is_some_and(YamlOwned::is_mapping)
     }
 
     fn is_badvalue(&self) -> bool {
         self.is_badvalue()
     }
 
+    fn into_tagged(self, tag: Cow<'_, Tag>) -> Self {
+        Self::Tagged(tag.into_owned(), Box::new(self))
+    }
+
     fn sequence_mut(&mut self) -> &mut Vec<Self> {
-        self.as_vec_mut()
-            .expect("Called sequence_mut on a non-array")
+        if self.is_sequence() {
+            // Checked the type just above. Can't just `if let Some(vec) = self.as_vec_mut` as this
+            // create a double mutable borrow with the else branch.
+            self.as_vec_mut().unwrap()
+        } else if let Some(vec) = self.get_tagged_node_mut().and_then(YamlOwned::as_vec_mut) {
+            vec
+        } else {
+            panic!("Called sequence_mut on a non-array")
+        }
     }
 
     fn mapping_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
-        self.as_mapping_mut()
-            .expect("Called mapping_mut on a non-hash")
+        if self.is_mapping() {
+            // Checked the type just above. Can't just `if let Some(map) = self.as_mapping_mut` as
+            // this create a double mutable borrow with the else branch.
+            self.as_mapping_mut().unwrap()
+        } else if let Some(map) = self
+            .get_tagged_node_mut()
+            .and_then(YamlOwned::as_mapping_mut)
+        {
+            map
+        } else {
+            panic!("Called mapping_mut on a non-array")
+        }
     }
 
     fn take(&mut self) -> Self {

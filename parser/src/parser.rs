@@ -101,6 +101,21 @@ pub struct Tag {
     pub suffix: String,
 }
 
+impl Tag {
+    /// Returns whether the tag is a YAML tag from the core schema (`!!str`, `!!int`, ...).
+    ///
+    /// The YAML specification specifies [a list of
+    /// tags](https://yaml.org/spec/1.2.2/#103-core-schema) for the Core Schema. This function
+    /// checks whether _the handle_ (but not the suffix) is the handle for the YAML Core Schema.
+    ///
+    /// # Return
+    /// Returns `true` if the handle is `tag:yaml.org,2002`, `false` otherwise.
+    #[must_use]
+    pub fn is_yaml_core_schema(&self) -> bool {
+        self.handle == "tag:yaml.org,2002:"
+    }
+}
+
 impl Display for Tag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}!{}", self.handle, self.suffix)
