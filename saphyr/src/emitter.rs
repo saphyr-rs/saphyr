@@ -1,13 +1,10 @@
 //! YAML serialization helpers.
 
-use saphyr_parser::Tag;
-
 use crate::{
     char_traits,
     yaml::{Mapping, Yaml},
     Scalar,
 };
-use std::borrow::Cow;
 use std::convert::From;
 use std::error::Error;
 use std::fmt::{self, Display};
@@ -221,10 +218,7 @@ impl<'a> YamlEmitter<'a> {
             Yaml::Sequence(ref v) => self.emit_sequence(v),
             Yaml::Mapping(ref h) => self.emit_mapping(h),
             Yaml::Value(Scalar::String(ref v)) => {
-                if self.multiline_strings
-                    && v.contains('\n')
-                    && char_traits::is_valid_literal_block_scalar(v)
-                {
+                if self.should_emit_string_as_block(v) {
                     self.emit_literal_block(v)?;
                 } else if need_quotes(v) {
                     escape_str(self.writer, v)?;
@@ -245,18 +239,8 @@ impl<'a> YamlEmitter<'a> {
             Yaml::Value(Scalar::FloatingPoint(ref v)) => Ok(write!(self.writer, "{v}")?),
             Yaml::Value(Scalar::Null) | Yaml::BadValue => Ok(write!(self.writer, "~")?),
             Yaml::Representation(ref v, style, ref tag) => {
-                if let Some(
-                    Cow::Owned(Tag {
-                        ref handle,
-                        ref suffix,
-                    })
-                    | Cow::Borrowed(Tag {
-                        ref handle,
-                        ref suffix,
-                    }),
-                ) = tag
-                {
-                    write!(self.writer, "{handle}!{suffix} ")?;
+                if let Some(tag) = tag {
+                    write!(self.writer, "{} ", tag.as_ref())?;
                 }
                 match style {
                     saphyr_parser::ScalarStyle::Plain => write!(self.writer, "{v}")?,
@@ -266,6 +250,34 @@ impl<'a> YamlEmitter<'a> {
                     saphyr_parser::ScalarStyle::Folded => todo!(),
                 }
                 Ok(())
+            }
+            Yaml::Tagged(ref tag, ref node) => {
+                write!(self.writer, "{} ", tag.as_ref())?;
+                // We need to insert a newline after the tag in the following cases:
+                //   - We have a non-empty sequence or mapping. `emit_sequence` and `emit_mapping`
+                //     do not add that extra newline at the beginning.
+                //       foo: !tag {} // OK
+                //       ---
+                //       foo: !tag [] // OK
+                //       ---
+                //       foo: !tag bar: baz // KO
+                //       ---
+                //       foo: !tag // OK
+                //         bar: baz
+                //       ---
+                //       foo: !tag - a // OK
+                //       ---
+                //       foo: !tag - a // KO
+                //         - b
+                //       ---
+                //       foo: !tag // OK
+                //         - a
+                //         - b
+                if node.is_non_empty_collection() {
+                    writeln!(self.writer)?;
+                    self.write_indent()?;
+                }
+                self.emit_node(node.as_ref())
             }
             // XXX(chenyh) Alias
             Yaml::Alias(_) => Ok(()),
@@ -372,6 +384,17 @@ impl<'a> YamlEmitter<'a> {
                 self.emit_node(val)
             }
         }
+    }
+
+    /// Check whether the string should be emitted as a literal block.
+    ///
+    /// This takes into account the [`multiline_strings`] option and whether the string contains
+    /// newlines.
+    ///
+    /// [`multiline_strings`]: Self::multiline_strings.
+    #[must_use]
+    fn should_emit_string_as_block(&self, s: &str) -> bool {
+        self.multiline_strings && s.contains('\n') && char_traits::is_valid_literal_block_scalar(s)
     }
 }
 

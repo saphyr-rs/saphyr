@@ -38,13 +38,18 @@ pub enum Yaml<'input> {
     /// (e.g.: [`is_boolean`], [`as_integer`], [`into_floating_point`], ...) will always return
     /// [`None`].
     ///
+    /// Resolving the representation to its scalar value can either yield a [`Value`] or a
+    /// [`Tagged`] variant, depending on whether the scalar is tagged.
+    ///
     /// This variant is only meant:
     ///   - As an optimization, when lazy-parsing is preferred.
     ///   - As a more generic way of handling keys in [`Mapping`]s (if user-defined key duplication
-    ///     detection is required.
+    ///     detection is required).
     ///
     /// [`Mapping`]: Yaml::Mapping
     /// [`Representation`]: Yaml::Representation
+    /// [`Value`]: Yaml::Value
+    /// [`Tagged`]: Yaml::Tagged
     /// [`is_boolean`]: Yaml::is_boolean
     /// [`as_integer`]: Yaml::as_integer
     /// [`into_floating_point`]: Yaml::into_floating_point
@@ -85,6 +90,10 @@ pub enum Yaml<'input> {
     /// [scalar style]: ScalarStyle
     /// [`OrderedFloat`]: ordered_float::OrderedFloat
     Mapping(Mapping<'input>),
+    /// A tagged node.
+    ///
+    /// Tags can be applied to any node, whether a scalar or a collection.
+    Tagged(Cow<'input, Tag>, Box<Yaml<'input>>),
     /// Alias, not fully supported yet.
     Alias(usize),
     /// A variant used when parsing the representation of a scalar node fails.
@@ -178,6 +187,10 @@ impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
             .expect("Called mapping_mut on a non-hash")
     }
 
+    fn into_tagged(self, tag: Cow<'input, Tag>) -> Self {
+        Self::Tagged(tag, Box::new(self))
+    }
+
     fn take(&mut self) -> Self {
         let mut taken_out = Yaml::BadValue;
         std::mem::swap(&mut taken_out, self);
@@ -238,6 +251,9 @@ impl<'input> From<&'input YamlOwned> for Yaml<'input> {
                     .map(|(key, value)| (key.into(), value.into()))
                     .collect::<Mapping>(),
             ),
+            YamlOwned::Tagged(tag, node) => {
+                Yaml::Tagged(Cow::Borrowed(tag), Box::new(node.as_ref().into()))
+            }
             YamlOwned::Alias(usize) => Yaml::Alias(*usize),
             YamlOwned::BadValue => Yaml::BadValue,
         }

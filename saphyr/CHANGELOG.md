@@ -5,6 +5,17 @@
 **Breaking Changes**:
 
 - 234c69c9..374d8920: Use `Cow`s for `Tag`s
+- Perform parsing of scalars with unknown tags according to the core schema.
+  Previously, `!foo 42` would yield a `Scalar::String("42")` becuse the tag
+  wasn't known. It will now yield a `Scalar::Integer(42)`. `!!str 42` will
+  still yield a `Scalar::String`.
+- Parsing a scalar with an unknown Core Schema tag (e.g.: `!!unknown`) now
+  results in a `BadValue` rather than a `String`.
+- Expose custom YAML tags as a variant of `Yaml`/`YamlData` objects. The
+  biggest pain point for existing users is probably the inclusion of
+  `Yaml::Tagged`, which will break existing `match`es on `Yaml`. Details about
+  how `saphyr` handles YAML tags can be found on the library documentation.
+- Add `into_tagged` as a `LoadableYamlNode` requirement.
 
 **Features**:
 
@@ -12,6 +23,7 @@
   and borrowed versions of `Yaml` and `Scalar`.
 - `parse_core_schema_fp` for parsing floating point values according to the
   YAML core schema.
+- Support for custom tags.
 
 **Fixes**:
 

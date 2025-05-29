@@ -48,6 +48,9 @@ where
     /// (e.g.: [`is_boolean`], [`as_integer`], [`into_floating_point`], ...) will always return
     /// [`None`].
     ///
+    /// Resolving the representation to its scalar value can either yield a [`Value`] or a
+    /// [`Tagged`] variant, depending on whether the scalar is tagged.
+    ///
     /// This variant is only meant:
     ///   - As an optimization, when lazy-parsing is preferred.
     ///   - As a more generic way of handling keys in [`Mapping`]s (if user-defined key duplication
@@ -55,6 +58,8 @@ where
     ///
     /// [`Mapping`]: YamlData::Mapping
     /// [`Representation`]: YamlData::Representation
+    /// [`Value`]: YamlData::Value
+    /// [`Tagged`]: YamlData::Tagged
     /// [`is_boolean`]: YamlData::is_boolean
     /// [`as_integer`]: YamlData::as_integer
     /// [`into_floating_point`]: YamlData::into_floating_point
@@ -95,6 +100,10 @@ where
     /// [scalar style]: ScalarStyle
     /// [`OrderedFloat`]: ordered_float::OrderedFloat
     Mapping(AnnotatedMapping<'input, Node>),
+    /// A tagged node.
+    ///
+    /// Tags can be applied to any node, whether a scalar or a collection.
+    Tagged(Cow<'input, Tag>, Box<Node>),
     /// Alias, not fully supported yet.
     Alias(usize),
     /// A variant used when parsing the representation of a scalar node fails.
