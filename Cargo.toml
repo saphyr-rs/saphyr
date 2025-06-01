@@ -38,7 +38,7 @@ libtest-mimic = "0.3.0"
 miette = { version = "7.5.0", features = ["fancy"] }
 ordered-float = { version = "5.0", default-features = false }
 quickcheck = "1.0"
-rustyline = "15.0.0"
+rustyline = "16.0.0"
 saphyr = { path = "saphyr" }
 saphyr-bench = { path = "bench" }
 saphyr-parser = { path = "parser" }
