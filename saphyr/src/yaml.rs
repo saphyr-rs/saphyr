@@ -131,7 +131,7 @@ impl Yaml<'_> {
                 let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
                 mapping
                     .raw_entry()
-                    .from_hash(hash, |k| k.as_str().is_some_and(|s| s == key))
+                    .from_hash(hash, |k| k.as_str() == Some(key))
                     .map(|(_, v)| v)
             }
             _ => None,
@@ -147,7 +147,7 @@ impl Yaml<'_> {
                 let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
                 match mapping
                     .raw_entry_mut()
-                    .from_hash(hash, |k| k.as_str().is_some_and(|s| s == key))
+                    .from_hash(hash, |k| k.as_str() == Some(key))
                 {
                     Occupied(entry) => Some(entry.into_mut()),
                     Vacant(_) => None,

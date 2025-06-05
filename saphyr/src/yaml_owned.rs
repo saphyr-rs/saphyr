@@ -124,7 +124,7 @@ impl YamlOwned {
                 let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
                 mapping
                     .raw_entry()
-                    .from_hash(hash, |k| k.as_str().is_some_and(|s| s == key))
+                    .from_hash(hash, |k| k.as_str() == Some(key))
                     .map(|(_, v)| v)
             }
             _ => None,
@@ -140,7 +140,7 @@ impl YamlOwned {
                 let hash = hash_str_as_yaml_string(key, mapping.hasher().build_hasher());
                 match mapping
                     .raw_entry_mut()
-                    .from_hash(hash, |k| k.as_str().is_some_and(|s| s == key))
+                    .from_hash(hash, |k| k.as_str() == Some(key))
                 {
                     Occupied(entry) => Some(entry.into_mut()),
                     Vacant(_) => None,
@@ -174,11 +174,11 @@ impl LoadableYamlNode<'_> for YamlOwned {
     }
 
     fn is_sequence(&self) -> bool {
-        self.is_sequence() || self.get_tagged_node().is_some_and(YamlOwned::is_sequence)
+        self.is_sequence() || self.get_tagged_node().map_or(false, YamlOwned::is_sequence)
     }
 
     fn is_mapping(&self) -> bool {
-        self.is_mapping() || self.get_tagged_node().is_some_and(YamlOwned::is_mapping)
+        self.is_mapping() || self.get_tagged_node().map_or(false, YamlOwned::is_mapping)
     }
 
     fn is_badvalue(&self) -> bool {

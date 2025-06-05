@@ -130,15 +130,13 @@ impl Input for StrInput<'_> {
     #[inline]
     fn next_2_are(&self, c1: char, c2: char) -> bool {
         let mut chars = self.buffer.chars();
-        chars.next().is_some_and(|c| c == c1) && chars.next().is_some_and(|c| c == c2)
+        chars.next() == Some(c1) && chars.next() == Some(c2)
     }
 
     #[inline]
     fn next_3_are(&self, c1: char, c2: char, c3: char) -> bool {
         let mut chars = self.buffer.chars();
-        chars.next().is_some_and(|c| c == c1)
-            && chars.next().is_some_and(|c| c == c2)
-            && chars.next().is_some_and(|c| c == c3)
+        chars.next() == Some(c1) && chars.next() == Some(c2) && chars.next() == Some(c3)
     }
 
     #[inline]

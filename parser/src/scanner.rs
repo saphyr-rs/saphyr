@@ -2556,7 +2556,7 @@ impl<'input, T: Input> Scanner<'input, T> {
     /// An indentation is not added if we are inside a flow level or if the last indent is already
     /// a non-block indent.
     fn roll_one_col_indent(&mut self) {
-        if self.flow_level == 0 && self.indents.last().is_some_and(|x| x.needs_block_end) {
+        if self.flow_level == 0 && self.indents.last().map_or(false, |x| x.needs_block_end) {
             self.indents.push(Indent {
                 indent: self.indent,
                 needs_block_end: false,
