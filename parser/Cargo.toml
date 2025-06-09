@@ -11,6 +11,13 @@ license = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 version = { workspace = true }
+exclude = [
+  # Exclude the `yaml-test-suite` from the package. This removes the need to
+  # add its license to the package.
+  "/tests/yaml-test-suite",
+  # We don't need the documents either.
+  "/documents",
+]
 
 [features]
 debug_prints = []

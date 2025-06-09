@@ -20,6 +20,14 @@ struct YamlTest {
 }
 
 fn main() -> Result<()> {
+    if !std::path::Path::new("tests/yaml-test-suite").is_dir() {
+        eprintln!("===================================================================");
+        eprintln!("/!\\ yaml-test-suite directory not found, Skipping tests /!\\");
+        eprintln!("If you intend to contribute to the library, restore the test suite.");
+        eprintln!("===================================================================");
+        return Ok(());
+    }
+
     let mut arguments = Arguments::from_args();
     if arguments.num_threads.is_none() {
         arguments.num_threads = Some(1);

@@ -11,6 +11,10 @@
 - 8ef76dcc: Fix `Marker`s for `null` and empty values.
 - Fix `Span`s for collections to correctly mark the end of the collection.
 
+**Changes**
+
+- Exclude `yaml-test-suite` from the Cargo package.
+
 ## v0.0.4
 
 **Breaking Changes**:
