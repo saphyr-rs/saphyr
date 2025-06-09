@@ -11,6 +11,10 @@ version = { workspace = true }
 readme = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
+exclude = [
+  # We don't need the documents.
+  "/documents",
+]
 
 [features]
 default = [ "encoding" ]
