@@ -2,11 +2,13 @@
 
 ## Upcoming
 
+## v0.0.5
+
 **Breaking Changes**:
 
 - 234c69c9..374d8920: Use `Cow`s for `Tag`s
 - Perform parsing of scalars with unknown tags according to the core schema.
-  Previously, `!foo 42` would yield a `Scalar::String("42")` becuse the tag
+  Previously, `!foo 42` would yield a `Scalar::String("42")` because the tag
   wasn't known. It will now yield a `Scalar::Integer(42)`. `!!str 42` will
   still yield a `Scalar::String`.
 - Parsing a scalar with an unknown Core Schema tag (e.g.: `!!unknown`) now

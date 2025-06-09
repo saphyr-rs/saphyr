@@ -2,6 +2,8 @@
 
 ## Upcoming
 
+## v0.0.5
+
 **Breaking Changes**:
 
 - Emit `Cow<'input, Tag>` instead of `Tag` to avoid copies.
