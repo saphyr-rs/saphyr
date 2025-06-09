@@ -19,7 +19,7 @@ authors = [
   "David Aguilar <davvid@gmail.com>",
   "Yuheng Chen <yuhengchen@sensetime.com>"
 ]
-version = "0.0.4"
+version = "0.0.5"
 documentation = "https://docs.rs/saphyr"
 keywords = [ "yaml", "parser" ]
 categories = [ "encoding", "parser-implementations" ]
@@ -34,7 +34,7 @@ rust-version = "1.65.0"
 arraydeque = "0.5.1"
 encoding_rs = { version = "0.8.33" }
 hashlink = "0.10"
-libtest-mimic = "0.3.0"
+libtest-mimic = "0.8.1"
 miette = { version = "7.5.0", features = ["fancy"] }
 ordered-float = { version = "5.0", default-features = false }
 quickcheck = "1.0"

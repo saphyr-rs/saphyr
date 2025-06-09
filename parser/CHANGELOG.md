@@ -14,6 +14,7 @@
 **Changes**
 
 - Exclude `yaml-test-suite` from the Cargo package.
+- Bump `libtest-mimic` to `0.8.1`.
 
 ## v0.0.4
 

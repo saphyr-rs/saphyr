@@ -30,6 +30,8 @@
 - 3bbe4232: No longer parse any capitalization of `inf`, or `infinity` as
   `f64::INFINITY`
 - e88eeae3: Parse `.NaN` as float instead of `NaN`.
+- Lower `Cargo.toml`'s `rust-version` to `1.65.0`, as stated in the
+  documentation.
 
 ## v0.0.4
 
