@@ -717,7 +717,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "saphyr"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "arraydeque",
  "encoding_rs",
@@ -729,7 +729,7 @@ dependencies = [
 
 [[package]]
 name = "saphyr-bench"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "saphyr-parser",
 ]
@@ -745,7 +745,7 @@ dependencies = [
 
 [[package]]
 name = "saphyr-parser"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "arraydeque",
  "hashlink",
@@ -987,7 +987,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "walk"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "hashlink",
  "miette",
