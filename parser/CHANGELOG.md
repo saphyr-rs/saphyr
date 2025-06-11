@@ -2,6 +2,11 @@
 
 ## Upcoming
 
+## v0.0.6
+
+**Fixes**:
+- Fix emitting of tags with empty handles. `!tag` no longer emits as `!!tag`.
+
 ## v0.0.5
 
 **Breaking Changes**:

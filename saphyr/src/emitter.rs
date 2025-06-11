@@ -274,8 +274,10 @@ impl<'a> YamlEmitter<'a> {
                 //         - a
                 //         - b
                 if node.is_non_empty_collection() {
+                    self.level += 1;
                     writeln!(self.writer)?;
                     self.write_indent()?;
+                    self.level -= 1;
                 }
                 self.emit_node(node.as_ref())
             }

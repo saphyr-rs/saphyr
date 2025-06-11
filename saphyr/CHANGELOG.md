@@ -2,6 +2,11 @@
 
 ## Upcoming
 
+## v0.0.6
+
+**Fixes**:
+- #51: Fix indent when emitting tagged collections.
+
 ## v0.0.5
 
 **Breaking Changes**:

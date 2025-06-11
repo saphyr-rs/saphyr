@@ -118,7 +118,11 @@ impl Tag {
 
 impl Display for Tag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}!{}", self.handle, self.suffix)
+        if self.handle == "!" {
+            write!(f, "!{}", self.suffix)
+        } else {
+            write!(f, "{}!{}", self.handle, self.suffix)
+        }
     }
 }
 
