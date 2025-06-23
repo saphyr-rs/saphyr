@@ -3,13 +3,14 @@ lto = true
 
 [workspace]
 members = [
-    "parser",
-    "parser/tools/walk",
-    "saphyr",
-    "bench",
-    "bench/tools/gen_large_yaml",
-    "bench/tools/bench_compare",
-    "fuzz",
+  "parser",
+  "parser/tools/walk",
+  "saphyr",
+  "bench",
+  "bench/tools/gen_large_yaml",
+  "bench/tools/bench_compare",
+  "fuzz",
+  "serde",
 ]
 resolver = "2"
 
@@ -17,12 +18,12 @@ resolver = "2"
 authors = [
   "Ethiraric <ethiraric@gmail.com>",
   "David Aguilar <davvid@gmail.com>",
-  "Yuheng Chen <yuhengchen@sensetime.com>"
+  "Yuheng Chen <yuhengchen@sensetime.com>",
 ]
 version = "0.0.6"
 documentation = "https://docs.rs/saphyr"
-keywords = [ "yaml", "parser" ]
-categories = [ "encoding", "parser-implementations" ]
+keywords = ["yaml", "parser"]
+categories = ["encoding", "parser-implementations"]
 license = "MIT OR Apache-2.0"
 description = "A fully YAML 1.2 compliant YAML library"
 repository = "https://github.com/saphyr-rs/saphyr"
@@ -43,6 +44,9 @@ saphyr = { path = "saphyr" }
 saphyr-bench = { path = "bench" }
 saphyr-parser = { path = "parser" }
 thiserror = "2.0.12"
+serde = { version = "1.0.219" }
+serde_json = "1.0.140"
+regex = "1.11.1"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
