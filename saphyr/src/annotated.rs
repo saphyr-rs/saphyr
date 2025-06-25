@@ -58,7 +58,7 @@ pub mod marked_yaml_owned;
 pub mod yaml_data;
 pub mod yaml_data_owned;
 
-pub use yaml_data::{AnnotatedMapping, AnnotatedSequence, AnnotatedYamlIter, YamlData};
+pub use yaml_data::{AnnotatedMapping, AnnotatedMappingOwned, AnnotatedSequence, AnnotatedSequenceOwned, AnnotatedYamlIter, YamlData};
 pub use yaml_data_owned::YamlDataOwned;
 
 /// A trait allowing for introspection in the hash types of the [`YamlData::Mapping`] variant.
