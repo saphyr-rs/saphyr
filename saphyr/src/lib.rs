@@ -139,8 +139,9 @@ mod yaml_owned;
 
 // Re-export main components.
 pub use crate::annotated::{
-    marked_yaml::MarkedYaml, marked_yaml_owned::MarkedYamlOwned, AnnotatedMapping, AnnotatedNode,
-    AnnotatedNodeOwned, AnnotatedSequence, AnnotatedYamlIter, YamlData, YamlDataOwned,
+    marked_yaml::MarkedYaml, marked_yaml_owned::MarkedYamlOwned, AnnotatedMapping,
+    AnnotatedMappingOwned, AnnotatedNode, AnnotatedNodeOwned, AnnotatedSequence,
+    AnnotatedSequenceOwned, AnnotatedYamlIter, YamlData, YamlDataOwned,
 };
 pub use crate::emitter::{EmitError, YamlEmitter};
 pub use crate::loader::{LoadError, LoadableYamlNode, YamlLoader};
