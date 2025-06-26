@@ -10,6 +10,7 @@ members = [
     "bench/tools/gen_large_yaml",
     "bench/tools/bench_compare",
     "fuzz",
+    "serde",
 ]
 resolver = "2"
 
@@ -42,6 +43,7 @@ rustyline = "16.0.0"
 saphyr = { path = "saphyr" }
 saphyr-bench = { path = "bench" }
 saphyr-parser = { path = "parser" }
+serde = "1"
 thiserror = "2.0.12"
 
 [workspace.lints.rust]

@@ -758,6 +758,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "saphyr-serde"
+version = "0.0.6"
+dependencies = [
+ "saphyr",
+ "saphyr-parser",
+ "serde",
+]
+
+[[package]]
 name = "serde"
 version = "1.0.219"
 source = "registry+https://github.com/rust-lang/crates.io-index"
