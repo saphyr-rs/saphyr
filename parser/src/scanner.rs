@@ -131,6 +131,137 @@ impl Span {
     }
 }
 
+/// Error codes for `ScanError`.
+#[derive(Clone, PartialEq, Debug, Eq)]
+pub enum ScanErrorCode {
+    /// while scanning an anchor or alias, did not find expected alphabetic or numeric character
+    AlnumCharacterExpected,
+    /// while scanning a directive, found unexpected non-alphabetical character
+    AlphabeticalCharacterExpected,
+    /// a block scalar content cannot start with a tab
+    BlockScalarContentCannotStartWithTab,
+    /// block sequence entries are not allowed in this context
+    BlockSequenceEntriesNotAllowedHere,
+    /// ':' must be followed by a valid YAML whitespace
+    ColonMustBeFollowedByValidWhitespace,
+    /// ':' may not precede any of `[{` in flow mapping
+    ColonNotAllowedBeforeOpeningBracketInFlowMapping,
+    /// while parsing a flow mapping, did not find expected ',' or '}'
+    CommaOrClosingBracketExpectedInFlowMapping,
+    /// while parsing a flow sequence, expected ',' or ']'
+    CommaOrClosingBracketExpectedInFlowSequence,
+    /// while scanning a directive, did not find expected comment or line break
+    CommentOrLinebreakExpected,
+    /// comments must be separated from other tokens by whitespace
+    CommentWithoutPrecedingWhitespace,
+    /// invalid content after document end marker
+    ContentAfterDocumentEnd,
+    /// while scanning a YAML directive, did not find expected digit or '.' character
+    DigitOrDotExpected,
+    /// while scanning a directive, could not find expected directive name
+    DirectiveNameExpected,
+    /// missing explicit document end marker before directive
+    DocumentEndMarkerExpectedBeforeDirective,
+    /// did not find expected <document-start>
+    DocumentStartExpected,
+    /// the TAG directive must only be given at most once per handle in the same document
+    DuplicateTagDirective,
+    /// duplicate version directive
+    DuplicateVersionDirective,
+    /// while scanning a tag, did not find expected '!'
+    ExclamationMarkExpected,
+    /// while parsing a quoted scalar, did not find expected hexadecimal number
+    ExpectedHexadecimalNumberInQuotedScalar,
+    /// while scanning a verbatim tag, did not find the expected '>'
+    GreaterThanExpectedInVerbatimTag,
+    /// illegal placement of ':' indicator
+    IllegalPlacementOfColon,
+    /// while parsing a tag, found an incorrect leading UTF-8 byte
+    IncorrectLeadingUTF8Byte,
+    /// while parsing a tag, found an incorrect trailing UTF-8 byte
+    IncorrectTrailingUTF8Byte,
+    /// while parsing a tag, found an invalid UTF-8 codepoint
+    IncorrectUTF8Codepoint,
+    /// while scanning a block scalar, found an indentation indicator equal to 0
+    IndendationMustBeGreaterThan0,
+    /// while parsing a tag, found an invalid escape sequence
+    InvalidEscapeSequenceInTag,
+    /// invalid global tag character
+    InvalidGlobalTagCharacter,
+    /// invalid indentation
+    InvalidIndentation,
+    /// invalid indentation for anchor
+    InvalidIndentationForAnchor,
+    /// invalid indentation in flow construct
+    InvalidIndentationInFlowConstruct,
+    /// invalid indentation in quoted scalar
+    InvalidIndentationInQuotedScalar,
+    /// invalid trailing content after double-quoted scalar
+    InvalidTrailingContentAfterDoubleQuotedScalar,
+    /// while parsing a quoted scalar, found invalid Unicode character escape code
+    InvalidUnicodeCharacterEscapeCodeInQuotedScalar,
+    /// while parsing a block mapping, did not find expected key
+    KeyExpectedInBlockMapping,
+    /// mapping keys are not allowed in this context
+    MappingKeysAreNotAllowedHere,
+    /// mapping values are not allowed in this context
+    MappingValuesAreNotAllowedHere,
+    /// while parsing a block collection, did not find expected '-' indicator
+    MinusIndicatorExpectedInBlockCollection,
+    /// '-' must be followed by a valid YAML whitespace
+    MinusMustBeFollowedByValidWhitespace,
+    /// "-" is only valid inside a block
+    MinusOnlyValidInsideBlock,
+    /// did not find expected next token
+    NextTokenExpected,
+    /// while parsing a node, did not find expected node content
+    NodeContentExpected,
+    /// plain scalar cannot start with '-' followed by ,[]{}
+    PlainScalarCannotStartWithMinusFollowedByFlow,
+    /// while scanning a plain scalar, found a tab
+    PlainScalarContainsUnexpectedTab,
+    /// while scanning a quoted scalar, found unexpected document indicator
+    QuotedScalarWithUnexpectedDocumentIndicator,
+    /// recursion limit exceeded
+    RecursionLimitExceeded,
+    /// simple key expected ':'
+    SimpleKeyExpected,
+    /// did not find expected <stream-start>
+    StreamStartExpected,
+    /// tab cannot be used as indentation
+    TabCannotBeUsedAsIndentation,
+    /// tabs disallowed in this context
+    TabsNotAllowedHere,
+    /// tabs disallowed within this context (block indentation)
+    TabsNotAllowedInBlockIndentation,
+    /// while parsing a tag, did not find expected tag URI
+    URIExpected,
+    /// the handle wasn't declared
+    UndeclaredHandle,
+    /// unexpected character: '{c}'
+    UnexpectedCharacter,
+    /// unexpected eof
+    UnexpectedEOF,
+    /// unexpected end of plain scalar
+    UnexpectedEndOfPlainScalar,
+    /// while scanning a quoted scalar, found unexpected end of stream
+    UnexpectedEndOfStreamInQuotedScalar,
+    /// while parsing node, found unknown anchor
+    UnknownAnchorFoundInNode,
+    /// while parsing a quoted scalar, found unknown escape character
+    UnknownEscapeCharacterInQuotedScalar,
+    /// while scanning a YAML directive, did not find expected version number
+    VersionNumberExpected,
+    /// while scanning a YAML directive, found extremely long version number
+    VersionNumberTooLong,
+    /// expected whitespace
+    WhitespaceExpected,
+    /// while scanning TAG, did not find expected whitespace or line break
+    WhitespaceOrLinebreakExpectedInTag,
+    /// wrongly indented line in block scalar
+    WronglyIndentedLineInBlockScalar,
+}
+
 /// An error that occurred while scanning.
 #[derive(Clone, PartialEq, Debug, Eq)]
 pub struct ScanError {
@@ -138,21 +269,28 @@ pub struct ScanError {
     mark: Marker,
     /// Human-readable details about the error.
     info: String,
+    /// Error code.
+    code: ScanErrorCode,
 }
 
 impl ScanError {
     /// Create a new error from a location and an error string.
     #[must_use]
-    pub fn new(loc: Marker, info: String) -> ScanError {
-        ScanError { mark: loc, info }
+    pub fn new(loc: Marker, info: String, code: ScanErrorCode) -> ScanError {
+        ScanError {
+            mark: loc,
+            info,
+            code,
+        }
     }
 
     /// Convenience alias for string slices.
     #[must_use]
-    pub fn new_str(loc: Marker, info: &str) -> ScanError {
+    pub fn new_str(loc: Marker, info: &str, code: ScanErrorCode) -> ScanError {
         ScanError {
             mark: loc,
             info: info.to_owned(),
+            code,
         }
     }
 
@@ -166,6 +304,12 @@ impl ScanError {
     #[must_use]
     pub fn info(&self) -> &str {
         self.info.as_ref()
+    }
+
+    /// Return the error code.
+    #[must_use]
+    pub fn code(&self) -> &ScanErrorCode {
+        &self.code
     }
 }
 
@@ -701,6 +845,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                     return Err(ScanError::new_str(
                         self.mark,
                         "invalid content after document end marker",
+                        ScanErrorCode::ContentAfterDocumentEnd,
                     ));
                 }
                 return Ok(());
@@ -708,7 +853,11 @@ impl<'input, T: Input> Scanner<'input, T> {
         }
 
         if (self.mark.col as isize) < self.indent {
-            return Err(ScanError::new_str(self.mark, "invalid indentation"));
+            return Err(ScanError::new_str(
+                self.mark,
+                "invalid indentation",
+                ScanErrorCode::InvalidIndentation,
+            ));
         }
 
         let c = self.input.peek();
@@ -745,7 +894,8 @@ impl<'input, T: Input> Scanner<'input, T> {
             }
             '%' | '@' | '`' => Err(ScanError::new(
                 self.mark,
-                format!("unexpected character: `{c}'"),
+                format!("unexpected character: '{c}'"),
+                ScanErrorCode::UnexpectedCharacter,
             )),
             _ => self.fetch_plain_scalar(),
         }
@@ -766,6 +916,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 self.mark,
                 "did not find expected next token",
+                ScanErrorCode::NextTokenExpected,
             ));
         };
         self.token_available = false;
@@ -823,7 +974,11 @@ impl<'input, T: Input> Scanner<'input, T> {
                     && (sk.mark.line < self.mark.line || sk.mark.index + 1024 < self.mark.index)
             {
                 if sk.required {
-                    return Err(ScanError::new_str(self.mark, "simple key expect ':'"));
+                    return Err(ScanError::new_str(
+                        self.mark,
+                        "simple key expected ':'",
+                        ScanErrorCode::SimpleKeyExpected,
+                    ));
                 }
                 sk.possible = false;
             }
@@ -856,6 +1011,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                         return Err(ScanError::new_str(
                             self.mark,
                             "tabs disallowed within this context (block indentation)",
+                            ScanErrorCode::TabsNotAllowedInBlockIndentation,
                         ));
                     }
                 }
@@ -909,7 +1065,11 @@ impl<'input, T: Input> Scanner<'input, T> {
         }
 
         if need_whitespace {
-            Err(ScanError::new_str(self.mark(), "expected whitespace"))
+            Err(ScanError::new_str(
+                self.mark(),
+                "expected whitespace",
+                ScanErrorCode::WhitespaceExpected,
+            ))
         } else {
             Ok(())
         }
@@ -919,7 +1079,13 @@ impl<'input, T: Input> Scanner<'input, T> {
         let (n_bytes, result) = self.input.skip_ws_to_eol(skip_tabs);
         self.mark.col += n_bytes;
         self.mark.index += n_bytes;
-        result.map_err(|msg| ScanError::new_str(self.mark, msg))
+        result.map_err(|msg| {
+            ScanError::new_str(
+                self.mark,
+                msg,
+                ScanErrorCode::CommentWithoutPrecedingWhitespace,
+            )
+        })
     }
 
     fn fetch_stream_start(&mut self) {
@@ -945,7 +1111,11 @@ impl<'input, T: Input> Scanner<'input, T> {
         // had. If one was required, however, that was an error and we must propagate it.
         for sk in &mut self.simple_keys {
             if sk.required && sk.possible {
-                return Err(ScanError::new_str(self.mark, "simple key expected"));
+                return Err(ScanError::new_str(
+                    self.mark,
+                    "simple key expected",
+                    ScanErrorCode::SimpleKeyExpected,
+                ));
             }
             sk.possible = false;
         }
@@ -1005,6 +1175,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             Err(ScanError::new_str(
                 start_mark,
                 "while scanning a directive, did not find expected comment or line break",
+                ScanErrorCode::CommentOrLinebreakExpected,
             ))
         }
     }
@@ -1020,6 +1191,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 *mark,
                 "while scanning a YAML directive, did not find expected digit or '.' character",
+                ScanErrorCode::DigitOrDotExpected,
             ));
         }
         self.skip_non_blank();
@@ -1044,6 +1216,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 start_mark,
                 "while scanning a directive, could not find expected directive name",
+                ScanErrorCode::DirectiveNameExpected,
             ));
         }
 
@@ -1051,6 +1224,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 start_mark,
                 "while scanning a directive, found unexpected non-alphabetical character",
+                ScanErrorCode::AlphabeticalCharacterExpected,
             ));
         }
 
@@ -1065,6 +1239,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 return Err(ScanError::new_str(
                     *mark,
                     "while scanning a YAML directive, found extremely long version number",
+                    ScanErrorCode::VersionNumberTooLong,
                 ));
             }
             length += 1;
@@ -1076,6 +1251,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 *mark,
                 "while scanning a YAML directive, did not find expected version number",
+                ScanErrorCode::VersionNumberExpected,
             ));
         }
 
@@ -1106,6 +1282,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             Err(ScanError::new_str(
                 *mark,
                 "while scanning TAG, did not find expected whitespace or line break",
+                ScanErrorCode::WhitespaceOrLinebreakExpectedInTag,
             ))
         }
     }
@@ -1162,6 +1339,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             Err(ScanError::new_str(
                 start_mark,
                 "while scanning a tag, did not find expected whitespace or line break",
+                ScanErrorCode::WhitespaceOrLinebreakExpectedInTag,
             ))
         }
     }
@@ -1172,6 +1350,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 *mark,
                 "while scanning a tag, did not find expected '!'",
+                ScanErrorCode::ExclamationMarkExpected,
             ));
         }
 
@@ -1193,6 +1372,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 *mark,
                 "while parsing a tag directive, did not find expected '!'",
+                ScanErrorCode::ExclamationMarkExpected,
             ));
         }
         Ok(string)
@@ -1215,6 +1395,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 *start_mark,
                 "invalid global tag character",
+                ScanErrorCode::InvalidGlobalTagCharacter,
             ));
         } else if self.input.peek() == '%' {
             // If it is valid and an escape sequence, escape it.
@@ -1259,6 +1440,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 *start_mark,
                 "while scanning a verbatim tag, did not find the expected '>'",
+                ScanErrorCode::GreaterThanExpectedInVerbatimTag,
             ));
         }
         self.skip_non_blank();
@@ -1298,6 +1480,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 *mark,
                 "while parsing a tag, did not find expected tag URI",
+                ScanErrorCode::URIExpected,
             ));
         }
 
@@ -1317,6 +1500,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 return Err(ScanError::new_str(
                     *mark,
                     "while parsing a tag, found an invalid escape sequence",
+                    ScanErrorCode::InvalidEscapeSequenceInTag,
                 ));
             }
 
@@ -1331,6 +1515,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                         return Err(ScanError::new_str(
                             *mark,
                             "while parsing a tag, found an incorrect leading UTF-8 byte",
+                            ScanErrorCode::IncorrectLeadingUTF8Byte,
                         ));
                     }
                 };
@@ -1340,6 +1525,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                     return Err(ScanError::new_str(
                         *mark,
                         "while parsing a tag, found an incorrect trailing UTF-8 byte",
+                        ScanErrorCode::IncorrectTrailingUTF8Byte,
                     ));
                 }
                 code = (code << 8) + byte;
@@ -1358,6 +1544,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             None => Err(ScanError::new_str(
                 *mark,
                 "while parsing a tag, found an invalid UTF-8 codepoint",
+                ScanErrorCode::IncorrectUTF8Codepoint,
             )),
         }
     }
@@ -1384,7 +1571,7 @@ impl<'input, T: Input> Scanner<'input, T> {
         }
 
         if string.is_empty() {
-            return Err(ScanError::new_str(start_mark, "while scanning an anchor or alias, did not find expected alphabetic or numeric character"));
+            return Err(ScanError::new_str(start_mark, "while scanning an anchor or alias, did not find expected alphabetic or numeric character", ScanErrorCode::AlnumCharacterExpected));
         }
 
         let tok = if alias {
@@ -1471,10 +1658,13 @@ impl<'input, T: Input> Scanner<'input, T> {
 
     fn increase_flow_level(&mut self) -> ScanResult {
         self.simple_keys.push(SimpleKey::new(Marker::new(0, 0, 0)));
-        self.flow_level = self
-            .flow_level
-            .checked_add(1)
-            .ok_or_else(|| ScanError::new_str(self.mark, "recursion limit exceeded"))?;
+        self.flow_level = self.flow_level.checked_add(1).ok_or_else(|| {
+            ScanError::new_str(
+                self.mark,
+                "recursion limit exceeded",
+                ScanErrorCode::RecursionLimitExceeded,
+            )
+        })?;
         Ok(())
     }
 
@@ -1496,6 +1686,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 self.mark,
                 r#""-" is only valid inside a block"#,
+                ScanErrorCode::MinusOnlyValidInsideBlock,
             ));
         }
         // Check if we are allowed to start a new entry.
@@ -1503,6 +1694,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 self.mark,
                 "block sequence entries are not allowed in this context",
+                ScanErrorCode::BlockSequenceEntriesNotAllowedHere,
             ));
         }
 
@@ -1512,6 +1704,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 return Err(ScanError::new_str(
                     span.start,
                     "invalid indentation for anchor",
+                    ScanErrorCode::InvalidIndentationForAnchor,
                 ));
             }
         }
@@ -1529,6 +1722,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 self.mark,
                 "'-' must be followed by a valid YAML whitespace",
+                ScanErrorCode::MinusMustBeFollowedByValidWhitespace,
             ));
         }
 
@@ -1605,6 +1799,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                     return Err(ScanError::new_str(
                         start_mark,
                         "while scanning a block scalar, found an indentation indicator equal to 0",
+                        ScanErrorCode::IndendationMustBeGreaterThan0,
                     ));
                 }
                 increment = (self.input.peek() as usize) - ('0' as usize);
@@ -1615,6 +1810,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 return Err(ScanError::new_str(
                     start_mark,
                     "while scanning a block scalar, found an indentation indicator equal to 0",
+                    ScanErrorCode::IndendationMustBeGreaterThan0,
                 ));
             }
 
@@ -1639,6 +1835,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 start_mark,
                 "while scanning a block scalar, did not find expected comment or line break",
+                ScanErrorCode::CommentOrLinebreakExpected,
             ));
         }
 
@@ -1651,6 +1848,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 start_mark,
                 "a block scalar content cannot start with a tab",
+                ScanErrorCode::BlockScalarContentCannotStartWithTab,
             ));
         }
 
@@ -1698,6 +1896,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 self.mark,
                 "wrongly indented line in block scalar",
+                ScanErrorCode::WronglyIndentedLineInBlockScalar,
             ));
         }
 
@@ -1925,6 +2124,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 return Err(ScanError::new_str(
                     start_mark,
                     "while scanning a quoted scalar, found unexpected document indicator",
+                    ScanErrorCode::QuotedScalarWithUnexpectedDocumentIndicator,
                 ));
             }
 
@@ -1932,6 +2132,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 return Err(ScanError::new_str(
                     start_mark,
                     "while scanning a quoted scalar, found unexpected end of stream",
+                    ScanErrorCode::UnexpectedEndOfStreamInQuotedScalar,
                 ));
             }
 
@@ -1939,6 +2140,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 return Err(ScanError::new_str(
                     start_mark,
                     "invalid indentation in quoted scalar",
+                    ScanErrorCode::InvalidIndentationInQuotedScalar,
                 ));
             }
 
@@ -1965,6 +2167,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                             return Err(ScanError::new_str(
                                 self.mark,
                                 "tab cannot be used as indentation",
+                                ScanErrorCode::TabCannotBeUsedAsIndentation,
                             ));
                         }
                         self.skip_blank();
@@ -2026,6 +2229,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 return Err(ScanError::new_str(
                     self.mark,
                     "invalid trailing content after double-quoted scalar",
+                    ScanErrorCode::InvalidTrailingContentAfterDoubleQuotedScalar,
                 ));
             }
         }
@@ -2131,6 +2335,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 return Err(ScanError::new_str(
                     *start_mark,
                     "while parsing a quoted scalar, found unknown escape character",
+                    ScanErrorCode::UnknownEscapeCharacterInQuotedScalar,
                 ))
             }
         }
@@ -2146,6 +2351,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                     return Err(ScanError::new_str(
                         *start_mark,
                         "while parsing a quoted scalar, did not find expected hexadecimal number",
+                        ScanErrorCode::ExpectedHexadecimalNumberInQuotedScalar,
                     ));
                 }
                 value = (value << 4) + as_hex(c);
@@ -2155,6 +2361,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 return Err(ScanError::new_str(
                     *start_mark,
                     "while parsing a quoted scalar, found invalid Unicode character escape code",
+                    ScanErrorCode::InvalidUnicodeCharacterEscapeCodeInQuotedScalar,
                 ));
             };
             ret = ch;
@@ -2188,6 +2395,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 start_mark,
                 "invalid indentation in flow construct",
+                ScanErrorCode::InvalidIndentationInFlowConstruct,
             ));
         }
 
@@ -2209,6 +2417,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 return Err(ScanError::new_str(
                     self.mark,
                     "plain scalar cannot start with '-' followed by ,[]{}",
+                    ScanErrorCode::PlainScalarCannotStartWithMinusFollowedByFlow,
                 ));
             }
 
@@ -2285,6 +2494,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                             return Err(ScanError::new_str(
                                 start_mark,
                                 "while scanning a plain scalar, found a tab",
+                                ScanErrorCode::PlainScalarContainsUnexpectedTab,
                             ));
                         }
                     } else {
@@ -2322,6 +2532,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             Err(ScanError::new_str(
                 start_mark,
                 "unexpected end of plain scalar",
+                ScanErrorCode::UnexpectedEndOfPlainScalar,
             ))
         } else {
             Ok(Token(
@@ -2339,6 +2550,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 return Err(ScanError::new_str(
                     self.mark,
                     "mapping keys are not allowed in this context",
+                    ScanErrorCode::MappingKeysAreNotAllowedHere,
                 ));
             }
             self.roll_indent(
@@ -2366,6 +2578,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 self.mark(),
                 "tabs disallowed in this context",
+                ScanErrorCode::TabsNotAllowedHere,
             ));
         }
         self.tokens
@@ -2398,6 +2611,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 self.mark,
                 "':' may not precede any of `[{` in flow mapping",
+                ScanErrorCode::ColonNotAllowedBeforeOpeningBracketInFlowMapping,
             ));
         }
 
@@ -2423,6 +2637,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Err(ScanError::new_str(
                 self.mark,
                 "':' must be followed by a valid YAML whitespace",
+                ScanErrorCode::ColonMustBeFollowedByValidWhitespace,
             ));
         }
 
@@ -2435,6 +2650,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                     return Err(ScanError::new_str(
                         start_mark,
                         "illegal placement of ':' indicator",
+                        ScanErrorCode::IllegalPlacementOfColon,
                     ));
                 }
                 self.insert_token(
@@ -2465,6 +2681,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                     return Err(ScanError::new_str(
                         start_mark,
                         "mapping values are not allowed in this context",
+                        ScanErrorCode::MappingValuesAreNotAllowedHere,
                     ));
                 }
 
@@ -2595,7 +2812,11 @@ impl<'input, T: Input> Scanner<'input, T> {
     fn remove_simple_key(&mut self) -> ScanResult {
         let last = self.simple_keys.last_mut().unwrap();
         if last.possible && last.required {
-            return Err(ScanError::new_str(self.mark, "simple key expected"));
+            return Err(ScanError::new_str(
+                self.mark,
+                "simple key expected",
+                ScanErrorCode::SimpleKeyExpected,
+            ));
         }
 
         last.possible = false;
