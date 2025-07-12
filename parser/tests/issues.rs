@@ -261,7 +261,7 @@ fn test_issue14() {
     );
     assert_eq!(
         error.code(),
-        &ScanErrorCode::CommaOrClosingBracketExpectedInFlowMapping
+        ScanErrorCode::CommaOrClosingBracketExpectedInFlowMapping
     );
 }
 
@@ -276,7 +276,7 @@ fn test_issue14_v2() {
     assert!(error.to_string().ends_with("at byte 4 line 2 column 1"));
     assert_eq!(
         error.code(),
-        &ScanErrorCode::CommaOrClosingBracketExpectedInFlowMapping
+        ScanErrorCode::CommaOrClosingBracketExpectedInFlowMapping
     );
 }
 

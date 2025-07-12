@@ -132,7 +132,7 @@ impl Span {
 }
 
 /// Error codes for `ScanError`.
-#[derive(Clone, PartialEq, Debug, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ScanErrorCode {
     /// while scanning an anchor or alias, did not find expected alphabetic or numeric character
     AlnumCharacterExpected,
@@ -308,8 +308,8 @@ impl ScanError {
 
     /// Return the error code.
     #[must_use]
-    pub fn code(&self) -> &ScanErrorCode {
-        &self.code
+    pub fn code(&self) -> ScanErrorCode {
+        self.code
     }
 }
 
