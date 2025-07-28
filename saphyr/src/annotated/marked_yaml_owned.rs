@@ -193,4 +193,14 @@ impl LoadableYamlNode<'_> for MarkedYamlOwned {
         self.span = span;
         self
     }
+
+    fn with_start_marker(mut self, start: saphyr_parser::Marker) -> Self {
+        self.span.start = start;
+        self
+    }
+
+    fn with_end_marker(mut self, end: saphyr_parser::Marker) -> Self {
+        self.span.end = end;
+        self
+    }
 }

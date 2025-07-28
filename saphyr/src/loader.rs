@@ -273,6 +273,7 @@ where
                 if ev == Event::MappingEnd {
                     self.key_stack.pop().unwrap();
                 }
+
                 let (mut node, anchor_id, tag) = self.doc_stack.pop().unwrap();
                 node = node.with_end_marker(mark);
                 if let Some(tag) = tag {
