@@ -1936,10 +1936,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             }
 
             if (self.mark.col as isize) < self.indent {
-                return Err(ScanError::new_str(
-                    start_mark,
-                    "invalid indentation in quoted scalar",
-                ));
+                break;
             }
 
             leading_blanks = false;
