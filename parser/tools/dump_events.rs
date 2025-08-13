@@ -16,7 +16,7 @@ impl<'a> SpannedEventReceiver<'a> for EventSink<'a> {
     }
 }
 
-fn str_to_events(yaml: &str) -> Vec<(Event, Span)> {
+fn str_to_events(yaml: &str) -> Vec<(Event<'_>, Span)> {
     let mut sink = EventSink { events: Vec::new() };
     let mut parser = Parser::new_from_str(yaml);
     // Load events using our sink as the receiver.

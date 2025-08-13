@@ -147,7 +147,7 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Trial>> {
     Ok(result)
 }
 
-fn parse_to_events(source: &str) -> Result<EventReporter, ScanError> {
+fn parse_to_events(source: &str) -> Result<EventReporter<'_>, ScanError> {
     let mut str_events = vec![];
     let mut str_error = None;
     let mut iter_events = vec![];

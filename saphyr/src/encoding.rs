@@ -34,7 +34,7 @@ pub type YAMLDecodingTrapFn = fn(
 ) -> ControlFlow<Cow<'static, str>>;
 
 /// The behavior [`YamlDecoder`] must have when an decoding error occurs.
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone)]
 pub enum YAMLDecodingTrap {
     /// Ignore the offending bytes, remove them from the output.
     Ignore,
@@ -92,7 +92,7 @@ impl<T: std::io::Read> YamlDecoder<T> {
     ///
     /// # Errors
     /// Returns `LoadError` when decoding fails.
-    pub fn decode(&mut self) -> Result<Vec<Yaml>, LoadError> {
+    pub fn decode(&mut self) -> Result<Vec<Yaml<'_>>, LoadError> {
         let mut buffer = Vec::new();
         self.source.read_to_end(&mut buffer)?;
 

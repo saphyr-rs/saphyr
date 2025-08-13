@@ -388,7 +388,7 @@ impl<'input, T: Input> Parser<'input, T> {
     }
 
     /// Peek at the next token from the scanner.
-    fn peek_token(&mut self) -> Result<&Token, ScanError> {
+    fn peek_token(&mut self) -> Result<&Token<'_>, ScanError> {
         match self.token {
             None => {
                 self.token = Some(self.scan_next_token()?);

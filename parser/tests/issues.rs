@@ -12,7 +12,7 @@ use saphyr_parser::{Event, Parser, ScalarStyle, ScanError, Span};
 /// # Panics
 /// This function panics if there is a mismatch between the 2 parser invocations with the different
 /// input traits.
-fn run_parser_with_span(input: &str) -> Result<Vec<(Event, Span)>, ScanError> {
+fn run_parser_with_span(input: &str) -> Result<Vec<(Event<'_>, Span)>, ScanError> {
     let mut str_events = vec![];
     let mut str_error = None;
     let mut iter_events = vec![];
@@ -67,7 +67,7 @@ fn run_parser_with_span(input: &str) -> Result<Vec<(Event, Span)>, ScanError> {
 /// # Panics
 /// This function panics if there is a mismatch between the 2 parser invocations with the different
 /// input traits.
-fn run_parser(input: &str) -> Result<Vec<Event>, ScanError> {
+fn run_parser(input: &str) -> Result<Vec<Event<'_>>, ScanError> {
     Ok(run_parser_with_span(input)?
         .into_iter()
         .map(|x| x.0)
