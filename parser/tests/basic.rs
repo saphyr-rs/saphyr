@@ -353,6 +353,45 @@ hash:
 }
 
 #[test]
+fn test_quoted_string_indentation() {
+    let table = run_parser(
+        r"
+hash:
+    string: 'Closing single quote is
+        present but
+        not indented.
+  '
+    after: value
+",
+    )
+    .unwrap();
+
+    assert_eq!(
+        table,
+        [
+            Event::StreamStart,
+            Event::DocumentStart(false),
+            Event::MappingStart(0, None),
+            Event::Scalar("hash".into(), ScalarStyle::Plain, 0, None),
+            Event::MappingStart(0, None),
+            Event::Scalar("string".into(), ScalarStyle::Plain, 0, None),
+            Event::Scalar(
+                "Closing single quote is present but not indented. ".into(),
+                ScalarStyle::SingleQuoted,
+                0,
+                None
+            ),
+            Event::Scalar("after".into(), ScalarStyle::Plain, 0, None),
+            Event::Scalar("value".into(), ScalarStyle::Plain, 0, None),
+            Event::MappingEnd,
+            Event::MappingEnd,
+            Event::DocumentEnd,
+            Event::StreamEnd,
+        ]
+    );
+}
+
+#[test]
 fn test_recursion_depth_check_objects() {
     let s = "{a:".repeat(10_000) + &"}".repeat(10_000);
     assert!(run_parser(&s).is_err());
