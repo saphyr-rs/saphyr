@@ -13,7 +13,7 @@ use saphyr_parser::{Event, Parser, ScanError};
 /// # Panics
 /// This function panics if there is a mismatch between the 2 parser invocations with the different
 /// input traits.
-fn run_parser(input: &str) -> Result<Vec<Event>, ScanError> {
+fn run_parser(input: &str) -> Result<Vec<Event<'_>>, ScanError> {
     let mut str_events = vec![];
     let mut str_error = None;
     let mut iter_events = vec![];

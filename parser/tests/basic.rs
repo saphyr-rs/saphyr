@@ -7,7 +7,7 @@ use saphyr_parser::{Event, Parser, ScalarStyle, ScanError};
 ///
 /// # Returns
 /// This functions returns the events if parsing succeeds, the error the parser returned otherwise.
-fn run_parser(input: &str) -> Result<Vec<Event>, ScanError> {
+fn run_parser(input: &str) -> Result<Vec<Event<'_>>, ScanError> {
     let mut str_events = vec![];
     let mut str_error = None;
     let mut iter_events = vec![];
