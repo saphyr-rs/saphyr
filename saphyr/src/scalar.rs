@@ -188,9 +188,9 @@ impl<'input> Scalar<'input> {
             }
         }
         match &*v {
-            "~" | "null" | "NULL" => Self::Null,
-            "true" => Self::Boolean(true),
-            "false" => Self::Boolean(false),
+            "~" | "null" | "Null" | "NULL" => Self::Null,
+            "true" | "True" | "TRUE" => Self::Boolean(true),
+            "false" | "False" | "FALSE" => Self::Boolean(false),
             _ => {
                 if let Ok(integer) = v.parse::<i64>() {
                     Self::Integer(integer)
