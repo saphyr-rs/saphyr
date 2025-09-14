@@ -145,7 +145,7 @@ pub use crate::annotated::{
     AnnotatedSequenceOwned, AnnotatedYamlIter, YamlData, YamlDataOwned,
 };
 pub use crate::emitter::{EmitError, YamlEmitter};
-pub use crate::index::{Accessor, SafelyIndex};
+pub use crate::index::{Accessor, SafelyIndex, SafelyIndexMut};
 pub use crate::loader::{LoadError, LoadableYamlNode, YamlLoader};
 pub use crate::scalar::{parse_core_schema_fp, Scalar, ScalarOwned};
 pub use crate::yaml::{Mapping, Sequence, Yaml, YamlIter};

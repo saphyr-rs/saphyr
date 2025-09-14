@@ -711,6 +711,16 @@ impl $(< $( $generic ),+ >)? crate::index::SafelyIndex<$nodetype> for $yaml $(wh
         }
     }
 }
+
+#[allow(clippy::needless_lifetimes)]
+impl $(< $( $generic ),+ >)? crate::index::SafelyIndexMut<$nodetype> for $yaml $(where $($whereclause)+)? {
+    fn get_mut(&mut self, key: impl Into<crate::index::Accessor>) -> Option<&mut $nodetype> {
+        match key.into() {
+            crate::index::Accessor::Field(f) => self.as_mapping_get_mut(f.as_str()),
+            crate::index::Accessor::Index(i) => self.as_sequence_get_mut(i),
+        }
+    }
+}
     );
 );
 

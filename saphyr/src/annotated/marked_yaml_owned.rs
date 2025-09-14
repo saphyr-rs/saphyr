@@ -7,7 +7,10 @@ use std::borrow::Cow;
 use hashlink::LinkedHashMap;
 use saphyr_parser::{ScalarStyle, Span, Tag};
 
-use crate::{Accessor, LoadableYamlNode, SafelyIndex, ScalarOwned, Yaml, YamlDataOwned};
+use crate::{
+    index::SafelyIndexMut, Accessor, LoadableYamlNode, SafelyIndex, ScalarOwned, Yaml,
+    YamlDataOwned,
+};
 
 /// A YAML node with [`Span`]s pointing to the start of the node.
 ///
@@ -131,6 +134,15 @@ impl SafelyIndex for MarkedYamlOwned {
         match key.into() {
             Accessor::Field(f) => self.data.as_mapping_get(f.as_str()),
             Accessor::Index(i) => self.data.as_sequence_get(i),
+        }
+    }
+}
+
+impl SafelyIndexMut for MarkedYamlOwned {
+    fn get_mut(&mut self, key: impl Into<Accessor>) -> Option<&mut Self> {
+        match key.into() {
+            Accessor::Field(f) => self.data.as_mapping_get_mut(f.as_str()),
+            Accessor::Index(i) => self.data.as_sequence_get_mut(i),
         }
     }
 }

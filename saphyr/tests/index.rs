@@ -1,4 +1,6 @@
-use saphyr::{LoadableYamlNode, MarkedYaml, Scalar, Yaml, YamlData};
+use std::string::ToString;
+
+use saphyr::{LoadableYamlNode, MarkedYaml, SafelyIndex, SafelyIndexMut, Scalar, Yaml, YamlData};
 
 fn get_yaml_mapping() -> Yaml<'static> {
     let s = "
@@ -187,4 +189,84 @@ fn marked_yaml_index_str_wrong_variant() {
 fn marked_yaml_index_integer_wrong_variant() {
     let node: MarkedYaml<'_> = YamlData::Value(Scalar::Integer(3)).into();
     let _ = node.data[12];
+}
+
+#[test]
+fn safely_indexing_into_available_structures() {
+    let node = Yaml::load_from_str(
+        r#"
+person:
+  name: "Jim Halpert"
+  workplace:
+    - name: "Dunder Mifflin"
+      role: "Manager"
+  tenure_years: 5
+"#,
+    )
+    .unwrap()
+    .first()
+    .cloned()
+    .unwrap();
+
+    let name = node
+        .get("person")
+        .get("name")
+        .and_then(|name| name.as_str())
+        .map(ToString::to_string);
+
+    assert!(name.is_some_and(|n| n == "Jim Halpert"));
+
+    let role = node
+        .get("person")
+        .get("workplace")
+        .get(0)
+        .get("role".to_string()) //just for example...
+        .and_then(|role| role.as_str())
+        .map(ToString::to_string);
+
+    assert!(role.is_some_and(|r| r == "Manager"));
+}
+
+#[test]
+fn safely_indexing_mut_into_available_structures() {
+    let mut node = Yaml::load_from_str(
+        r#"
+person:
+  name: "Jim Halpert"
+  workplace:
+    - name: "Dunder Mifflin"
+      role: "Manager"
+  tenure_years: 5
+"#,
+    )
+    .unwrap()
+    .first()
+    .cloned()
+    .unwrap();
+
+    *node.get_mut("person").get_mut("name").unwrap() = Yaml::value_from_str("Dwight Schrute");
+    *node
+        .get_mut("person")
+        .get_mut("workplace")
+        .get_mut(0)
+        .get_mut("role")
+        .unwrap() = Yaml::value_from_str("Assistant");
+
+    let name = node
+        .get("person")
+        .get("name")
+        .and_then(|name| name.as_str())
+        .map(ToString::to_string);
+
+    assert!(name.is_some_and(|n| n == "Dwight Schrute"));
+
+    let role = node
+        .get("person")
+        .get("workplace")
+        .get(0)
+        .get("role".to_string()) //just for example...
+        .and_then(|role| role.as_str())
+        .map(ToString::to_string);
+
+    assert!(role.is_some_and(|r| r == "Assistant"));
 }
