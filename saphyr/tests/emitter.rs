@@ -1,4 +1,4 @@
-use saphyr::{LoadableYamlNode, Yaml, YamlEmitter};
+use saphyr::{LoadableYamlNode, MarkedYaml, Yaml, YamlEmitter};
 
 #[allow(clippy::similar_names)]
 #[test]
@@ -26,6 +26,40 @@ a4:
     println!("original:\n{s}");
     println!("emitted:\n{writer}");
     let docs_new = match Yaml::load_from_str(&writer) {
+        Ok(y) => y,
+        Err(e) => panic!("{}", e),
+    };
+    let doc_new = &docs_new[0];
+
+    assert_eq!(doc, doc_new);
+}
+
+#[allow(clippy::similar_names)]
+#[test]
+fn test_emit_simple_for_marked_yaml() {
+    let s = "
+# comment
+a0 bb: val
+a1:
+    b1: 4
+    b2: d
+a2: 4 # i'm comment
+a3: [1, 2, 3]
+a4:
+    - [a1, a2]
+    - 2
+";
+
+    let docs = MarkedYaml::load_from_str(s).unwrap();
+    let doc = &docs[0];
+    let mut writer = String::new();
+    {
+        let mut emitter = YamlEmitter::new(&mut writer);
+        emitter.dump(doc).unwrap();
+    }
+    println!("original:\n{s}");
+    println!("emitted:\n{writer}");
+    let docs_new = match MarkedYaml::load_from_str(&writer) {
         Ok(y) => y,
         Err(e) => panic!("{}", e),
     };
@@ -104,7 +138,8 @@ products:
   "{}": empty hash key
 x: test
 y: avoid quoting here
-z: string with spaces"#;
+z: string with spaces
+"#;
 
     let docs = Yaml::load_from_str(s).unwrap();
     let doc = &docs[0];
@@ -162,7 +197,8 @@ null0: ~
   - "OFF"
 : false_bools
 bool0: true
-bool1: false"#;
+bool1: false
+"#;
 
     let docs = Yaml::load_from_str(input).unwrap();
     let doc = &docs[0];
@@ -198,7 +234,8 @@ a:
 e:
   - f
   - g
-  - h: []"
+  - h: []
+"
     } else {
         r"---
 a:
@@ -209,7 +246,8 @@ e:
   - f
   - g
   -
-    h: []"
+    h: []
+"
     };
 
     let docs = Yaml::load_from_str(s).unwrap();
@@ -232,7 +270,8 @@ a:
   - - c
     - d
     - - e
-      - f";
+      - f
+";
 
     let docs = Yaml::load_from_str(s).unwrap();
     let doc = &docs[0];
@@ -256,7 +295,8 @@ a:
     - d
     - - e
       - - f
-      - - e";
+      - - e
+";
 
     let docs = Yaml::load_from_str(s).unwrap();
     let doc = &docs[0];
@@ -278,7 +318,8 @@ a:
   b:
     c:
       d:
-        e: f";
+        e: f
+";
 
     let docs = Yaml::load_from_str(s).unwrap();
     let doc = &docs[0];
