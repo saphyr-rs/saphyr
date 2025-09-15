@@ -1,0 +1,23 @@
+[package]
+name = "saphyr-serde"
+readme = "README.md"
+authors = { workspace = true }
+categories = { workspace = true }
+description = { workspace = true }
+documentation = { workspace = true }
+edition = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+version = { workspace = true }
+
+[dependencies]
+regex = { workspace = true }
+saphyr-parser = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
