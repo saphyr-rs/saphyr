@@ -1,7 +1,9 @@
 //! YAML serialization helpers.
 
+use crate::char_traits;
+use crate::MarkedYaml;
+use crate::MarkedYamlOwned;
 use crate::{
-    char_traits,
     yaml::{Mapping, Yaml},
     Scalar,
 };
@@ -48,7 +50,8 @@ impl From<fmt::Error> for EmitError {
 ///
 /// assert_eq!(output, r#"---
 /// a: b
-/// c: d"#);
+/// c: d
+/// "#);
 /// ```
 #[allow(clippy::module_name_repetitions)]
 pub struct YamlEmitter<'a> {
@@ -125,6 +128,87 @@ fn escape_str(wr: &mut dyn fmt::Write, v: &str) -> Result<(), fmt::Error> {
     Ok(())
 }
 
+pub trait Emittable {
+    fn node(&self) -> Yaml<'_>;
+}
+
+impl<E> Emittable for &E
+where
+    E: ?Sized + Emittable,
+{
+    fn node(&self) -> Yaml<'_> {
+        (**self).node()
+    }
+}
+
+impl Emittable for Yaml<'_> {
+    fn node(&self) -> Yaml<'_> {
+        Yaml::clone(self)
+    }
+}
+
+impl Emittable for MarkedYaml<'_> {
+    fn node(&self) -> Yaml<'_> {
+        from_marked_yaml(self)
+    }
+}
+
+impl Emittable for MarkedYamlOwned {
+    fn node(&self) -> Yaml<'_> {
+        from_marked_yaml_owned(self)
+    }
+}
+
+pub fn from_marked_yaml<'a>(input: &'a MarkedYaml) -> Yaml<'a> {
+    match &input.data {
+        crate::YamlData::Tagged(tag, node) => {
+            Yaml::Tagged(tag.clone(), Box::new(from_marked_yaml(node)))
+        }
+        crate::YamlData::Representation(content, style, tag) => {
+            Yaml::Representation(content.clone(), *style, tag.clone())
+        }
+        crate::YamlData::Value(v) => Yaml::Value(v.clone()),
+        crate::YamlData::Sequence(vec) => {
+            Yaml::Sequence(vec.iter().map(from_marked_yaml).collect())
+        }
+        crate::YamlData::Mapping(linked_hash_map) => Yaml::Mapping(
+            linked_hash_map
+                .iter()
+                .map(|(k, v)| (from_marked_yaml(k), from_marked_yaml(v)))
+                .collect(),
+        ),
+        crate::YamlData::Alias(a) => Yaml::Alias(*a),
+        crate::YamlData::BadValue => Yaml::BadValue,
+    }
+}
+
+pub fn from_marked_yaml_owned(input: &MarkedYamlOwned) -> Yaml<'_> {
+    match &input.data {
+        crate::YamlDataOwned::Tagged(tag, node) => Yaml::Tagged(
+            std::borrow::Cow::Borrowed(tag),
+            Box::new(from_marked_yaml_owned(node)),
+        ),
+        crate::YamlDataOwned::Representation(content, style, tag) => Yaml::Representation(
+            std::borrow::Cow::Borrowed(content.as_str()),
+            *style,
+            tag.as_ref().map(std::borrow::Cow::Borrowed),
+        ),
+        crate::YamlDataOwned::Value(v) => Yaml::Value(v.as_scalar()),
+        crate::YamlDataOwned::Sequence(vec) => {
+            let items: Vec<Yaml<'_>> = vec.iter().map(from_marked_yaml_owned).collect();
+            Yaml::Sequence(items)
+        }
+        crate::YamlDataOwned::Mapping(linked_hash_map) => Yaml::Mapping(
+            linked_hash_map
+                .iter()
+                .map(|(k, v)| (from_marked_yaml_owned(k), from_marked_yaml_owned(v)))
+                .collect(),
+        ),
+        crate::YamlDataOwned::Alias(a) => Yaml::Alias(*a),
+        crate::YamlDataOwned::BadValue => Yaml::BadValue,
+    }
+}
+
 impl<'a> YamlEmitter<'a> {
     /// Create a new emitter serializing into `writer`.
     pub fn new(writer: &'a mut dyn fmt::Write) -> Self {
@@ -177,7 +261,8 @@ impl<'a> YamlEmitter<'a> {
     /// foo: |-
     ///   bar!
     ///   bar!
-    /// baz: 42");
+    /// baz: 42
+    /// ");
     /// ```
     ///
     /// [literal style]: https://yaml.org/spec/1.2/spec.html#id2795688
@@ -194,11 +279,13 @@ impl<'a> YamlEmitter<'a> {
     /// Dump Yaml to an output stream.
     /// # Errors
     /// Returns `EmitError` when an error occurs.
-    pub fn dump(&mut self, doc: &Yaml) -> EmitResult {
+    pub fn dump<Y: Emittable>(&mut self, doc: &Y) -> EmitResult {
         // write DocumentStart
         writeln!(self.writer, "---")?;
         self.level = -1;
-        self.emit_node(doc)
+        let node = doc.node();
+        self.emit_node(&node)?;
+        writeln!(self.writer).map_err(EmitError::FmtError)
     }
 
     fn write_indent(&mut self) -> EmitResult {
