@@ -34,7 +34,7 @@ rust-version = "1.65.0"
 arraydeque = { version = "0.5.1", default-features = false }
 encoding_rs = { version = "0.8.33" }
 # Keep in sync with hashlink to reduce dependency duplication
-hashbrown = { version = "0.15", default-features = false, features = ["default-hasher"] }
+hashbrown = { version = "0.16", default-features = false, features = ["default-hasher"] }
 hashlink = "0.10"
 libtest-mimic = "0.8.1"
 miette = { version = "7.5.0", features = ["fancy"] }
