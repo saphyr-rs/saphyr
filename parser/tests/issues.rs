@@ -404,3 +404,33 @@ fn test_issue37() {
         ]
     );
 }
+
+#[test]
+fn test_issue84() {
+    // https://github.com/saphyr-rs/saphyr/issues/84
+    let s = r"hello:
+  world: this is a string
+    --- still a string";
+
+    assert_eq!(
+        run_parser(s).unwrap(),
+        [
+            Event::StreamStart,
+            Event::DocumentStart(false),
+            Event::MappingStart(0, None),
+            Event::Scalar("hello".into(), ScalarStyle::Plain, 0, None),
+            Event::MappingStart(0, None),
+            Event::Scalar("world".into(), ScalarStyle::Plain, 0, None),
+            Event::Scalar(
+                "this is a string --- still a string".into(),
+                ScalarStyle::Plain,
+                0,
+                None
+            ),
+            Event::MappingEnd,
+            Event::MappingEnd,
+            Event::DocumentEnd,
+            Event::StreamEnd,
+        ]
+    );
+}
