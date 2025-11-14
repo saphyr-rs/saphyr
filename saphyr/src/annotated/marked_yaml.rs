@@ -123,7 +123,7 @@ impl core::hash::Hash for MarkedYaml<'_> {
 }
 
 impl SafelyIndex for MarkedYaml<'_> {
-    fn get(&self, key: impl Into<crate::Accessor>) -> Option<&Self> {
+    fn get(&self, key: impl Into<Accessor>) -> Option<&Self> {
         match key.into() {
             Accessor::Field(f) => self.data.as_mapping_get(f.as_str()),
             Accessor::Index(i) => self.data.as_sequence_get(i),

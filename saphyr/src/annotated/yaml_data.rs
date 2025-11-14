@@ -121,10 +121,10 @@ define_yaml_object_impl!(
     < 'input, Node>,
     where {
         Node: core::hash::Hash
-            + core::cmp::Eq
+            + Eq
             + From<Self>
             + AnnotatedNode
-            + for<'a> core::cmp::PartialEq<Node::HashKey<'a>>,
+            + for<'a> PartialEq<Node::HashKey<'a>>,
     },
     mappingtype = AnnotatedMapping<'input, Node>,
     sequencetype = AnnotatedSequence<Node>,
@@ -136,11 +136,7 @@ define_yaml_object_impl!(
 
 impl<'input, Node> YamlData<'input, Node>
 where
-    Node: core::hash::Hash
-        + core::cmp::Eq
-        + From<Self>
-        + AnnotatedNode
-        + for<'a> core::cmp::PartialEq<Node::HashKey<'a>>,
+    Node: core::hash::Hash + Eq + From<Self> + AnnotatedNode + for<'a> PartialEq<Node::HashKey<'a>>,
 {
     /// Take the contained node out of `Self`, leaving a `BadValue` in its place.
     #[must_use]
@@ -208,11 +204,7 @@ where
 
 impl<'input, Node> IntoIterator for YamlData<'input, Node>
 where
-    Node: core::hash::Hash
-        + core::cmp::Eq
-        + From<Self>
-        + AnnotatedNode
-        + for<'a> core::cmp::PartialEq<Node::HashKey<'a>>,
+    Node: core::hash::Hash + Eq + From<Self> + AnnotatedNode + for<'a> PartialEq<Node::HashKey<'a>>,
 {
     type Item = Node;
     type IntoIter = AnnotatedYamlIter<'input, Node>;
@@ -229,7 +221,7 @@ where
 #[allow(clippy::module_name_repetitions)]
 pub struct AnnotatedYamlIter<'input, Node>
 where
-    Node: core::hash::Hash + core::cmp::Eq + From<YamlData<'input, Node>> + AnnotatedNode,
+    Node: core::hash::Hash + Eq + From<YamlData<'input, Node>> + AnnotatedNode,
 {
     yaml: alloc::vec::IntoIter<Node>,
     marker: PhantomData<&'input ()>,
@@ -237,7 +229,7 @@ where
 
 impl<'input, Node> Iterator for AnnotatedYamlIter<'input, Node>
 where
-    Node: core::hash::Hash + core::cmp::Eq + From<YamlData<'input, Node>> + AnnotatedNode,
+    Node: core::hash::Hash + Eq + From<YamlData<'input, Node>> + AnnotatedNode,
 {
     type Item = Node;
 

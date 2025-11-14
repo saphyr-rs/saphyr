@@ -21,7 +21,7 @@ use crate::{annotated::AnnotatedNodeOwned, ScalarOwned};
 #[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
 pub enum YamlDataOwned<Node>
 where
-    Node: core::hash::Hash + core::cmp::Eq + From<Self> + AnnotatedNodeOwned,
+    Node: core::hash::Hash + Eq + From<Self> + AnnotatedNodeOwned,
 {
     /// The raw string from the input.
     ///
@@ -73,10 +73,10 @@ define_yaml_object_impl!(
     < Node>,
     where {
         Node: core::hash::Hash
-            + core::cmp::Eq
+            + Eq
             + From<Self>
             + AnnotatedNodeOwned
-            + core::cmp::PartialEq<Node::HashKey>,
+            + PartialEq<Node::HashKey>,
     },
     mappingtype = AnnotatedMappingOwned<Node>,
     sequencetype = AnnotatedSequenceOwned<Node>,
@@ -88,18 +88,12 @@ define_yaml_object_impl!(
 
 impl<Node> YamlDataOwned<Node>
 where
-    Node: core::hash::Hash
-        + core::cmp::Eq
-        + From<Self>
-        + AnnotatedNodeOwned
-        + core::cmp::PartialEq<Node::HashKey>,
+    Node: core::hash::Hash + Eq + From<Self> + AnnotatedNodeOwned + PartialEq<Node::HashKey>,
 {
     /// Take the contained node out of `Self`, leaving a `BadValue` in its place.
     #[must_use]
-    pub fn take(&mut self) -> Self {
-        let mut taken_out = Self::BadValue;
-        core::mem::swap(self, &mut taken_out);
-        taken_out
+    fn take(&mut self) -> Self {
+        core::mem::replace(self, Self::BadValue)
     }
 
     /// Implementation detail for [`Self::as_mapping_get`], which is generated from a macro.
@@ -159,11 +153,7 @@ where
 
 impl<Node> IntoIterator for YamlDataOwned<Node>
 where
-    Node: core::hash::Hash
-        + core::cmp::Eq
-        + From<Self>
-        + AnnotatedNodeOwned
-        + core::cmp::PartialEq<Node::HashKey>,
+    Node: core::hash::Hash + Eq + From<Self> + AnnotatedNodeOwned + PartialEq<Node::HashKey>,
 {
     type Item = Node;
     type IntoIter = AnnotatedYamlOwnedIter<Node>;
@@ -179,14 +169,14 @@ where
 #[allow(clippy::module_name_repetitions)]
 pub struct AnnotatedYamlOwnedIter<Node>
 where
-    Node: core::hash::Hash + core::cmp::Eq + From<YamlDataOwned<Node>> + AnnotatedNodeOwned,
+    Node: core::hash::Hash + Eq + From<YamlDataOwned<Node>> + AnnotatedNodeOwned,
 {
     yaml: alloc::vec::IntoIter<Node>,
 }
 
 impl<Node> Iterator for AnnotatedYamlOwnedIter<Node>
 where
-    Node: core::hash::Hash + core::cmp::Eq + From<YamlDataOwned<Node>> + AnnotatedNodeOwned,
+    Node: core::hash::Hash + Eq + From<YamlDataOwned<Node>> + AnnotatedNodeOwned,
 {
     type Item = Node;
 

@@ -48,10 +48,25 @@ pub type EmitResult = Result<(), EmitError>;
 fn escape_str(wr: &mut dyn fmt::Write, v: &str) -> Result<(), fmt::Error> {
     wr.write_str("\"")?;
 
+    let bytes = v.as_bytes();
     let mut start = 0;
 
-    for (i, byte) in v.bytes().enumerate() {
-        let escaped = match byte {
+    while start < bytes.len() {
+        let Some(i) = bytes[start..]
+            .iter()
+            .position(|&b| matches!(b, b'"' | b'\\' | b'\x00'..=b'\x1f' | b'\x7f'))
+        else {
+            wr.write_str(&v[start..])?;
+            break;
+        };
+
+        let i = start + i;
+
+        if start < i {
+            wr.write_str(&v[start..i])?;
+        }
+
+        let escaped = match bytes[i] {
             b'"' => "\\\"",
             b'\\' => "\\\\",
             b'\x00' => "\\u0000",
@@ -87,20 +102,11 @@ fn escape_str(wr: &mut dyn fmt::Write, v: &str) -> Result<(), fmt::Error> {
             b'\x1e' => "\\u001e",
             b'\x1f' => "\\u001f",
             b'\x7f' => "\\u007f",
-            _ => continue,
+            _ => unreachable!(),
         };
 
-        if start < i {
-            wr.write_str(&v[start..i])?;
-        }
-
         wr.write_str(escaped)?;
-
         start = i + 1;
-    }
-
-    if start != v.len() {
-        wr.write_str(&v[start..])?;
     }
 
     wr.write_str("\"")?;
