@@ -175,33 +175,55 @@ impl<'input> Scalar<'input> {
     /// Returns the parsed [`Scalar`].
     #[must_use]
     pub fn parse_from_cow(v: Cow<'input, str>) -> Self {
-        if let Some(number) = v.strip_prefix("0x") {
-            if let Ok(i) = i64::from_str_radix(number, 16) {
-                return Self::Integer(i);
-            }
-        } else if let Some(number) = v.strip_prefix("0o") {
-            if let Ok(i) = i64::from_str_radix(number, 8) {
-                return Self::Integer(i);
-            }
-        } else if let Some(number) = v.strip_prefix('+') {
-            if let Ok(i) = number.parse::<i64>() {
-                return Self::Integer(i);
+        let s = &*v;
+        let bytes = s.as_bytes();
+
+        if bytes.len() >= 2 {
+            match (bytes[0], bytes[1]) {
+                (b'0', b'x') => {
+                    if let Ok(i) = i64::from_str_radix(&s[2..], 16) {
+                        return Self::Integer(i);
+                    }
+                }
+                (b'0', b'o') => {
+                    if let Ok(i) = i64::from_str_radix(&s[2..], 8) {
+                        return Self::Integer(i);
+                    }
+                }
+                (b'+', _) => {
+                    if let Ok(i) = s[1..].parse::<i64>() {
+                        return Self::Integer(i);
+                    }
+                }
+                _ => {}
             }
         }
-        match &*v {
-            "~" | "null" | "Null" | "NULL" => Self::Null,
-            "true" | "True" | "TRUE" => Self::Boolean(true),
-            "false" | "False" | "FALSE" => Self::Boolean(false),
-            _ => {
-                if let Ok(integer) = v.parse::<i64>() {
-                    Self::Integer(integer)
-                } else if let Some(float) = parse_core_schema_fp(&v) {
-                    Self::FloatingPoint(float.into())
-                } else {
-                    Self::String(v)
+
+        match bytes.len() {
+            1 if bytes[0] == b'~' => return Self::Null,
+            4 => {
+                let f = bytes[0] & 0xDF;
+                if f == b'N' && matches!(s, "null" | "Null" | "NULL") {
+                    return Self::Null;
+                } else if f == b'T' && matches!(s, "true" | "True" | "TRUE") {
+                    return Self::Boolean(true);
                 }
             }
+            5 if matches!(s, "false" | "False" | "FALSE") => {
+                return Self::Boolean(false);
+            }
+            _ => {}
         }
+
+        if let Ok(integer) = s.parse::<i64>() {
+            return Self::Integer(integer);
+        }
+
+        if let Some(float) = parse_core_schema_fp(s) {
+            return Self::FloatingPoint(float.into());
+        }
+
+        Self::String(v)
     }
 }
 

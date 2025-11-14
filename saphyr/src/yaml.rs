@@ -192,9 +192,7 @@ impl<'input> LoadableYamlNode<'input> for Yaml<'input> {
     }
 
     fn take(&mut self) -> Self {
-        let mut taken_out = Yaml::BadValue;
-        core::mem::swap(&mut taken_out, self);
-        taken_out
+        core::mem::replace(self, Yaml::BadValue)
     }
 }
 

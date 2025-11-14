@@ -69,10 +69,10 @@ pub use yaml_data_owned::{AnnotatedMappingOwned, AnnotatedSequenceOwned, YamlDat
 ///
 /// [`LoadableYamlNode::HashKey`]: crate::loader::LoadableYamlNode::HashKey
 #[allow(clippy::module_name_repetitions)]
-pub trait AnnotatedNode: core::hash::Hash + core::cmp::Eq {
+pub trait AnnotatedNode: core::hash::Hash + Eq {
     /// The type used as the key in the [`YamlData::Mapping`] variant.
     type HashKey<'a>: From<YamlData<'a, Self::HashKey<'a>>>
-        + for<'b> core::cmp::PartialEq<Self::HashKey<'b>>
+        + for<'b> PartialEq<Self::HashKey<'b>>
         + AnnotatedNode;
 
     /// See [`YamlData::parse_representation_recursive`].
@@ -87,11 +87,9 @@ pub trait AnnotatedNode: core::hash::Hash + core::cmp::Eq {
 ///
 /// [`LoadableYamlNode::HashKey`]: crate::loader::LoadableYamlNode::HashKey
 #[allow(clippy::module_name_repetitions)]
-pub trait AnnotatedNodeOwned: core::hash::Hash + core::cmp::Eq {
+pub trait AnnotatedNodeOwned: core::hash::Hash + Eq {
     /// The type used as the key in the [`YamlDataOwned::Mapping`] variant.
-    type HashKey: From<YamlDataOwned<Self::HashKey>>
-        + core::cmp::PartialEq<Self::HashKey>
-        + AnnotatedNodeOwned;
+    type HashKey: From<YamlDataOwned<Self::HashKey>> + PartialEq<Self::HashKey> + AnnotatedNodeOwned;
 
     /// See [`YamlData::parse_representation_recursive`].
     fn parse_representation_recursive(&mut self) -> bool;

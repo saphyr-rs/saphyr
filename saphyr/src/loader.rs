@@ -371,7 +371,7 @@ pub enum LoadError {
     Scan(#[source] ScanError),
     /// A decoding error (e.g.: Invalid UTF-8).
     #[error("{0}")]
-    Decode(alloc::borrow::Cow<'static, str>),
+    Decode(Cow<'static, str>),
 }
 
 #[cfg(feature = "encoding")]
