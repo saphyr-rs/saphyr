@@ -181,6 +181,23 @@ pub struct Parser<'input, T: Input> {
     keep_tags: bool,
 }
 
+impl<'input, T: Input + Clone> Clone for Parser<'input, T> {
+    fn clone(&self) -> Self {
+        Self {
+            scanner: self.scanner.clone(),
+            states: self.states.clone(),
+            state: self.state,
+            token: self.token.clone(),
+            current: self.current.clone(),
+            anchors: self.anchors.clone(),
+            anchor_id_count: self.anchor_id_count,
+            tags: self.tags.clone(),
+            stream_end_emitted: self.stream_end_emitted,
+            keep_tags: self.keep_tags,
+        }
+    }
+}
+
 /// Trait to be implemented in order to use the low-level parsing API.
 ///
 /// The low-level parsing API is event-based (a push parser), calling [`EventReceiver::on_event`]
