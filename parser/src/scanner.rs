@@ -373,7 +373,7 @@ struct Indent {
 ///
 /// [`FlowMappingStart`]: TokenType::FlowMappingStart
 /// [`FlowMappingEnd`]: TokenType::FlowMappingEnd
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 enum ImplicitMappingState {
     /// It is possible there is an implicit mapping.
     ///
@@ -467,6 +467,33 @@ pub struct Scanner<'input, T> {
     buf_leading_break: String,
     buf_trailing_breaks: String,
     buf_whitespaces: String,
+}
+
+impl<'input, T: Input + Clone> Clone for Scanner<'input, T> {
+    fn clone(&self) -> Self {
+        Self {
+            input: self.input.clone(),
+            mark: self.mark,
+            tokens: self.tokens.clone(),
+            error: self.error.clone(),
+            stream_start_produced: self.stream_start_produced,
+            stream_end_produced: self.stream_end_produced,
+            adjacent_value_allowed_at: self.adjacent_value_allowed_at,
+            simple_key_allowed: self.simple_key_allowed,
+            simple_keys: self.simple_keys.clone(),
+            indent: self.indent,
+            indents: self.indents.clone(),
+            flow_level: self.flow_level,
+            tokens_parsed: self.tokens_parsed,
+            token_available: self.token_available,
+            leading_whitespace: self.leading_whitespace,
+            flow_mapping_started: self.flow_mapping_started,
+            implicit_flow_mapping_states: self.implicit_flow_mapping_states.clone(),
+            buf_leading_break: self.buf_leading_break.clone(),
+            buf_trailing_breaks: self.buf_trailing_breaks.clone(),
+            buf_whitespaces: self.buf_whitespaces.clone(),
+        }
+    }
 }
 
 impl<'input, T: Input> Iterator for Scanner<'input, T> {
