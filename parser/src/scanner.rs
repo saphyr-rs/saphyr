@@ -1412,6 +1412,11 @@ impl<'input, T: Input> Scanner<'input, T> {
     }
 
     fn fetch_flow_collection_end(&mut self, tok: TokenType<'input>) -> ScanResult {
+        // A closing bracket without a corresponding opening is invalid YAML.
+        if self.flow_level == 0 {
+            return Err(ScanError::new_str(self.mark, "misplaced bracket"));
+        }
+
         self.remove_simple_key()?;
         self.decrease_flow_level();
 
