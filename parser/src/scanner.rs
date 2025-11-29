@@ -872,8 +872,18 @@ impl<'input, T: Input> Scanner<'input, T> {
         // If a plain scalar was interrupted by a comment, and the next line could
         // continue the scalar in block context, this is invalid.
         if let Some(err_mark) = self.interrupted_plain_by_comment.take() {
+            // Ensure enough lookahead for the check below (peek and peek_nth) and for
+            // document indicator detection which needs 4 chars.
+            self.input.lookahead(4);
+            // BS4K should only trigger when the continuation would start on the immediate next
+            // line (no intervening empty/comment-only lines). A blank line resets the folding
+            // opportunity and thus should not error.
+            let is_immediate_next_line = self.mark.line == err_mark.line + 1;
             if self.flow_level == 0
+                && is_immediate_next_line
                 && self.mark.col as isize > self.indent
+                && !self.input.next_is_z()
+                && !self.input.next_is_document_indicator()
                 && self.input.next_can_be_plain_scalar(false)
             {
                 return Err(ScanError::new_str(

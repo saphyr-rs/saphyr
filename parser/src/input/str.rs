@@ -243,22 +243,12 @@ impl Input for StrInput<'_> {
     #[allow(clippy::inline_always)]
     #[inline(always)]
     fn next_can_be_plain_scalar(&self, in_flow: bool) -> bool {
-        let c = self.buffer.as_bytes()[0];
-        if self.buffer.len() > 1 {
-            let nc = self.buffer.as_bytes()[1];
-            match c {
-                // indicators can end a plain scalar, see 7.3.3. Plain Style
-                b':' if is_blank_or_breakz(nc as char) || (in_flow && is_flow(nc as char)) => false,
-                c if in_flow && is_flow(c as char) => false,
-                _ => true,
-            }
-        } else {
-            match c {
-                // indicators can end a plain scalar, see 7.3.3. Plain Style
-                b':' => false,
-                c if in_flow && is_flow(c as char) => false,
-                _ => true,
-            }
+        let nc = self.peek_nth(1);
+        match self.peek() {
+            // indicators can end a plain scalar, see 7.3.3. Plain Style
+            ':' if is_blank_or_breakz(nc) || (in_flow && is_flow(nc)) => false,
+            c if in_flow && is_flow(c) => false,
+            _ => true,
         }
     }
 
