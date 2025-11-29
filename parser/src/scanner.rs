@@ -464,6 +464,9 @@ pub struct Scanner<'input, T> {
     /// [`Possible`]: ImplicitMappingState::Possible
     /// [`Inside`]: ImplicitMappingState::Inside
     implicit_flow_mapping_states: Vec<ImplicitMappingState>,
+    /// If a plain scalar was terminated by a `#` comment on its line, we set this
+    /// to detect an illegal multiline continuation on the following line.
+    interrupted_plain_by_comment: Option<Marker>,
     buf_leading_break: String,
     buf_trailing_breaks: String,
     buf_whitespaces: String,
@@ -519,6 +522,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             leading_whitespace: true,
             flow_mapping_started: false,
             implicit_flow_mapping_states: vec![],
+            interrupted_plain_by_comment: None,
 
             buf_leading_break: String::new(),
             buf_trailing_breaks: String::new(),
@@ -863,6 +867,19 @@ impl<'input, T: Input> Scanner<'input, T> {
                     self.mark.col += comment_length;
                 }
                 _ => break,
+            }
+        }
+        // If a plain scalar was interrupted by a comment, and the next line could
+        // continue the scalar in block context, this is invalid.
+        if let Some(err_mark) = self.interrupted_plain_by_comment.take() {
+            if self.flow_level == 0
+                && self.mark.col as isize > self.indent
+                && self.input.next_can_be_plain_scalar(false)
+            {
+                return Err(ScanError::new_str(
+                    err_mark,
+                    "comment intercepting the multiline text",
+                ));
             }
         }
         Ok(())
@@ -2192,6 +2209,13 @@ impl<'input, T: Input> Scanner<'input, T> {
             if (self.leading_whitespace && self.input.next_is_document_indicator())
                 || self.input.peek() == '#'
             {
+                // BS4K: If a `#` starts a comment after some separation spaces following content
+                // of a plain scalar in block context, and there is potential continuation on the
+                // next line, this is invalid. We cannot decide yet if there will be continuation,
+                // so record that a comment interrupted a plain scalar.
+                if self.input.peek() == '#' && !string.is_empty() && !self.buf_whitespaces.is_empty() && self.flow_level == 0 {
+                    self.interrupted_plain_by_comment = Some(self.mark);
+                }
                 break;
             }
 
