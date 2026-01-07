@@ -192,8 +192,6 @@ impl LoadableYamlNode<'_> for YamlOwned {
     fn sequence_mut(&mut self) -> &mut Vec<Self> {
         match self {
             Self::Sequence(vec) => vec,
-            // Checked the type just above. Can't just `if let Some(vec) = self.as_vec_mut` as this
-            // create a double mutable borrow with the else branch.
             Self::Tagged(_, node) => node.sequence_mut(),
             _ => panic!("Called sequence_mut on a non-array"),
         }
@@ -202,8 +200,6 @@ impl LoadableYamlNode<'_> for YamlOwned {
     fn mapping_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
         match self {
             Self::Mapping(map) => map,
-            // Checked the type just above. Can't just `if let Some(map) = self.as_mapping_mut` as
-            // this create a double mutable borrow with the else branch.
             Self::Tagged(_, node) => node.mapping_mut(),
             _ => panic!("Called mapping_mut on a non-array"),
         }

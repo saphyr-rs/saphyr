@@ -594,7 +594,7 @@ impl<'key $(, $($generic),+)? > Index<&'key str> for $yaml $( where $($whereclau
     /// # Panics
     /// This function panics if the key given does not exist within `self` (as per [`Index`]).
     ///
-    /// This function also panics if `self` is not a [`$t::Mapping`].
+    /// This function also panics if `self` is not a `$t::Mapping`.
     fn index(&self, idx: &'key str) -> &$nodetype {
         match self.as_mapping_get_impl(idx) {
             Some(value) => value,
@@ -615,7 +615,7 @@ impl<'key $(, $($generic),+)?> IndexMut<&'key str> for $yaml $( where $($wherecl
     /// # Panics
     /// This function panics if the key given does not exist within `self` (as per [`Index`]).
     ///
-    /// This function also panics if `self` is not a [`$t::Mapping`].
+    /// This function also panics if `self` is not a `$t::Mapping`.
     fn index_mut(&mut self, idx: &'key str) -> &mut $nodetype {
         assert!(
             matches!(self, Self::Mapping(_)),
@@ -637,11 +637,11 @@ impl $(<$($generic),+>)? Index<usize> for $yaml $( where $($whereclause)+ )? {
     ///
     /// # Panics
     /// This function panics if the index given is out of range (as per [`Index`]). If `self` is a
-    /// [`$t::Sequence`], this is when the index is bigger or equal to the length of the underlying
-    /// `Vec`. If `self` is a [`$t::Mapping`], this is when the mapping sequence
+    /// `$t::Sequence`, this is when the index is bigger or equal to the length of the underlying
+    /// `Vec`. If `self` is a `$t::Mapping`, this is when the mapping sequence
     /// does not contain [`Scalar::Integer`]`(idx)` as a key.
     ///
-    /// This function also panics if `self` is not a [`$t::Sequence`] nor a [`$t::Mapping`].
+    /// This function also panics if `self` is not a `$t::Sequence` nor a `$t::Mapping`.
     ///
     /// [`Scalar::Integer`]: `crate::Scalar::Integer`
     fn index(&self, idx: usize) -> &$nodetype {
@@ -672,11 +672,11 @@ impl $(<$($generic),+>)? IndexMut<usize> for $yaml $( where $($whereclause)+ )? 
     ///
     /// # Panics
     /// This function panics if the index given is out of range (as per [`IndexMut`]). If `self` is
-    /// a [`$t::Sequence`], this is when the index is bigger or equal to the length of the
-    /// underlying `Vec`. If `self` is a [`$t::Mapping`], this is when the mapping sequence does
+    /// a `$t::Sequence`, this is when the index is bigger or equal to the length of the
+    /// underlying `Vec`. If `self` is a `$t::Mapping`, this is when the mapping sequence does
     /// not contain [`Scalar::Integer`]`(idx)` as a key.
     ///
-    /// This function also panics if `self` is not a [`$t::Sequence`] nor a [`$t::Mapping`].
+    /// This function also panics if `self` is not a `$t::Sequence` nor a `$t::Mapping`.
     ///
     /// [`Scalar::Integer`]: `crate::Scalar::Integer`
     fn index_mut(&mut self, idx: usize) -> &mut $nodetype {
