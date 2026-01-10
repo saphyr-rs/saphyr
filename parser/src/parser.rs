@@ -671,6 +671,7 @@ impl<'input, T: Input> Parser<'input, T> {
                 _,
                 TokenType::VersionDirective(..)
                 | TokenType::TagDirective(..)
+                | TokenType::ReservedDirective(..)
                 | TokenType::DocumentStart,
             ) => {
                 // explicit document
@@ -714,6 +715,9 @@ impl<'input, T: Input> Parser<'input, T> {
                     }
                     tags.insert(handle.to_string(), prefix.to_string());
                 }
+                Token(_, TokenType::ReservedDirective(_, _)) => {
+                    // Reserved directives are ignored
+                }
                 _ => break,
             }
             self.tags = tags;
@@ -750,6 +754,7 @@ impl<'input, T: Input> Parser<'input, T> {
                 mark,
                 TokenType::VersionDirective(..)
                 | TokenType::TagDirective(..)
+                | TokenType::ReservedDirective(..)
                 | TokenType::DocumentStart
                 | TokenType::DocumentEnd
                 | TokenType::StreamEnd,
@@ -782,8 +787,12 @@ impl<'input, T: Input> Parser<'input, T> {
         if explicit_end {
             self.state = State::ImplicitDocumentStart;
         } else {
-            if let Token(span, TokenType::VersionDirective(..) | TokenType::TagDirective(..)) =
-                *self.peek_token()?
+            if let Token(
+                span,
+                TokenType::VersionDirective(..)
+                | TokenType::TagDirective(..)
+                | TokenType::ReservedDirective(..),
+            ) = *self.peek_token()?
             {
                 return Err(ScanError::new_str(
                     span.start,

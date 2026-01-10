@@ -369,6 +369,34 @@ impl Input for StrInput<'_> {
 
         n_bytes_to_append
     }
+
+    fn fetch_while_is_yaml_non_space(&mut self, out: &mut String) -> usize {
+        let mut not_non_space = None;
+
+        // Skip while we have non-space characters.
+        let mut chars = self.buffer.chars();
+        for c in chars.by_ref() {
+            if !crate::char_traits::is_yaml_non_space(c) {
+                not_non_space = Some(c);
+                break;
+            }
+        }
+
+        let remaining_string = if let Some(c) = not_non_space {
+            let n_bytes_read = chars.as_str().as_ptr() as usize - self.buffer.as_ptr() as usize;
+            let last_char_bytes = c.len_utf8();
+            &self.buffer[n_bytes_read - last_char_bytes..]
+        } else {
+            chars.as_str()
+        };
+
+        let n_bytes_to_append = remaining_string.as_ptr() as usize - self.buffer.as_ptr() as usize;
+        out.reserve(n_bytes_to_append);
+        out.push_str(&self.buffer[..n_bytes_to_append]);
+        self.buffer = remaining_string;
+
+        n_bytes_to_append
+    }
 }
 
 /// The buffer size we return to the scanner.

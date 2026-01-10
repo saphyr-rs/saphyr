@@ -242,6 +242,13 @@ pub enum TokenType<'input> {
     ),
     /// A regular YAML scalar.
     Scalar(ScalarStyle, Cow<'input, str>),
+    /// A reserved YAML directive.
+    ReservedDirective(
+        /// Name
+        String,
+        /// Parameters
+        Vec<String>,
+    ),
 }
 
 /// A scanner token.
@@ -969,19 +976,26 @@ impl<'input, T: Input> Scanner<'input, T> {
         let tok = match name.as_ref() {
             "YAML" => self.scan_version_directive_value(&start_mark)?,
             "TAG" => self.scan_tag_directive_value(&start_mark)?,
-            // XXX This should be a warning instead of an error
             _ => {
-                // skip current line
-                let line_len = self.input.skip_while_non_breakz();
-                self.mark.index += line_len;
-                self.mark.col += line_len;
-                // XXX return an empty TagDirective token
+                let mut params = Vec::new();
+                while self.input.next_is_blank() {
+                    let n_blanks = self.input.skip_while_blank();
+                    self.mark.index += n_blanks;
+                    self.mark.col += n_blanks;
+
+                    if !is_blank_or_breakz(self.input.peek()) {
+                        let mut param = String::new();
+                        let n_chars = self.input.fetch_while_is_yaml_non_space(&mut param);
+                        self.mark.index += n_chars;
+                        self.mark.col += n_chars;
+                        params.push(param);
+                    }
+                }
+
                 Token(
                     Span::new(start_mark, self.mark),
-                    TokenType::TagDirective(Cow::default(), Cow::default()),
+                    TokenType::ReservedDirective(name, params),
                 )
-                // return Err(ScanError::new_str(start_mark,
-                //     "while scanning a directive, found unknown directive name"))
             }
         };
 
@@ -1026,7 +1040,7 @@ impl<'input, T: Input> Scanner<'input, T> {
         let start_mark = self.mark;
         let mut string = String::new();
 
-        let n_chars = self.input.fetch_while_is_alpha(&mut string);
+        let n_chars = self.input.fetch_while_is_yaml_non_space(&mut string);
         self.mark.index += n_chars;
         self.mark.col += n_chars;
 
