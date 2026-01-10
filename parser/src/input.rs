@@ -424,6 +424,23 @@ pub trait Input {
         }
         n_chars
     }
+
+    /// Fetch characters as long as they satisfy `is_yaml_non_space(c)`.
+    ///
+    /// The characters are consumed from the input.
+    ///
+    /// # Return
+    /// Return the number of characters that were consumed. The number of characters returned can
+    /// be used to advance the index and column, since no end-of-line character will be consumed.
+    fn fetch_while_is_yaml_non_space(&mut self, out: &mut String) -> usize {
+        let mut n_chars = 0;
+        while crate::char_traits::is_yaml_non_space(self.look_ch()) {
+            n_chars += 1;
+            out.push(self.peek());
+            self.skip();
+        }
+        n_chars
+    }
 }
 
 /// Behavior to adopt regarding treating tabs as whitespace.
