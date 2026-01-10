@@ -8,3 +8,6 @@
 *.swp
 fuzz/artifacts
 fuzz/corpus
+
+# IDEs
+.idea/
