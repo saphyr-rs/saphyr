@@ -190,36 +190,23 @@ impl LoadableYamlNode<'_> for YamlOwned {
     }
 
     fn sequence_mut(&mut self) -> &mut Vec<Self> {
-        if self.is_sequence() {
-            // Checked the type just above. Can't just `if let Some(vec) = self.as_vec_mut` as this
-            // create a double mutable borrow with the else branch.
-            self.as_vec_mut().unwrap()
-        } else if let Some(vec) = self.get_tagged_node_mut().and_then(YamlOwned::as_vec_mut) {
-            vec
-        } else {
-            panic!("Called sequence_mut on a non-array")
+        match self {
+            Self::Sequence(vec) => vec,
+            Self::Tagged(_, node) => node.sequence_mut(),
+            _ => panic!("Called sequence_mut on a non-array"),
         }
     }
 
     fn mapping_mut(&mut self) -> &mut LinkedHashMap<Self::HashKey, Self> {
-        if self.is_mapping() {
-            // Checked the type just above. Can't just `if let Some(map) = self.as_mapping_mut` as
-            // this create a double mutable borrow with the else branch.
-            self.as_mapping_mut().unwrap()
-        } else if let Some(map) = self
-            .get_tagged_node_mut()
-            .and_then(YamlOwned::as_mapping_mut)
-        {
-            map
-        } else {
-            panic!("Called mapping_mut on a non-array")
+        match self {
+            Self::Mapping(map) => map,
+            Self::Tagged(_, node) => node.mapping_mut(),
+            _ => panic!("Called mapping_mut on a non-array"),
         }
     }
 
     fn take(&mut self) -> Self {
-        let mut taken_out = Self::BadValue;
-        core::mem::swap(&mut taken_out, self);
-        taken_out
+        core::mem::replace(self, Self::BadValue)
     }
 }
 
@@ -229,7 +216,10 @@ impl IntoIterator for YamlOwned {
 
     fn into_iter(self) -> Self::IntoIter {
         YamlOwnedIter {
-            yaml: self.into_vec().unwrap_or_default().into_iter(),
+            yaml: match self {
+                Self::Sequence(vec) => vec.into_iter(),
+                _ => Vec::new().into_iter(),
+            },
         }
     }
 }

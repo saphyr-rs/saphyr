@@ -348,8 +348,7 @@ fn expected_events(expected_tree: &str) -> Vec<String> {
                 let idx = anchors
                     .iter()
                     .enumerate()
-                    .filter(|(_, v)| v == &name)
-                    .next_back()
+                    .rfind(|(_, v)| v == &name)
                     .unwrap()
                     .0;
                 s = s.replace(&s[start..], &format!("*{}", idx + 1));

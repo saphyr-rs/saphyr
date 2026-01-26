@@ -1,3 +1,5 @@
+#![allow(unused_assignments)]
+
 use hashlink::LinkedHashMap;
 use miette::{bail, Diagnostic, NamedSource, Result, SourceSpan};
 use rustyline::{error::ReadlineError, DefaultEditor};
