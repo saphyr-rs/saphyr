@@ -697,7 +697,10 @@ impl<'input, T: Input> Scanner<'input, T> {
             }
         }
 
-        if (self.mark.col as isize) < self.indent {
+        // Indentation rules only apply in block contexts. Inside flow-style
+        // collections (`[...]`, `{...}`), indentation is not significant per
+        // the YAML spec (§8.1.1), so we skip this check when flow_level > 0.
+        if self.flow_level == 0 && (self.mark.col as isize) < self.indent {
             return Err(ScanError::new_str(self.mark, "invalid indentation"));
         }
 
