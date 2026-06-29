@@ -21,6 +21,7 @@ commands:
   doc: RUSTDOCFLAGS="-D warnings" cargo doc ${workspace} --all-features --document-private-items
   fix: cargo clippy --all-targets ${workspace} --fix "$@" -- -D warnings
   fmt: cargo fmt
+  fuzz: CARGO_PROFILE_RELEASE_LTO=false cargo +nightly fuzz run parse
   test: |
     cargo test ${release}
     cargo test ${release} --doc
