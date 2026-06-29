@@ -18,7 +18,7 @@ commands:
     - doc
   check/clippy: cargo clippy --all-targets ${workspace} ${release} -- -D warnings
   check/fmt: cargo fmt --check
-  doc: cargo doc ${workspace} --all-features
+  doc: RUSTDOCFLAGS="-D warnings" cargo doc ${workspace} --all-features --document-private-items
   fix: cargo clippy --all-targets ${workspace} --fix "$@" -- -D warnings
   fmt: cargo fmt
   test: |
