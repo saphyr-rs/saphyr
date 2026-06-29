@@ -13,11 +13,23 @@ commands:
   check>:
     - check/clippy
     - check/fmt
+    - check/msrv
     - build
     - test
     - doc
   check/clippy: cargo clippy --all-targets ${workspace} ${release} -- -D warnings
   check/fmt: cargo fmt --check
+  check/msrv: |
+    if type cargo-msrv >/dev/null 2>&1
+    then
+        cargo msrv --path bench verify
+        cargo msrv --path bench/tools/bench_compare verify
+        cargo msrv --path bench/tools/gen_large_yaml verify
+        cargo msrv --path fuzz verify
+        cargo msrv --path parser verify
+        cargo msrv --path parser/tools/walk verify
+        cargo msrv --path saphyr verify
+    fi
   doc: RUSTDOCFLAGS="-D warnings" cargo doc ${workspace} --all-features --document-private-items
   fix: cargo clippy --all-targets ${workspace} --fix "$@" -- -D warnings
   fmt: cargo fmt
