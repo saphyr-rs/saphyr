@@ -8,23 +8,23 @@
 #   garden fix
 
 commands:
-    bench: cargo bench "$@"
-    build: cargo build --all-targets ${workspace} ${release} "$@"
-    check>:
-        - check/clippy
-        - check/fmt
-        - build
-        - test
-        - doc
-    check/clippy: cargo clippy --all-targets ${workspace} ${release} -- -D warnings
-    check/fmt: cargo fmt --check
-    doc: cargo doc ${workspace} --all-features
-    fix: cargo clippy --all-targets ${workspace} --fix "$@" -- -D warnings
-    fmt: cargo fmt
-    test: |
-      cargo test ${release}
-      cargo test ${release} --doc
-    watch: cargo watch --shell "garden check"
+  bench: cargo bench "$@"
+  build: cargo build --all-targets ${workspace} ${release} "$@"
+  check>:
+    - check/clippy
+    - check/fmt
+    - build
+    - test
+    - doc
+  check/clippy: cargo clippy --all-targets ${workspace} ${release} -- -D warnings
+  check/fmt: cargo fmt --check
+  doc: cargo doc ${workspace} --all-features
+  fix: cargo clippy --all-targets ${workspace} --fix "$@" -- -D warnings
+  fmt: cargo fmt
+  test: |
+    cargo test ${release}
+    cargo test ${release} --doc
+  watch: cargo watch --shell "garden check"
 
 variables:
   workspace: ""
@@ -36,7 +36,7 @@ environment:
 
 trees:
   saphyr-workspace:
-    description: Saphyr tools and libraries
+    description: A set of crates dedicated to parsing YAML.
     path: ${GARDEN_CONFIG_DIR}
     url: "git@github.com:saphyr-rs/saphyr.git"
     variables:
