@@ -5,6 +5,7 @@ description = "Utilities to benchmark saphyr"
 license = "MIT"
 readme = "README.md"
 edition = { workspace = true }
+rust-version = { workspace = true }
 version = { workspace = true }
 
 [dependencies]
