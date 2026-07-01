@@ -1,6 +1,6 @@
 [package]
 name = "saphyr-bench"
-authors = [ "Ethiraric <ethiraric@gmail.com>" ]
+authors = { workspace = true }
 description = "Utilities to benchmark saphyr"
 license = "MIT"
 readme = "README.md"

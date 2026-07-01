@@ -1,14 +1,12 @@
 [package]
 name = "bench_compare"
-version = "0.6.0"
-authors = [
-  "Ethiraric <ethiraric@gmail.com>"
-]
-license = "MIT OR Apache-2.0"
-description = "Run multiple YAML parsers and compare their times"
-repository = "https://github.com/Ethiraric/yaml-rust2"
+version = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
 readme = "README.md"
-edition = "2018"
+description = "Run multiple YAML parsers and compare their times"
+repository = { workspace = true }
+edition = { workspace = true }
 rust-version = "1.76.0"
 
 [dependencies]

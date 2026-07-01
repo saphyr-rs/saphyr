@@ -1,14 +1,12 @@
 [package]
 name = "gen_large_yaml"
-version = "0.6.0"
-authors = [
-  "Ethiraric <ethiraric@gmail.com>"
-]
-license = "MIT OR Apache-2.0"
+version = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
 description = "A helper to generate large YAML files"
-repository = "https://github.com/Ethiraric/yaml-rust2"
+repository = { workspace = true }
 readme = "README.md"
-edition = "2018"
+edition = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]

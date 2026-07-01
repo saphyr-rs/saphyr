@@ -1,17 +1,17 @@
 [package]
 name = "saphyr-fuzz"
 version = { workspace = true }
-publish = false
-edition = "2021"
+edition = { workspace = true }
 rust-version = "1.70.0"
+publish = false
 
 [package.metadata]
 cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-saphyr.workspace = true
-saphyr-parser.workspace = true
+saphyr = { workspace = true }
+saphyr-parser = { workspace = true }
 
 [[bin]]
 name = "parse"

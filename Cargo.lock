@@ -129,7 +129,7 @@ dependencies = [
 
 [[package]]
 name = "bench_compare"
-version = "0.6.0"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "serde",
@@ -293,7 +293,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "gen_large_yaml"
-version = "0.6.0"
+version = "0.0.7"
 dependencies = [
  "lipsum",
  "rand",
