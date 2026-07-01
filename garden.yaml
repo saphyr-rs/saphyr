@@ -34,6 +34,10 @@ commands:
   fix: cargo clippy --all-targets ${workspace} --fix "$@" -- -D warnings
   fmt: cargo fmt
   fuzz: CARGO_PROFILE_RELEASE_LTO=false cargo +nightly fuzz run parse
+  publish: |
+    cargo publish --package saphyr-parser "$@"
+    cargo publish --package saphyr "$@"
+    cargo publish --package saphyr-bench "$@"
   test: |
     cargo test ${release}
     cargo test ${release} --doc
