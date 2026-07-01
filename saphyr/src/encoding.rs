@@ -118,8 +118,6 @@ fn decode_loop(
     decoder: &mut Decoder,
     trap: YAMLDecodingTrap,
 ) -> Result<(), LoadError> {
-    use crate::loader::LoadError;
-
     output.reserve(input.len());
     let mut total_bytes_read = 0;
 
