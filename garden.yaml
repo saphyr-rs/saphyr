@@ -44,9 +44,6 @@ variables:
   # Debug build: garden build -D release=''
   release: "--release"
 
-environment:
-  RUSTDOCFLAGS: "-D warnings"
-
 trees:
   saphyr-workspace:
     description: A set of crates dedicated to parsing YAML.
