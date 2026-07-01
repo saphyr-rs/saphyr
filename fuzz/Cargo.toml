@@ -1,6 +1,6 @@
 [package]
 name = "saphyr-fuzz"
-version = "0.0.0"
+version = { workspace = true }
 publish = false
 edition = "2021"
 rust-version = "1.70.0"
