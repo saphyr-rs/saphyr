@@ -14,6 +14,7 @@ commands:
     - check/clippy
     - check/fmt
     - check/msrv
+    - check/no-std
     - build
     - test
     - doc
@@ -30,6 +31,7 @@ commands:
         cargo msrv --path parser/tools/walk verify
         cargo msrv --path saphyr verify
     fi
+  check/no-std: cargo check -p saphyr --no-default-features --target wasm32-unknown-unknown
   doc: RUSTDOCFLAGS="-D warnings" cargo doc ${workspace} --all-features --document-private-items
   fix: cargo clippy --all-targets ${workspace} --fix "$@" -- -D warnings
   fmt: cargo fmt
