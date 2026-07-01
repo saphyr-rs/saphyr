@@ -40,7 +40,7 @@ hashbrown = { version = "0.16", default-features = false, features = ["default-h
 hashlink = "0.11"
 libtest-mimic = "0.8.2"
 miette = { version = "7.6.0", features = ["fancy"] }
-ordered-float = { version = "5.1", default-features = false }
+ordered-float = { version = "5.3.0", default-features = false }
 quickcheck = "1.0"
 rustyline = "17.0.2"
 saphyr = { path = "saphyr" }
