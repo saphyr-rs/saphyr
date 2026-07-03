@@ -6,7 +6,7 @@
 
 use crate::{
     input::{str::StrInput, Input},
-    scanner::{ScalarStyle, ScanError, Scanner, Span, Token, TokenType},
+    scanner::{ScalarStyle, ScanError, ScanErrorCode, Scanner, Span, Token, TokenType},
     BufferedInput, Marker,
 };
 
@@ -411,7 +411,11 @@ impl<'input, T: Input> Parser<'input, T> {
         let token = self.scanner.next();
         match token {
             None => match self.scanner.get_error() {
-                None => Err(ScanError::new_str(self.scanner.mark(), "unexpected eof")),
+                None => Err(ScanError::new_str(
+                    self.scanner.mark(),
+                    "unexpected eof",
+                    ScanErrorCode::UnexpectedEOF,
+                )),
                 Some(e) => Err(e),
             },
             Some(tok) => Ok(tok),
@@ -474,6 +478,7 @@ impl<'input, T: Input> Parser<'input, T> {
                 return Err(ScanError::new_str(
                     span.start,
                     "did not find expected <stream-start>",
+                    ScanErrorCode::StreamStartExpected,
                 ));
             }
             recv.on_event(ev, span);
@@ -510,6 +515,7 @@ impl<'input, T: Input> Parser<'input, T> {
             return Err(ScanError::new_str(
                 span.start,
                 "did not find expected <document-start>",
+                ScanErrorCode::DocumentStartExpected,
             ));
         }
         recv.on_event(first_ev, span);
@@ -649,6 +655,7 @@ impl<'input, T: Input> Parser<'input, T> {
             Token(span, _) => Err(ScanError::new_str(
                 span.start,
                 "did not find expected <stream-start>",
+                ScanErrorCode::StreamStartExpected,
             )),
         }
     }
@@ -704,13 +711,14 @@ impl<'input, T: Input> Parser<'input, T> {
                         return Err(ScanError::new_str(
                             span.start,
                             "duplicate version directive",
+                            ScanErrorCode::DuplicateVersionDirective,
                         ));
                     }
                     version_directive_received = true;
                 }
                 Token(mark, TokenType::TagDirective(handle, prefix)) => {
                     if tags.contains_key(&**handle) {
-                        return Err(ScanError::new_str(mark.start, "the TAG directive must only be given at most once per handle in the same document"));
+                        return Err(ScanError::new_str(mark.start, "the TAG directive must only be given at most once per handle in the same document", ScanErrorCode::DuplicateTagDirective));
                     }
                     tags.insert(handle.to_string(), prefix.to_string());
                 }
@@ -737,6 +745,7 @@ impl<'input, T: Input> Parser<'input, T> {
             Token(span, _) => Err(ScanError::new_str(
                 span.start,
                 "did not find expected <document start>",
+                ScanErrorCode::DocumentStartExpected,
             )),
         }
     }
@@ -788,6 +797,7 @@ impl<'input, T: Input> Parser<'input, T> {
                 return Err(ScanError::new_str(
                     span.start,
                     "missing explicit document end marker before directive",
+                    ScanErrorCode::DocumentEndMarkerExpectedBeforeDirective,
                 ));
             }
             self.state = State::DocumentStart;
@@ -823,6 +833,7 @@ impl<'input, T: Input> Parser<'input, T> {
                             return Err(ScanError::new_str(
                                 span.start,
                                 "while parsing node, found unknown anchor",
+                                ScanErrorCode::UnknownAnchorFoundInNode,
                             ))
                         }
                         Some(id) => return Ok((Event::Alias(*id), span)),
@@ -897,6 +908,7 @@ impl<'input, T: Input> Parser<'input, T> {
             Token(span, _) => Err(ScanError::new_str(
                 span.start,
                 "while parsing a node, did not find expected node content",
+                ScanErrorCode::NodeContentExpected,
             )),
         }
     }
@@ -938,6 +950,7 @@ impl<'input, T: Input> Parser<'input, T> {
             Token(span, _) => Err(ScanError::new_str(
                 span.start,
                 "while parsing a block mapping, did not find expected key",
+                ScanErrorCode::KeyExpectedInBlockMapping,
             )),
         }
     }
@@ -986,6 +999,7 @@ impl<'input, T: Input> Parser<'input, T> {
                             Token(span, _) => return Err(ScanError::new_str(
                                 span.start,
                                 "while parsing a flow mapping, did not find expected ',' or '}'",
+                                ScanErrorCode::CommaOrClosingBracketExpectedInFlowMapping,
                             )),
                         }
                     }
@@ -1078,6 +1092,7 @@ impl<'input, T: Input> Parser<'input, T> {
                 return Err(ScanError::new_str(
                     span.start,
                     "while parsing a flow sequence, expected ',' or ']'",
+                    ScanErrorCode::CommaOrClosingBracketExpectedInFlowSequence,
                 ));
             }
             _ => { /* next */ }
@@ -1155,6 +1170,7 @@ impl<'input, T: Input> Parser<'input, T> {
             Token(span, _) => Err(ScanError::new_str(
                 span.start,
                 "while parsing a block collection, did not find expected '-' indicator",
+                ScanErrorCode::MinusIndicatorExpectedInBlockCollection,
             )),
         }
     }
@@ -1251,7 +1267,11 @@ impl<'input, T: Input> Parser<'input, T> {
                 // If the handle is of the form "!foo!", this cannot be a local handle and we need
                 // to error.
                 if handle.len() >= 2 && handle.starts_with('!') && handle.ends_with('!') {
-                    return Err(ScanError::new_str(span.start, "the handle wasn't declared"));
+                    return Err(ScanError::new_str(
+                        span.start,
+                        "the handle wasn't declared",
+                        ScanErrorCode::UndeclaredHandle,
+                    ));
                 }
                 Tag {
                     handle: handle.to_string(),

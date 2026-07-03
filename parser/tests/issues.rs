@@ -1,5 +1,5 @@
 use saphyr::Marker;
-use saphyr_parser::{Event, Parser, ScalarStyle, ScanError, Span};
+use saphyr_parser::{Event, Parser, ScalarStyle, ScanError, ScanErrorCode, Span};
 
 /// Run the parser through the string.
 ///
@@ -259,6 +259,10 @@ fn test_issue14() {
         error.to_string(),
         "while parsing a flow mapping, did not find expected ',' or '}' at byte 4 line 2 column 1"
     );
+    assert_eq!(
+        error.code(),
+        ScanErrorCode::CommaOrClosingBracketExpectedInFlowMapping
+    );
 }
 
 #[test]
@@ -270,6 +274,10 @@ fn test_issue14_v2() {
         "while parsing a flow mapping, did not find expected ',' or '}'"
     );
     assert!(error.to_string().ends_with("at byte 4 line 2 column 1"));
+    assert_eq!(
+        error.code(),
+        ScanErrorCode::CommaOrClosingBracketExpectedInFlowMapping
+    );
 }
 
 #[test]
