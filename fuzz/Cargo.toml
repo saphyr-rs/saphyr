@@ -1,9 +1,9 @@
 [package]
 name = "saphyr-fuzz"
+publish = false
 version = { workspace = true }
 edition = { workspace = true }
-rust-version = "1.70.0"
-publish = false
+rust-version = { workspace = true }
 
 [package.metadata]
 cargo-fuzz = true

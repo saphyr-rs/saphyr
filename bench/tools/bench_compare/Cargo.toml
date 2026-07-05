@@ -7,7 +7,7 @@ readme = "README.md"
 description = "Run multiple YAML parsers and compare their times"
 repository = { workspace = true }
 edition = { workspace = true }
-rust-version = "1.76.0"
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { version = "1.0.81", features = ["backtrace"] }
