@@ -15,6 +15,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - run: rustup toolchain install 1.85.0 --profile minimal --component rustfmt --component clippy --no-self-update
+      - run: rustup default 1.85.0
       - run: rustup target add wasm32v1-none
       - uses: Swatinem/rust-cache@v2
       - name: Run clippy checks
