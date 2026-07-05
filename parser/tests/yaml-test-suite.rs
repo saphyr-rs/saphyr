@@ -4,7 +4,7 @@ use std::{
     process::ExitCode,
 };
 
-use libtest_mimic::{run, Arguments, Failed, Trial};
+use libtest_mimic::{Arguments, Failed, Trial, run};
 
 use saphyr::{LoadableYamlNode, Mapping, Scalar, Yaml};
 use saphyr_parser::{

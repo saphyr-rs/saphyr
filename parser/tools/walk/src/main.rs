@@ -1,8 +1,8 @@
 #![allow(unused_assignments)]
 
 use hashlink::LinkedHashMap;
-use miette::{bail, Diagnostic, NamedSource, Result, SourceSpan};
-use rustyline::{error::ReadlineError, DefaultEditor};
+use miette::{Diagnostic, NamedSource, Result, SourceSpan, bail};
+use rustyline::{DefaultEditor, error::ReadlineError};
 use saphyr::{LoadableYamlNode, MarkedYaml};
 use thiserror::Error;
 

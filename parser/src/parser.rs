@@ -5,9 +5,9 @@
 //! YAML objects.
 
 use crate::{
-    input::{str::StrInput, Input},
-    scanner::{ScalarStyle, ScanError, Scanner, Span, Token, TokenType},
     BufferedInput, Marker,
+    input::{Input, str::StrInput},
+    scanner::{ScalarStyle, ScanError, Scanner, Span, Token, TokenType},
 };
 
 use alloc::{
@@ -710,7 +710,10 @@ impl<'input, T: Input> Parser<'input, T> {
                 }
                 Token(mark, TokenType::TagDirective(handle, prefix)) => {
                     if tags.contains_key(&**handle) {
-                        return Err(ScanError::new_str(mark.start, "the TAG directive must only be given at most once per handle in the same document"));
+                        return Err(ScanError::new_str(
+                            mark.start,
+                            "the TAG directive must only be given at most once per handle in the same document",
+                        ));
                     }
                     tags.insert(handle.to_string(), prefix.to_string());
                 }
@@ -823,7 +826,7 @@ impl<'input, T: Input> Parser<'input, T> {
                             return Err(ScanError::new_str(
                                 span.start,
                                 "while parsing node, found unknown anchor",
-                            ))
+                            ));
                         }
                         Some(id) => return Ok((Event::Alias(*id), span)),
                     }
@@ -983,10 +986,12 @@ impl<'input, T: Input> Parser<'input, T> {
                     if !first {
                         match *self.peek_token()? {
                             Token(_, TokenType::FlowEntry) => self.skip(),
-                            Token(span, _) => return Err(ScanError::new_str(
-                                span.start,
-                                "while parsing a flow mapping, did not find expected ',' or '}'",
-                            )),
+                            Token(span, _) => {
+                                return Err(ScanError::new_str(
+                                    span.start,
+                                    "while parsing a flow mapping, did not find expected ',' or '}'",
+                                ));
+                            }
                         }
                     }
 

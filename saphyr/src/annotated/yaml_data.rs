@@ -8,7 +8,7 @@ use core::{
 use hashlink::LinkedHashMap;
 use saphyr_parser::{ScalarStyle, Tag};
 
-use crate::{annotated::AnnotatedNode, Scalar};
+use crate::{Scalar, annotated::AnnotatedNode};
 
 /// YAML data for nodes that will contain annotations.
 ///
@@ -173,7 +173,6 @@ where
     fn as_mapping_get_mut_impl(&mut self, key: &str) -> Option<&mut Node> {
         match self.as_mapping_mut() {
             Some(mapping) => {
-
                 use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
 
                 // In order to work around `needle`'s lifetime being different from `h`'s, we need

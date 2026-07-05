@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
 
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 /// The path into which the generated YAML files will be written.
 const OUTPUT_DIR: &str = "bench_yaml";
@@ -79,7 +79,11 @@ impl Generator {
         words_hi: usize,
     ) -> std::io::Result<()> {
         self.gen_array(writer, items_lo, items_hi, |generator, writer| {
-            write!(writer, "{}", r#gen::words(&mut generator.rng, words_lo, words_hi))
+            write!(
+                writer,
+                "{}",
+                r#gen::words(&mut generator.rng, words_lo, words_hi)
+            )
         })
     }
 
@@ -124,13 +128,21 @@ impl Generator {
             (
                 "home".to_string(),
                 Box::new(|generator, w| {
-                    write!(w, "{}", r#gen::url(&mut generator.rng, "https", 0, 1, 0, 0, None))
+                    write!(
+                        w,
+                        "{}",
+                        r#gen::url(&mut generator.rng, "https", 0, 1, 0, 0, None)
+                    )
                 }),
             ),
             (
                 "repository".to_string(),
                 Box::new(|generator, w| {
-                    write!(w, "{}", r#gen::url(&mut generator.rng, "git", 1, 4, 10, 20, None))
+                    write!(
+                        w,
+                        "{}",
+                        r#gen::url(&mut generator.rng, "git", 1, 4, 10, 20, None)
+                    )
                 }),
             ),
             (
@@ -162,7 +174,9 @@ impl Generator {
         let fields: Vec<(String, Box<GenFn<W>>)> = vec![
             (
                 "name".to_string(),
-                Box::new(|generator, w| write!(w, "{}", r#gen::full_name(&mut generator.rng, 10, 15))),
+                Box::new(|generator, w| {
+                    write!(w, "{}", r#gen::full_name(&mut generator.rng, 10, 15))
+                }),
             ),
             (
                 "email".to_string(),

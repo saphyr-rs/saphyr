@@ -5,7 +5,7 @@ use core::ops::ControlFlow;
 
 use encoding_rs::{Decoder, DecoderResult, Encoding};
 
-use crate::{loader::LoadError, LoadableYamlNode, Yaml};
+use crate::{LoadableYamlNode, Yaml, loader::LoadError};
 
 /// The signature of the function to call when using [`YAMLDecodingTrap::Call`].
 ///

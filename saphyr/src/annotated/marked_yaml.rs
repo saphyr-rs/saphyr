@@ -8,7 +8,7 @@ use hashlink::LinkedHashMap;
 use saphyr_parser::{Marker, ScalarStyle, Span, Tag};
 
 use crate::{
-    index::SafelyIndexMut, Accessor, LoadableYamlNode, SafelyIndex, Scalar, Yaml, YamlData,
+    Accessor, LoadableYamlNode, SafelyIndex, Scalar, Yaml, YamlData, index::SafelyIndexMut,
 };
 
 /// A YAML node with [`Span`]s pointing to the start of the node.

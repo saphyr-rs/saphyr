@@ -11,7 +11,7 @@ use core::{
 use hashlink::LinkedHashMap;
 use saphyr_parser::{ScalarStyle, Tag};
 
-use crate::{annotated::AnnotatedNodeOwned, ScalarOwned};
+use crate::{ScalarOwned, annotated::AnnotatedNodeOwned};
 
 /// YAML data for nodes that will contain annotations.
 ///

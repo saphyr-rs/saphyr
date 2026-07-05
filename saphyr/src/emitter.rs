@@ -5,9 +5,8 @@ use core::fmt;
 use thiserror::Error;
 
 use crate::{
-    char_traits,
+    Scalar, char_traits,
     yaml::{Mapping, Yaml},
-    Scalar,
 };
 
 /// An error when emitting YAML.
