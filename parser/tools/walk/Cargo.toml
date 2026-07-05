@@ -1,5 +1,6 @@
 [package]
 name = "walk"
+publish = false
 readme = "README.md"
 authors = { workspace = true }
 categories = { workspace = true }
