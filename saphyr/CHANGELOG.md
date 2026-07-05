@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.0.8
+
+**Upcoming Breaking Changes**:
+
+- The Minimum Supported Rust Version will be updated to v1.82.0 in the next release.
+
+**Development**:
+
+- `ordered-float` was updated to `v5.3.0`.
+
+
 ## v0.0.7
 
 **Changes**:

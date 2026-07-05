@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.8
+
+**Upcoming Breaking Changes**:
+
+- The Minimum Supported Rust Version will be updated to v1.82.0 in the next release.
+
 ## v0.0.7
 
 **Changes**:
