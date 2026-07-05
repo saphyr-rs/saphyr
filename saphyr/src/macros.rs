@@ -165,7 +165,7 @@ impl $(< $( $generic ),+ >)? $yaml $(where $($whereclause)+)? {
             base
         );
 impl< $( $generic ),+ > $yaml $(where $($whereclause)+)? {
-    define_as_ref_pattern!(as_cow,                    &Cow<'input, str>     => Self::Value($scalartype::String(ref v))            => Some(v));
+    define_as_ref_pattern!(as_cow,                    &Cow<'input, str>     => Self::Value($scalartype::String(v))                => Some(v));
     define_as_ref_mut_pattern!(as_cow_mut,            &mut Cow<'input, str> => Self::Value($scalartype::String(ref mut v))        => Some(v));
     define_into_pattern!(into_cow,                    Cow<'input, str>      => Self::Value($scalartype::String(v))                => Some(v));
     define_as_ref_mut_pattern!(as_str_mut,            &mut str              => Self::Value($scalartype::String(ref mut v))        => Some(v.to_mut()));
@@ -742,7 +742,7 @@ define_as_pattern!($fn_name, $t => Self::$variant(v) => Some(v.into()));
 /// [`YamlData`]: crate::YamlData
 macro_rules! define_as_ref (
     ($fn_name:ident, $t:ty, $variant:ident) => (
-define_as_ref_pattern!($fn_name, $t => Self::$variant(ref v) => Some(v));
+define_as_ref_pattern!($fn_name, $t => Self::$variant(v) => Some(v));
     );
 );
 

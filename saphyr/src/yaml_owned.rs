@@ -174,11 +174,11 @@ impl LoadableYamlNode<'_> for YamlOwned {
     }
 
     fn is_sequence(&self) -> bool {
-        self.is_sequence() || self.get_tagged_node().map_or(false, YamlOwned::is_sequence)
+        self.is_sequence() || self.get_tagged_node().is_some_and(YamlOwned::is_sequence)
     }
 
     fn is_mapping(&self) -> bool {
-        self.is_mapping() || self.get_tagged_node().map_or(false, YamlOwned::is_mapping)
+        self.is_mapping() || self.get_tagged_node().is_some_and(YamlOwned::is_mapping)
     }
 
     fn is_badvalue(&self) -> bool {

@@ -4,7 +4,7 @@ use alloc::{
     vec::Vec,
 };
 use core::{
-    hash::{BuildHasher, Hasher},
+    hash::BuildHasher,
     ops::{Index, IndexMut},
 };
 
@@ -98,8 +98,6 @@ where
 
     /// Implementation detail for [`Self::as_mapping_get`], which is generated from a macro.
     fn as_mapping_get_impl(&self, key: &str) -> Option<&Node> {
-        use core::hash::Hash;
-
         match self {
             Self::Mapping(mapping) => {
                 let needle =
@@ -108,10 +106,7 @@ where
                 // In order to work around `needle`'s lifetime being different from `h`'s, we need
                 // to manually compute the hash. Otherwise, we'd use `h.get()`, which complains the
                 // needle's lifetime doesn't match that of the key in `h`.
-                let mut hasher = mapping.hasher().build_hasher();
-                needle.hash(&mut hasher);
-                let hash = hasher.finish();
-
+                let hash = mapping.hasher().hash_one(&needle);
                 mapping
                     .raw_entry()
                     .from_hash(hash, |candidate| *candidate == needle)
@@ -126,7 +121,6 @@ where
     fn as_mapping_get_mut_impl(&mut self, key: &str) -> Option<&mut Node> {
         match self.as_mapping_mut() {
             Some(mapping) => {
-                use core::hash::Hash;
                 use hashlink::linked_hash_map::RawEntryMut::{Occupied, Vacant};
 
                 // In order to work around `needle`'s lifetime being different from `h`'s, we need
@@ -134,10 +128,7 @@ where
                 // needle's lifetime doesn't match that of the key in `h`.
                 let needle =
                     Node::HashKey::from(YamlDataOwned::Value(ScalarOwned::String(key.to_string())));
-                let mut hasher = mapping.hasher().build_hasher();
-                needle.hash(&mut hasher);
-                let hash = hasher.finish();
-
+                let hash = mapping.hasher().hash_one(&needle);
                 match mapping
                     .raw_entry_mut()
                     .from_hash(hash, |candidate| *candidate == needle)
