@@ -1,6 +1,6 @@
 # Changelog
 
-## Upcoming
+## v0.0.7
 
 **Changes**:
 
