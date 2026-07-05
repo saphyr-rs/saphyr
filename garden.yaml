@@ -58,8 +58,12 @@ trees:
     variables:
       workspace: "--workspace"
     remotes:
-      mkniewallner: https://github.com/mkniewallner/saphyr
-      yaml-test-suite: https://github.com/yaml/yaml-test-suite
+      bourumir-wyngs: "https://github.com/bourumir-wyngs/saphyr.git"
+      duckduckwhale: "https://github.com/DuckDuckWhale/saphyr.git"
+      facet-rs: "https://github.com/facet-rs/saphyr.git"
+      jeanmertz: "https://github.com/JeanMertz/saphyr.git"
+      lava-sh: "https://github.com/lava-sh/saphyr.git"
+      yaml-test-suite: "https://github.com/yaml/yaml-test-suite.git"
   saphyr:
     description: |
       The high-level saphyr crate provides quick-and-easy YAML importing,
