@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches:
+      - dev
       - master
 
 jobs:
@@ -13,7 +14,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-      - run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy --no-self-update
+      - run: rustup toolchain install 1.85.0 --profile minimal --component rustfmt --component clippy --no-self-update
       - run: rustup target add wasm32v1-none
       - uses: Swatinem/rust-cache@v2
       - name: Run clippy checks
@@ -29,7 +30,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        rust: [stable]
+        rust: [stable, 1.85.0]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
