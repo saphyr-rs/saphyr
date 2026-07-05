@@ -1,11 +1,12 @@
 # Use "cargo install garden-tools" to install garden https://gitlab.com/garden-rs/garden
 #
 # usage:
-#   garden build
-#   garden test
-#   garden check
-#   garden fmt
-#   garden fix
+#   garden build                      # Build all crates
+#   garden test                       # Run the test suite
+#   garden check -vv                  # Run automated checks, verbosely
+#   garden fmt                        # Run the code formatter
+#   garden fix                        # Apply cargo clippy fixes
+#   garden pull/yaml-test-suite       # Fetch and merge yaml-test-suite updates
 
 commands:
   bench: cargo bench "$@"
@@ -64,6 +65,15 @@ trees:
       jeanmertz: "https://github.com/JeanMertz/saphyr.git"
       lava-sh: "https://github.com/lava-sh/saphyr.git"
       yaml-test-suite: "https://github.com/yaml/yaml-test-suite.git"
+    commands:
+      pull/yaml-test-suite>:
+        - fetch/yaml-test-suite
+        - merge/yaml-test-suite
+      fetch/yaml-test-suite: git fetch yaml-test-suite
+      merge/yaml-test-suite: |
+        git merge --squash --allow-unrelated-histories \
+            -s subtree -X theirs \
+            -X subtree=parser/tests/yaml-test-suite/ yaml-test-suite/main
   saphyr:
     description: |
       The high-level saphyr crate provides quick-and-easy YAML importing,
