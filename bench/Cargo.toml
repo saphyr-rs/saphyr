@@ -2,9 +2,11 @@
 name = "saphyr-bench"
 authors = { workspace = true }
 description = "Utilities to benchmark saphyr"
+documentation = { workspace = true }
 license = "MIT"
 readme = "README.md"
 edition = { workspace = true }
+repository = { workspace = true }
 rust-version = { workspace = true }
 version = { workspace = true }
 
