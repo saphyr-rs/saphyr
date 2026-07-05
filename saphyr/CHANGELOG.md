@@ -6,6 +6,10 @@
 
 - The Minimum Supported Rust Version was updated to v1.85.0.
 
+**Development**:
+
+- `thiserror` was updated to `v2.0.18`.
+
 ## v0.0.8
 
 **Upcoming Breaking Changes**:
