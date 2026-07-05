@@ -10,5 +10,5 @@ edition = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-rand = { version = "0.8.5", features = [ "small_rng" ] }
+rand = { version = "0.10.0", features = [ "small_rng" ] }
 lipsum = "0.9.0"
