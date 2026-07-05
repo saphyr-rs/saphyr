@@ -14,4 +14,4 @@ rust-version = { workspace = true }
 anyhow = { version = "1.0.81", features = ["backtrace"] }
 serde = { version = "1.0.197", features = ["derive"] }
 serde_yaml = "0.9.32"
-toml = "0.9.0"
+toml = "1.0"
