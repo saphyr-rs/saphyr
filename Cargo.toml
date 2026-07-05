@@ -28,11 +28,11 @@ repository = "https://github.com/saphyr-rs/saphyr"
 readme = "README.md"
 edition = "2021"
 rust-version = "1.65.0"
-version = "0.0.7"
+version = "0.0.8"
 
 [workspace.dependencies]
 # Keep the saphyr-parser version in sync with workspace.package.version
-saphyr-parser = { path = "parser", version = "0.0.7" }
+saphyr-parser = { path = "parser", version = "0.0.8" }
 arraydeque = { version = "0.5.1", default-features = false }
 encoding_rs = { version = "0.8.35" }
 # Keep in sync with hashlink to reduce dependency duplication
