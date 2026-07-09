@@ -404,3 +404,74 @@ fn test_issue37() {
         ]
     );
 }
+
+#[test]
+fn test_multiline_flow_sequence_in_block() {
+    // Multi-line flow sequences inside block mappings should be valid YAML.
+    // The closing `]` may appear at any indentation level inside a flow collection.
+    let s = r#"
+root:
+  key: [
+    "a",
+    "b",
+    "c"
+  ]
+"#;
+    let events = run_parser(s).unwrap();
+    assert_eq!(
+        events,
+        [
+            Event::StreamStart,
+            Event::DocumentStart(false),
+            Event::MappingStart(0, None),
+            Event::Scalar("root".into(), ScalarStyle::Plain, 0, None),
+            Event::MappingStart(0, None),
+            Event::Scalar("key".into(), ScalarStyle::Plain, 0, None),
+            Event::SequenceStart(0, None),
+            Event::Scalar("a".into(), ScalarStyle::DoubleQuoted, 0, None),
+            Event::Scalar("b".into(), ScalarStyle::DoubleQuoted, 0, None),
+            Event::Scalar("c".into(), ScalarStyle::DoubleQuoted, 0, None),
+            Event::SequenceEnd,
+            Event::MappingEnd,
+            Event::MappingEnd,
+            Event::DocumentEnd,
+            Event::StreamEnd,
+        ]
+    );
+}
+
+#[test]
+fn test_multiline_flow_sequence_deep_nesting() {
+    // Multi-line flow sequence deeply nested in block structure
+    let s = r#"
+a:
+  b:
+    c:
+      d: [
+        "value1",
+        "value2"
+      ]
+"#;
+    assert!(run_parser(s).is_ok());
+}
+
+#[test]
+fn test_multiline_flow_mapping_in_block() {
+    // Multi-line flow mappings inside block mappings should be valid YAML.
+    let s = r#"
+root:
+  key: {
+    "a": 1,
+    "b": 2
+  }
+"#;
+    assert!(run_parser(s).is_ok());
+}
+
+#[test]
+fn test_multiline_flow_sequence_closing_at_lower_indent() {
+    // The closing bracket at a column lower than the block indent level
+    // This is the exact pattern that caused the saphyr-parser bug
+    let s = "            TopLevel:\n              SubLevel: [\n                \"first-entry\",\n                \"second-entry\"\n              ]\n            Foo: bar\n";
+    assert!(run_parser(s).is_ok());
+}
