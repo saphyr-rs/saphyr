@@ -725,7 +725,11 @@ impl<'input, T: Input> Scanner<'input, T> {
         }
 
         if (self.mark.col as isize) < self.indent {
-            return Err(ScanError::new_str(self.mark, "invalid indentation"));
+            self.input.lookahead(1);
+            let c = self.input.peek();
+            if self.flow_level == 0 || !matches!(c, ']' | '}' | ',') {
+                return Err(ScanError::new_str(self.mark, "invalid indentation"));
+            }
         }
 
         let c = self.input.peek();
