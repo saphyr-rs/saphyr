@@ -37,7 +37,7 @@ communicating with the outside world just by parsing a YAML document.
 ## Specification Compliance
 
 This implementation is fully compatible with the YAML 1.2 specification. In
-order to help with compliance, `yaml-rust2` tests against (and passes) the [YAML
+order to help with compliance, `saphyr-parser` tests against (and passes) the [YAML
 test suite](https://github.com/yaml/yaml-test-suite/).
 
 ## License
