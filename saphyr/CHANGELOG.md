@@ -30,148 +30,175 @@
 **Breaking Changes**:
 
 - `LoadError` is now a `non_exhaustive` enum.
-  This allows adding variants with features without violating the additive
-  nature of Cargo features.
-  Consider using a wildcard `_` pattern to exhaustively match on `LoadError`.
+This allows adding variants with features without violating the additive
+nature of Cargo features.
+Consider using a wildcard `_` pattern to exhaustively match on `LoadError`.
+
 - `LoadError::Io` is now gated behind the `encoding` feature.
-  Previously, `LoadError::Io` was incompatible with `no_std` due to its reliance
-  on `std::io::Error`.
-  This error variant would only occur with the `encoding` feature enabled; now
-  this is codified.
+Previously, `LoadError::Io` was incompatible with `no_std` due to its reliance
+on `std::io::Error`.
+This error variant would only occur with the `encoding` feature enabled; now
+this is codified.
+
 
 ## v0.0.6
 
 **Fixes**:
+
 - #51: Fix indent when emitting tagged collections.
+
 
 ## v0.0.5
 
 **Breaking Changes**:
 
 - 234c69c9..374d8920: Use `Cow`s for `Tag`s
+
 - Perform parsing of scalars with unknown tags according to the core schema.
-  Previously, `!foo 42` would yield a `Scalar::String("42")` because the tag
-  wasn't known. It will now yield a `Scalar::Integer(42)`. `!!str 42` will
-  still yield a `Scalar::String`.
+Previously, `!foo 42` would yield a `Scalar::String("42")` because the tag
+wasn't known. It will now yield a `Scalar::Integer(42)`. `!!str 42` will
+still yield a `Scalar::String`.
+
 - Parsing a scalar with an unknown Core Schema tag (e.g.: `!!unknown`) now
-  results in a `BadValue` rather than a `String`.
+results in a `BadValue` rather than a `String`.
+
 - Expose custom YAML tags as a variant of `Yaml`/`YamlData` objects. The
-  biggest pain point for existing users is probably the inclusion of
-  `Yaml::Tagged`, which will break existing `match`es on `Yaml`. Details about
-  how `saphyr` handles YAML tags can be found on the library documentation.
+biggest pain point for existing users is probably the inclusion of
+`Yaml::Tagged`, which will break existing `match`es on `Yaml`. Details about
+how `saphyr` handles YAML tags can be found on the library documentation.
+
 - Add `into_tagged` as a `LoadableYamlNode` requirement.
 
 **Features**:
 
 - c0e8b8cc and f4ab7330: Add `From` implementations to convert between owned
-  and borrowed versions of `Yaml` and `Scalar`.
+and borrowed versions of `Yaml` and `Scalar`.
+
 - `parse_core_schema_fp` for parsing floating point values according to the
-  YAML core schema.
+YAML core schema.
+
 - Support for custom tags.
 
 **Fixes**:
 
-- 3bbe4232: No longer parse any capitalization of `inf`, or `infinity` as
-  `f64::INFINITY`
+- 3bbe4232: No longer parse any capitalization of `inf`, or `infinity` as `f64::INFINITY`
+
 - e88eeae3: Parse `.NaN` as float instead of `NaN`.
+
 - Lower `Cargo.toml`'s `rust-version` to `1.65.0`, as stated in the
-  documentation.
+documentation.
+
 
 ## v0.0.4
 
 **Breaking Changes**:
 
 - Allow `Yaml` to borrow from the input.
+
 - All indexing traits now panic if the key is not found or the YAML variant is
-  incorrect. This helps in making the behavior of `[]` more consistent across
-  all operations.
+incorrect. This helps in making the behavior of `[]` more consistent across
+all operations.
+
 - Use `Mapping` instead of `Hash` to refer to YAML mappings.
+
 - Use `Sequence` instead of `Array` to refer to YAML sequences.
-  Methods to access sequences using `vec` instead of `array` still exist.
-  Another method using `sequence` has been added.
+Methods to access sequences using `vec` instead of `array` still exist.
+Another method using `sequence` has been added.
+
 - `as_f64` -> `as_floating_point`, `as_i64` -> `as_integer`
+
 - Reworked `Yaml` and `YamlData`
-  - They now have a `Value` and a `Representation` variants for scalars.
-    `Representation` holds the raw characters from the input (pre-parsing)
-    while `Value` holds the parsed value. In `foo: 3`, `Representation` would
-    hold `"foo"` and `"3"` (both as strings) while `Value` would hold `"foo"`
-    and `3`.
-  - The idea behind this is to allow lazy-parsing of scalar nodes and to give
-    more control about key duplication detection in mappings (e.g.: is `{ 0xB:
-    ~, 11: ~ }` considered a duplicate because `0xB == 11`?).
+    - They now have a `Value` and a `Representation` variants for scalars.
+      `Representation` holds the raw characters from the input (pre-parsing)
+      while `Value` holds the parsed value. In `foo: 3`, `Representation` would
+      hold `"foo"` and `"3"` (both as strings) while `Value` would hold `"foo"`
+      and `3`.
+    - The idea behind this is to allow lazy-parsing of scalar nodes and to give
+      more control about key duplication detection in mappings (e.g.: is `{ 0xB:
+      ~, 11: ~ }` considered a duplicate because `0xB == 11`?).
+
 - Rename `from_str` to `value_from_str` to better highlight it:
-  - Doesn't load a YAML document
-  - Doesn't always load into a YAML string
+    - Doesn't load a YAML document
+    - Doesn't always load into a YAML string
+
 - `load_from_*` functions now belong to the `LoadableYamlNode` trait to avoid
-  implementing them in each YAML node type. It is now required to import
-  `LoadableYamlNode` to use these functions (LSPs should have a fixit for it).
+implementing them in each YAML node type. It is now required to import
+`LoadableYamlNode` to use these functions (LSPs should have a fixit for it).
 
 **Features**:
+
 - Add the following convenience methods to the YAML objects:
-  - `contains_mapping_key`
-  - `as_mapping_get`
-  - `as_mapping_get_mut`
+    * `contains_mapping_key`
+    * `as_mapping_get`
+    * `as_mapping_get_mut`
+
 - Add many more conversion methods (`as_*`, `as_*_mut`, `into_*`, ...).
+
 - Use
-  [`ordered-float`](https://docs.rs/ordered-float/latest/ordered_float/struct.OrderedFloat.html)
-  to store floating point values in scalars. This allows using floating point
-  values in mappings, with the caveats listed in the crate description (#18).
-  The `OrderedFloat`s are kept within the `Scalar` object and conversion
-  methods do not expose them.
+[`ordered-float`](https://docs.rs/ordered-float/latest/ordered_float/struct.OrderedFloat.html)
+to store floating point values in scalars. This allows using floating point
+values in mappings, with the caveats listed in the crate description (#18).
+The `OrderedFloat`s are kept within the `Scalar` object and conversion
+methods do not expose them.
+
 - Add `YamlDataOwned`, an owned version of `YamlData` for when lifetimes are
-  not required.
+not required.
+
 - Add `MarkedYamlOwned`, an owned version of `MarkedYaml` for when lifetimes
-  are not required.
+are not required.
+
 - Add `YamlOwned`, an owned version of `Yaml` which corresponds to what `Yaml`
-  was prior to this version.
+was prior to this version.
 
 ## v0.0.3
 
-Skipping version `v0.0.2` to align this crate's version with that of
-`saphyr-parser`.
+Skipping version `v0.0.2` to align this crate's version with that of `saphyr-parser`.
 
 **Breaking Changes**:
 
 - Move `load_from_*` methods out of the `YamlLoader`. Now, `YamlLoader` gained
-  a generic parameter. Moving those functions out of it spares having to
-  manually specify the generic in `YamlLoader::<Yaml>::load_from_str`.
-  Manipulating the `YamlLoader` directly was not common.
+a generic parameter. Moving those functions out of it spares having to
+manually specify the generic in `YamlLoader::<Yaml>::load_from_str`.
+Manipulating the `YamlLoader` directly was not common.
+
 - Make `LoadError` `Clone` by storing an `Arc<std::io::Error>` instead of the
-  error directly.
+error directly.
 
 **Features**:
 
 - ([#19](https://github.com/Ethiraric/yaml-rust2/pull/19)) `Yaml` now
-  implements `IndexMut<usize>` and `IndexMut<&'a str>`. These functions may not
-  return a mutable reference to a `BAD_VALUE`. Instead, `index_mut()` will
-  panic if either:
-  * The index is out of range, as per `IndexMut`'s requirements
-  * The inner `Yaml` variant doesn't match `Yaml::Array` for `usize` or
-    `Yaml::Hash` for `&'a str`
+implements `IndexMut<usize>` and `IndexMut<&'a str>`. These functions may not
+return a mutable reference to a `BAD_VALUE`. Instead, `index_mut()` will
+panic if either:
+* The index is out of range, as per `IndexMut`'s requirements
+* The inner `Yaml` variant doesn't match `Yaml::Array` for `usize` or
+  `Yaml::Hash` for `&'a str`
 
 - Use cargo features
 
-  This allows for more fine-grained control over MSRV and to completely remove
-  debug code from the library when it is consumed.
+This allows for more fine-grained control over MSRV and to completely remove
+debug code from the library when it is consumed.
 
-  The `encoding` feature, governing the `YamlDecoder`, has been enabled by
-  default. Users of `@davvid`'s fork of `yaml-rust` or of `yaml-rust2` might
-  already use this. Users of the original `yaml-rust` crate may freely disable
-  this feature (`cargo <...> --no-default-features`) and lower MSRV to 1.65.0.
+The `encoding` feature, governing the `YamlDecoder`, has been enabled by
+default. Users of `@davvid`'s fork of `yaml-rust` or of `yaml-rust2` might
+already use this. Users of the original `yaml-rust` crate may freely disable
+this feature (`cargo <...> --no-default-features`) and lower MSRV to 1.65.0.
 
 - Load with metadata
 
-  The `YamlLoader` now supports adding metadata alongside the nodes. For now,
-  the only one supported is the `Marker`, pointing to the position in the input
-  stream of the start of the node.
+The `YamlLoader` now supports adding metadata alongside the nodes. For now,
+the only one supported is the `Marker`, pointing to the position in the input
+stream of the start of the node.
 
-  This feature is extensible and should allow (later) to add comments.
+This feature is extensible and should allow (later) to add comments.
 
 **Fixes**:
 
 - 1fc4692: Fix trailing newlines when emitting multiline strings.
 
-# Older `yaml-rust2` changelgos
+
+# Older `yaml-rust2` changelogs
+
 ## v0.8.0
 
 **Breaking Changes**:
@@ -182,15 +209,15 @@ An additional enum `YamlDecoderTrap` has been added to abstract the
 underlying library and avoid breaking changes in the future. This
 additionally lifts the `encoding` dependency on _your_ project if you were
 using that feature.
-  - The signature of the function for `YamlDecoderTrap::Call` has changed:
-  - The `encoding::types::DecoderTrap` has been replaced with `YamlDecoderTrap`.
-    ```rust
-    // Before, with `encoding::types::DecoderTrap::Call`
-    fn(_: &mut encoding::RawDecoder, _: &[u8], _: &mut encoding::StringWriter) -> bool;
-    // Now, with `YamlDecoderTrap::Call`
-    fn(_: u8, _: u8, _: &[u8], _: &mut String) -> ControlFlow<Cow<'static str>>;
-    ```
-    Please refer to the `YamlDecoderTrapFn` documentation for more details.
+* The signature of the function for `YamlDecoderTrap::Call` has changed:
+* The `encoding::types::DecoderTrap` has been replaced with `YamlDecoderTrap`.
+  ```rust
+  // Before, with `encoding::types::DecoderTrap::Call`
+  fn(_: &mut encoding::RawDecoder, _: &[u8], _: &mut encoding::StringWriter) -> bool;
+  // Now, with `YamlDecoderTrap::Call`
+  fn(_: u8, _: u8, _: &[u8], _: &mut String) -> ControlFlow<Cow<'static str>>;
+  ```
+  Please refer to the `YamlDecoderTrapFn` documentation for more details.
 
 **Features**:
 
@@ -208,6 +235,7 @@ documents associated with a loader.
 
 - Linguist attributes were added for the `tests/*.rs.inc` files to prevent github from
 classifying them as C++ files.
+
 
 ## v0.7.0
 
@@ -239,6 +267,7 @@ yaml-rust is safe because it does not interpret types.
 - `hashlink` is [now used](https://github.com/chyh1990/yaml-rust/pull/157)
 instead of `linked_hash_map`.
 
+
 ## v0.6.0
 
 **Development**:
@@ -249,7 +278,10 @@ instead of `linked_hash_map`.
 
 - Performance was improved.
 
+
 ## v0.5.0
+
+**Changes**:
 
 - The parser now supports tag directives.
 ([#35](https://github.com/chyh1990/yaml-rust/issues/35)
