@@ -499,7 +499,7 @@ impl<T: Input + Clone> Clone for Scanner<'_, T> {
             leading_whitespace: self.leading_whitespace,
             flow_mapping_started: self.flow_mapping_started,
             implicit_flow_mapping_states: self.implicit_flow_mapping_states.clone(),
-            interrupted_plain_by_comment: self.interrupted_plain_by_comment.clone(),
+            interrupted_plain_by_comment: self.interrupted_plain_by_comment,
             buf_leading_break: self.buf_leading_break.clone(),
             buf_trailing_breaks: self.buf_trailing_breaks.clone(),
             buf_whitespaces: self.buf_whitespaces.clone(),

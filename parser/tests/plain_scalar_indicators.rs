@@ -11,9 +11,9 @@ fn colon_followed_by_space_ends_plain_scalar_not_part_of_value() {
     // "a: b" as a single scalar value).
     let s = "foo: a: b\n";
 
-    let mut it = Parser::new_from_str(s);
+    let it = Parser::new_from_str(s);
     let mut got_err: Option<ScanError> = None;
-    while let Some(res) = it.next() {
+    for res in it {
         if let Err(e) = res {
             got_err = Some(e);
             break;

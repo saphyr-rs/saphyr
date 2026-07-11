@@ -7,11 +7,11 @@ fn bs4k_comment_between_plain_scalar_lines_should_fail() {
 word2
 "#;
 
-    let mut parser = Parser::new_from_str(yaml);
-    while let Some(next) = parser.next() {
+    let parser = Parser::new_from_str(yaml);
+    for next in parser {
         match next {
             Ok((Event::DocumentEnd, _)) => {
-                assert!(false, "Document end before any error");
+                panic!("Document end before any error");
             }
             Err(err) => {
                 assert_eq!(
@@ -33,9 +33,9 @@ key: word1  # comment
   word2
 "#;
 
-    let mut parser = Parser::new_from_str(yaml);
+    let parser = Parser::new_from_str(yaml);
     let mut got_error = false;
-    while let Some(next) = parser.next() {
+    for next in parser {
         if let Err(err) = next {
             assert_eq!(
                 err.info(),
@@ -56,9 +56,9 @@ key: word1
   word2
 "#;
 
-    let mut parser = Parser::new_from_str(yaml);
+    let parser = Parser::new_from_str(yaml);
     let mut events = Vec::new();
-    while let Some(next) = parser.next() {
+    for next in parser {
         events.push(next.unwrap().0);
     }
 
