@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.0.11
+
+**Fixes**:
+
+- Reserved `%` directives such as `%YAML 1.1 1.2` are now recognized and ignored.
+([+100](https://github.com/saphyr-rs/saphyr/pull/100))
+
+- Comments intercepting muliline text is now correctly handled.
+([+93](https://github.com/saphyr-rs/saphyr/pull/93))
+
+
 ## v0.0.10
 
 **Changes**:

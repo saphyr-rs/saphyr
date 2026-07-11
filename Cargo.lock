@@ -153,7 +153,7 @@ dependencies = [
 
 [[package]]
 name = "bench_compare"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "anyhow",
  "serde",
@@ -327,7 +327,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "gen_large_yaml"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "lipsum",
  "rand 0.8.5",
@@ -784,7 +784,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "saphyr"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "encoding_rs",
  "hashlink",
@@ -796,14 +796,14 @@ dependencies = [
 
 [[package]]
 name = "saphyr-bench"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "saphyr-parser",
 ]
 
 [[package]]
 name = "saphyr-fuzz"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "libfuzzer-sys",
  "saphyr",
@@ -812,7 +812,7 @@ dependencies = [
 
 [[package]]
 name = "saphyr-parser"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "arraydeque",
  "libtest-mimic",
@@ -1048,7 +1048,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "walk"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "hashlink",
  "miette",
