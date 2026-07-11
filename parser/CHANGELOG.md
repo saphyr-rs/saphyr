@@ -30,6 +30,7 @@ of plain scalar while parsing strings.
 **Development**:
 
 - `thiserror` was updated to `v2.0.18`.
+
 - `quickcheck` was updated to `v1.1`.
 
 
@@ -63,11 +64,13 @@ of plain scalar while parsing strings.
 **Fixes**:
 
 - 8ef76dcc: Fix `Marker`s for `null` and empty values.
+
 - Fix `Span`s for collections to correctly mark the end of the collection.
 
 **Changes**
 
 - Exclude `yaml-test-suite` from the Cargo package.
+
 - Bump `libtest-mimic` to `0.8.1`.
 
 
@@ -76,6 +79,7 @@ of plain scalar while parsing strings.
 **Breaking Changes**:
 
 - Allow events to borrow from the input.
+
 - Rename `TScalarStyle` to `ScalarStyle`.
 
 
@@ -85,6 +89,7 @@ of plain scalar while parsing strings.
 
 - 926fdfb: Events now use spans rather than markers, allowing for tracking both
 the beginning and the end of scalars.
+
 - 6c57b5b: Add a boolean to `DocumentStart` to know whether the start was
 explicit (`---`) or implicit.
 
@@ -93,6 +98,7 @@ explicit (`---`) or implicit.
 - Add an `Input` interface to prepare the ground to future input-specific.
 optimizations (such as returning `Cow`'d strings when possible). This also
 potentially allows for user-defined optimizations.
+
 - Add `Parser::new_from_iter` to load from an iterator. This automatically
 wraps using `BufferedInput`, which implements the new `Input` trait the
 `Parser` needs.
@@ -100,15 +106,21 @@ wraps using `BufferedInput`, which implements the new `Input` trait the
 **Fixes**:
 
 - 750c992: Add support for nested implicit flow mappings.
+
 - 11cffc6: Fix error with deeply indented block scalars.
+
 - d3b9641: Fix assertion that could erroneously trigger with multibyte characters.
+
 - 95fe3fe: Fix parse errors when `---` appeared in the middle of plain scalars.
+
 - 3358629: Fix infinite loop with `...` in plain scalars in flow contexts.
+
 - Fix panics on other various erroneous inputs found while fuzzing.
 
 **Internal changes**:
 
 - Run all tests with both `Input` backends
+
 - #15: Add fuzzing
 
 
