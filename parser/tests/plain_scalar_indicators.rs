@@ -28,8 +28,7 @@ fn colon_without_space_is_part_of_scalar_value() {
     // When there is no blank after ':', the ':' is part of the plain scalar (7.3.3).
     // Here the value should be the single scalar "a:b".
     let s = "k: a:b\n";
-    let events: Vec<_> = Parser::new_from_str(s).map(
-        |r| r.unwrap().0).collect();
+    let events: Vec<_> = Parser::new_from_str(s).map(|r| r.unwrap().0).collect();
     assert_eq!(
         events,
         vec![

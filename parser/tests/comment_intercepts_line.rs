@@ -14,8 +14,10 @@ word2
                 assert!(false, "Document end before any error");
             }
             Err(err) => {
-                assert_eq!(err.info(), "comment intercepting the multiline text",
-                           "BS4K: comment intercepting the multiline text is invalid YAML"
+                assert_eq!(
+                    err.info(),
+                    "comment intercepting the multiline text",
+                    "BS4K: comment intercepting the multiline text is invalid YAML"
                 );
                 break; // fine
             }
@@ -35,8 +37,10 @@ key: word1  # comment
     let mut got_error = false;
     while let Some(next) = parser.next() {
         if let Err(err) = next {
-            assert_eq!(err.info(), "comment intercepting the multiline text",
-                       "BS4K: comment intercepting the multiline text is invalid YAML in a map"
+            assert_eq!(
+                err.info(),
+                "comment intercepting the multiline text",
+                "BS4K: comment intercepting the multiline text is invalid YAML in a map"
             );
             got_error = true;
             break;
@@ -58,5 +62,10 @@ key: word1
         events.push(next.unwrap().0);
     }
 
-    assert!(events.contains(&Event::Scalar("word1 word2".into(), ScalarStyle::Plain, 0, None)));
+    assert!(events.contains(&Event::Scalar(
+        "word1 word2".into(),
+        ScalarStyle::Plain,
+        0,
+        None
+    )));
 }

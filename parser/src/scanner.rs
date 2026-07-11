@@ -2272,7 +2272,11 @@ impl<'input, T: Input> Scanner<'input, T> {
                 // of a plain scalar in block context, and there is potential continuation on the
                 // next line, this is invalid. We cannot decide yet if there will be continuation,
                 // so record that a comment interrupted a plain scalar.
-                if self.input.peek() == '#' && !string.is_empty() && !self.buf_whitespaces.is_empty() && self.flow_level == 0 {
+                if self.input.peek() == '#'
+                    && !string.is_empty()
+                    && !self.buf_whitespaces.is_empty()
+                    && self.flow_level == 0
+                {
                     self.interrupted_plain_by_comment = Some(self.mark);
                 }
                 break;
