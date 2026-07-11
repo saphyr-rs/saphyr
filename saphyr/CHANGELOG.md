@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.0.10
+
+**Changes**:
+
+- Update to [saphyr-parser v0.0.10](https://crates.io/crates/saphyr-parser/0.0.10).
+
+
 ## v0.0.9
 
 **Breaking Changes**:

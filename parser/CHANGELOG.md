@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.0.10
+
+**Changes**:
+
+- `Parser` and `Scanner` now implement `Clone`.
+([+91](https://github.com/saphyr-rs/saphyr/pull/91))
+
+**Fixes**:
+
+- Indented end-of-document (`---`) markers no longer trigger an unexpected end
+of plain scalar while parsing strings.
+([#84](https://github.com/saphyr-rs/saphyr/issue/84))
+([+87](https://github.com/saphyr-rs/saphyr/pull/87))
+
+- Carriage return is now correctly handled as being a valid literal block scalar.
+([+90](https://github.com/saphyr-rs/saphyr/pull/90))
+
+- YAML test suite case 4H7K (extra closing bracket should fail) was corrected.
+([+92](https://github.com/saphyr-rs/saphyr/pull/92))
+
+
 ## v0.0.9
 
 **Breaking Changes**:
