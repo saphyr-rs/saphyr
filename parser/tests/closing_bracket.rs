@@ -12,8 +12,10 @@ fn misplaced_closing_bracket() {
                 assert!(false, "Document end before any error");
             }
             Err(err) => {
-                assert_eq!(err.info(), "misplaced bracket",
-                        "4H7K: misplaced bracket should result the error"
+                assert_eq!(
+                    err.info(),
+                    "misplaced bracket",
+                    "4H7K: misplaced bracket should result the error"
                 );
                 break; // fine
             }
