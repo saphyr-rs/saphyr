@@ -178,6 +178,26 @@ bool1: false"#;
     );
 }
 
+/// Ensure that whole floats such as 100.0 emit as a float (not int).
+#[test]
+fn test_emit_whole_floats() {
+    let input = r#"---
+value: 100.0"#;
+    let expected = r#"---
+value: 100.0"#;
+    let docs = Yaml::load_from_str(input).unwrap();
+    let doc = &docs[0];
+    let mut writer = String::new();
+    {
+        let mut emitter = YamlEmitter::new(&mut writer);
+        emitter.dump(doc).unwrap();
+    }
+    assert_eq!(
+        expected, writer,
+        "expected:\n{expected}\nactual:\n{writer}\n",
+    );
+}
+
 #[test]
 fn test_empty_and_nested() {
     test_empty_and_nested_flag(false);
