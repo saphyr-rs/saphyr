@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.0.12
+
+**Fixes**:
+
+- Whole floats such as `100.0` were being emitted as integers by `YamlEmitter`.
+Whole floats now include a `.0` suffix when emitted to correct this behavior.
+([+97](https://github.com/saphyr-rs/saphyr/pull/97))
+
+
 ## v0.0.11
 
 **Changes**:
