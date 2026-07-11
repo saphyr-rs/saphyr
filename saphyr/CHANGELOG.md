@@ -10,6 +10,7 @@
 
 - `thiserror` was updated to `v2.0.18`.
 
+
 ## v0.0.8
 
 **Upcoming Breaking Changes**:
@@ -128,9 +129,9 @@ implementing them in each YAML node type. It is now required to import
 **Features**:
 
 - Add the following convenience methods to the YAML objects:
-    * `contains_mapping_key`
-    * `as_mapping_get`
-    * `as_mapping_get_mut`
+    - `contains_mapping_key`
+    - `as_mapping_get`
+    - `as_mapping_get_mut`
 
 - Add many more conversion methods (`as_*`, `as_*_mut`, `into_*`, ...).
 
@@ -149,6 +150,7 @@ are not required.
 
 - Add `YamlOwned`, an owned version of `Yaml` which corresponds to what `Yaml`
 was prior to this version.
+
 
 ## v0.0.3
 
