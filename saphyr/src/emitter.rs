@@ -2,6 +2,7 @@
 
 use core::fmt;
 
+use ordered_float::FloatCore;
 use thiserror::Error;
 
 use crate::{
