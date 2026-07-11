@@ -181,7 +181,7 @@ pub struct Parser<'input, T: Input> {
     keep_tags: bool,
 }
 
-impl<'input, T: Input + Clone> Clone for Parser<'input, T> {
+impl<T: Input + Clone> Clone for Parser<'_, T> {
     fn clone(&self) -> Self {
         Self {
             scanner: self.scanner.clone(),

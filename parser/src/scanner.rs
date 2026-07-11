@@ -469,7 +469,7 @@ pub struct Scanner<'input, T> {
     buf_whitespaces: String,
 }
 
-impl<'input, T: Input + Clone> Clone for Scanner<'input, T> {
+impl<T: Input + Clone> Clone for Scanner<'_, T> {
     fn clone(&self) -> Self {
         Self {
             input: self.input.clone(),
