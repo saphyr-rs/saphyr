@@ -7,6 +7,22 @@
 - Whole floats such as `100.0` were being emitted as integers by `YamlEmitter`.
 Whole floats now include a `.0` suffix when emitted to correct this behavior.
 ([+97](https://github.com/saphyr-rs/saphyr/pull/97))
+- Core schema tags no longer resolve more narrowly than untagged scalars. `!!int 0x1F`,
+`!!bool TRUE` and `!!null NULL` used to yield a `BadValue` although the same representations
+resolve fine without a tag.
+([#122](https://github.com/saphyr-rs/saphyr/pull/122))
+- An empty node now resolves to `Null` even when it carries an anchor. `a: &anchor` used to
+yield an empty string.
+([#122](https://github.com/saphyr-rs/saphyr/pull/122))
+- The implicit resolver no longer accepts integers the core schema rejects, such as `0x-1F`
+and `++7`.
+([#122](https://github.com/saphyr-rs/saphyr/pull/122))
+
+**Additions**:
+
+- `is_core_schema_null`, `parse_core_schema_bool` and `parse_core_schema_int`, alongside the
+existing `parse_core_schema_fp`.
+([#122](https://github.com/saphyr-rs/saphyr/pull/122))
 
 
 ## v0.0.11
