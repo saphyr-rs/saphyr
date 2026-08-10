@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.12
+
+**Changes**:
+
+- `thiserror` was updated to `v2.0.20`.
+
 ## v0.0.11
 
 **Fixes**:

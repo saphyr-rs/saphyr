@@ -8,6 +8,10 @@
 Whole floats now include a `.0` suffix when emitted to correct this behavior.
 ([+97](https://github.com/saphyr-rs/saphyr/pull/97))
 
+**Changes**:
+
+- `thiserror` was updated to `v2.0.20`.
+
 
 ## v0.0.11
 
