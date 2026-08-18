@@ -4,6 +4,9 @@
 
 **Fixes**:
 
+- Short inputs can no longer lead to an infinite loop.
+([+126](https://github.com/saphyr-rs/saphyr/pull/126))
+
 - Whole floats such as `100.0` were being emitted as integers by `YamlEmitter`.
 Whole floats now include a `.0` suffix when emitted to correct this behavior.
 ([+97](https://github.com/saphyr-rs/saphyr/pull/97))
