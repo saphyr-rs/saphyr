@@ -36,7 +36,21 @@ where
     marker: PhantomData<&'input u32>,
     /// See [`Self::early_parse()`]
     early_parse: bool,
+    /// See [`Self::alias_node_budget()`]
+    alias_node_budget: usize,
+    /// Set once alias expansion exceeds `alias_node_budget`. Surfaced by
+    /// [`LoadableYamlNode::load_from_parser`].
+    alias_error: Option<ScanError>,
 }
+
+/// Default budget (in nodes) for anchor alias expansion, used unless
+/// [`YamlLoader::alias_node_budget`] overrides it.
+///
+/// Resolving an [`Event::Alias`] clones the anchor's already-built subtree. Without a
+/// limit, a handful of nested anchors can be crafted to expand into an exponential number
+/// of nodes (a "billion laughs" attack), exhausting memory. See
+/// <https://github.com/saphyr-rs/saphyr/issues/109>.
+pub const DEFAULT_ALIAS_NODE_BUDGET: usize = 100_000;
 
 /// A trait providing methods used by the [`YamlLoader`].
 ///
@@ -210,6 +224,9 @@ pub trait LoadableYamlNode<'input>: Clone + core::hash::Hash + Eq {
     fn load_from_parser<I: Input>(parser: &mut Parser<'input, I>) -> Result<Vec<Self>, ScanError> {
         let mut loader = YamlLoader::default();
         parser.load(&mut loader, true)?;
+        if let Some(err) = loader.alias_error.take() {
+            return Err(err);
+        }
         Ok(loader.into_documents())
     }
 }
@@ -230,6 +247,19 @@ where
     /// [`Scalar`]: crate::Scalar
     pub fn early_parse(&mut self, enabled: bool) {
         self.early_parse = enabled;
+    }
+
+    /// Set the maximum number of nodes that anchor alias expansion may produce.
+    ///
+    /// Resolving an [`Event::Alias`] clones the anchor's already-built subtree. Without a
+    /// limit, a handful of nested anchors can be crafted to expand into an exponential
+    /// number of nodes (a "billion laughs" attack), exhausting memory: see
+    /// <https://github.com/saphyr-rs/saphyr/issues/109>. This budget bounds the total
+    /// number of nodes that may be produced via alias resolution across the whole load,
+    /// beyond which loading fails with a [`ScanError`]. Defaults to
+    /// [`DEFAULT_ALIAS_NODE_BUDGET`].
+    pub fn alias_node_budget(&mut self, budget: usize) {
+        self.alias_node_budget = budget;
     }
 
     /// Return the document nodes from `self`, consuming it in the process.
@@ -297,10 +327,7 @@ where
                 self.insert_new_node(Node::from_bare_yaml(node).with_span(span), aid, tag);
             }
             Event::Alias(id) => {
-                let n = match self.anchor_map.get(&id) {
-                    Some(v) => v.clone(),
-                    None => Node::from_bare_yaml(Yaml::BadValue),
-                };
+                let n = self.resolve_alias(id, mark);
                 self.insert_new_node(n.with_span(span), 0, None);
             }
         }
@@ -311,6 +338,35 @@ impl<'input, Node> YamlLoader<'input, Node>
 where
     Node: LoadableYamlNode<'input>,
 {
+    /// Resolve an [`Event::Alias`] by cloning the referenced anchor's subtree.
+    ///
+    /// Returns a `BadValue` node, without cloning, if the anchor is unknown or if cloning
+    /// it would push the total number of alias-produced nodes past `self.alias_node_budget`
+    /// (in which case `self.alias_error` is set, once). The anchor's size is established by
+    /// walking it directly (via a mutable borrow, so no clone is needed just to measure it),
+    /// and that walk stops as soon as the budget is exhausted, so a single oversized anchor
+    /// cannot be used to force an expensive full traversal either. See
+    /// <https://github.com/saphyr-rs/saphyr/issues/109>.
+    fn resolve_alias(&mut self, id: usize, mark: Marker) -> Node {
+        if self.alias_error.is_some() {
+            return Node::from_bare_yaml(Yaml::BadValue);
+        }
+        let Some(existing) = self.anchor_map.get_mut(&id) else {
+            return Node::from_bare_yaml(Yaml::BadValue);
+        };
+        let mut remaining = self.alias_node_budget;
+        if count_nodes_within_budget(existing, &mut remaining) {
+            self.alias_node_budget = remaining;
+            existing.clone()
+        } else {
+            self.alias_error = Some(ScanError::new_str(
+                mark,
+                "alias expansion exceeded the maximum node budget (possible billion-laughs attack)",
+            ));
+            Node::from_bare_yaml(Yaml::BadValue)
+        }
+    }
+
     fn insert_new_node(&mut self, mut node: Node, anchor_id: usize, tag: Option<Cow<'input, Tag>>) {
         // valid anchor id starts from 1
         if anchor_id > 0 {
@@ -354,8 +410,49 @@ where
             anchor_map: BTreeMap::new(),
             marker: PhantomData,
             early_parse: true,
+            alias_node_budget: DEFAULT_ALIAS_NODE_BUDGET,
+            alias_error: None,
         }
     }
+}
+
+/// Recursively count the nodes making up `node`, decrementing `budget` as it goes.
+///
+/// Stops as soon as `budget` reaches zero and returns `false` in that case, without
+/// establishing `node`'s full size (only that it exceeds `budget`). Returns `true` if the
+/// whole subtree fits within `budget`, leaving `budget` decremented by `node`'s exact node
+/// count so callers can accumulate usage across several calls instead of recomputing it.
+///
+/// Mapping keys are each counted as a single node rather than recursed into: the
+/// `LoadableYamlNode::HashKey` type isn't itself a `LoadableYamlNode`, so its structure
+/// isn't visible here. In practice alias-bomb payloads use sequence fan-out (as in the
+/// reported attack), so this is not a gap in the defense the budget is meant to provide.
+fn count_nodes_within_budget<'input, Node>(node: &mut Node, budget: &mut usize) -> bool
+where
+    Node: LoadableYamlNode<'input>,
+{
+    if *budget == 0 {
+        return false;
+    }
+    *budget -= 1;
+    if node.is_sequence() {
+        for child in node.sequence_mut() {
+            if !count_nodes_within_budget(child, budget) {
+                return false;
+            }
+        }
+    } else if node.is_mapping() {
+        for (_, value) in node.mapping_mut().iter_mut() {
+            if *budget == 0 {
+                return false;
+            }
+            *budget -= 1;
+            if !count_nodes_within_budget(value, budget) {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 /// An error that happened when loading a YAML document.
