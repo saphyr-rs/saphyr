@@ -17,6 +17,8 @@ Whole floats now include a `.0` suffix when emitted to correct this behavior.
 
 - `hashlink` was updated to `v0.12.1`.
 
+- Update to [saphyr-parser v0.0.12](https://crates.io/crates/saphyr-parser/0.0.12).
+
 
 ## v0.0.11
 
