@@ -15,6 +15,8 @@ Whole floats now include a `.0` suffix when emitted to correct this behavior.
 
 - `thiserror` was updated to `v2.0.20`.
 
+- `hashlink` was updated to `v0.12.1`.
+
 
 ## v0.0.11
 
