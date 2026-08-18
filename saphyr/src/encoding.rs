@@ -131,7 +131,15 @@ fn decode_loop(
                 total_bytes_read += bytes_read;
                 // The output is already reserved to the size of the input. We slowly resize. Here,
                 // we're expecting that 10% of bytes will double in size when converting to UTF-8.
-                output.reserve(input.len() / 10);
+                //
+                // Reserve at least 4 additional bytes to guarantee forward progress. A single
+                // UTF-8 scalar is at most 4 bytes, so reserving 4 ensures there is always room for
+                // at least one more character each iteration. Without this floor `input.len() / 10`
+                // is 0 for inputs shorter than 10 bytes, so the buffer never grows: when the
+                // decoded UTF-8 output is longer than the input (e.g. multi-byte UTF-16), the
+                // decoder keeps returning `OutputFull` with no capacity gained and the loop spins
+                // forever, pegging a CPU core (see Ethiraric/yaml-rust2#78).
+                output.reserve((input.len() / 10).max(4));
             }
             (DecoderResult::Malformed(malformed_len, bytes_after_malformed), bytes_read) => {
                 total_bytes_read += bytes_read;
@@ -289,6 +297,21 @@ c: [1, 2]
         assert!((doc["b"].as_floating_point().unwrap() - 2.2f64).abs() <= f64::EPSILON);
         assert_eq!(doc["c"][1].as_integer().unwrap(), 2i64);
         assert!(!doc.contains_mapping_key("d"));
+    }
+
+    #[test]
+    fn test_short_multibyte_utf16_does_not_hang() {
+        // Regression test for Ethiraric/yaml-rust2#78. This 8-byte input is a UTF-16LE BOM
+        // (0xFF 0xFE) followed by three copies of U+1234 (0x34 0x12). Each U+1234 is 3 bytes in
+        // UTF-8, so the decoded output (9 bytes) is longer than the input. Before the fix, the
+        // `OutputFull` arm reserved `input.len() / 10 == 0` additional bytes, so the output buffer
+        // never grew and `decode` looped forever pegging a CPU core. It must now return promptly
+        // with the three decoded characters.
+        let s: &[u8] = &[0xFF, 0xFE, 0x34, 0x12, 0x34, 0x12, 0x34, 0x12];
+        let mut decoder = YamlDecoder::read(s);
+        let out = decoder.decode().unwrap();
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].as_str(), Some("\u{1234}\u{1234}\u{1234}"));
     }
 
     #[test]
