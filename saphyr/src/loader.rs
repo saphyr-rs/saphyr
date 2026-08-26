@@ -186,6 +186,26 @@ pub trait LoadableYamlNode<'input>: Clone + core::hash::Hash + Eq {
         Self::load_from_iter(source.chars())
     }
 
+    /// Load the contents of the given reader as an array of YAML documents.
+    ///
+    /// The whole of `source` is read into memory as a UTF-8 string and then handed to
+    /// [`load_from_str`]. Parsing is not incremental, so there is nothing to gain from feeding the
+    /// reader in piecemeal, and reading it up-front keeps this a thin convenience wrapper. If you
+    /// need to decode input that isn't UTF-8, use [`YamlDecoder`] instead.
+    ///
+    /// # Errors
+    /// Returns [`LoadError::IO`] if reading from `source` fails, which includes the input not being
+    /// valid UTF-8, and [`LoadError::Scan`] if the YAML is malformed.
+    ///
+    /// [`load_from_str`]: LoadableYamlNode::load_from_str
+    /// [`YamlDecoder`]: crate::YamlDecoder
+    #[cfg(feature = "encoding")]
+    fn load_from_read<R: std::io::Read>(mut source: R) -> Result<Vec<Self>, LoadError> {
+        let mut buffer = alloc::string::String::new();
+        source.read_to_string(&mut buffer)?;
+        Self::load_from_str(&buffer).map_err(LoadError::Scan)
+    }
+
     /// Load the contents of the given iterator as an array of YAML documents.
     ///
     /// See [`load_from_str`] for details.

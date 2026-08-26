@@ -287,3 +287,25 @@ fn test_nominal_float_parse() {
         assert!(it.as_str().is_some());
     }
 }
+
+#[test]
+fn test_load_from_read() {
+    let yaml = "- name: Ogre\n  hp: 10\n- name: Dragon\n  hp: 25\n";
+    // `&[u8]` implements `std::io::Read`, so it stands in for any reader here.
+    let from_read = Yaml::load_from_read(yaml.as_bytes()).unwrap();
+    let from_str = Yaml::load_from_str(yaml).unwrap();
+    assert_eq!(from_read, from_str);
+}
+
+#[test]
+fn test_load_from_read_invalid_utf8() {
+    // 0xFF is never valid UTF-8, so reading it into a string fails before parsing.
+    let err = Yaml::load_from_read([0xff].as_slice()).unwrap_err();
+    assert!(matches!(err, saphyr::LoadError::IO(_)));
+}
+
+#[test]
+fn test_load_from_read_malformed_yaml() {
+    let err = Yaml::load_from_read("[unterminated".as_bytes()).unwrap_err();
+    assert!(matches!(err, saphyr::LoadError::Scan(_)));
+}
