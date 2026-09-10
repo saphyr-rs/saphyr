@@ -359,7 +359,6 @@ fn expected_events(expected_tree: &str) -> Vec<String> {
                 "-DOC ..." => "-DOC".into(),
                 s if s.starts_with("+SEQ []") => s.replacen("+SEQ []", "+SEQ", 1),
                 s if s.starts_with("+MAP {}") => s.replacen("+MAP {}", "+MAP", 1),
-                "=VAL :" => "=VAL :~".into(), // FIXME: known bug
                 s => s.into(),
             }
         })
