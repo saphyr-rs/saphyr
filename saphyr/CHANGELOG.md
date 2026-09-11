@@ -1,5 +1,12 @@
 # Changelog
 
+## Upcoming
+
+**Changes**:
+- ([yaml-rust2#82](https://github.com/Ethiraric/yaml-rust2/issues/82)) `encoding_rs` was
+  pinned to versions prior to `v0.8.40` to maintain the current MSRV.
+
+
 ## v0.0.12
 
 **Fixes**:
