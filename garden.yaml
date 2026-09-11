@@ -31,6 +31,7 @@ commands:
         cargo msrv --path parser verify
         cargo msrv --path parser/tools/walk verify
         cargo msrv --path saphyr verify
+        cargo msrv --path saphyr verify --features encoding
     fi
   check/no-std: cargo check -p saphyr --no-default-features --target wasm32v1-none
   doc: RUSTDOCFLAGS="-D warnings" cargo doc ${workspace} --all-features --document-private-items

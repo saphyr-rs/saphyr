@@ -35,7 +35,8 @@ version = "0.0.12"
 # Keep the saphyr-parser version in sync with workspace.package.version
 saphyr-parser = { path = "parser", version = "0.0.12" }
 arraydeque = { version = "0.5.1", default-features = false }
-encoding_rs = { version = "0.8.35" }
+# 0.8.41 bumped its MSRV. Unpin when updating saphyr's MSRV.
+encoding_rs = { version = "< 0.8.40" }
 # Keep in sync with hashlink to reduce dependency duplication
 hashbrown = { version = "0.17", default-features = false, features = ["default-hasher"] }
 hashlink = "0.12.0"
