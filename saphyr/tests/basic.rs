@@ -287,3 +287,72 @@ fn test_nominal_float_parse() {
         assert!(it.as_str().is_some());
     }
 }
+
+#[test]
+fn test_mapping_duplicate_keys() {
+    // https://github.com/saphyr-rs/saphyr/issues/116
+    let s = "
+a: 1
+b: 2
+a: 3
+";
+    let err = Yaml::load_from_str(s).expect_err("duplicate key must not load");
+    assert_eq!(err.info(), "duplicated key in mapping");
+    // The error points at the second occurrence of `a`.
+    assert_eq!(err.marker().line(), 4);
+    assert_eq!(err.marker().col(), 0);
+}
+
+#[test]
+fn test_mapping_duplicate_keys_nested() {
+    let s = "
+outer:
+  - inner: 1
+    inner: 2
+";
+    assert!(Yaml::load_from_str(s).is_err());
+}
+
+#[test]
+fn test_mapping_duplicate_keys_flow() {
+    assert!(Yaml::load_from_str("{ a: 1, a: 2 }").is_err());
+}
+
+#[test]
+fn test_mapping_distinct_keys() {
+    // The same key used in 2 different mappings is not a duplicate.
+    let s = "
+- a: 1
+  b: 2
+- a: 3
+  b: 4
+";
+    let docs = Yaml::load_from_str(s).unwrap();
+    let doc = &docs[0];
+    assert_eq!(doc[0]["a"].as_integer(), Some(1));
+    assert_eq!(doc[0]["b"].as_integer(), Some(2));
+    assert_eq!(doc[1]["a"].as_integer(), Some(3));
+    assert_eq!(doc[1]["b"].as_integer(), Some(4));
+}
+
+#[test]
+fn test_mapping_duplicate_keys_allowed() {
+    use saphyr::YamlLoader;
+    use saphyr_parser::Parser;
+
+    let s = "
+a: 1
+b: 2
+a: 3
+";
+    let mut parser = Parser::new_from_str(s);
+    let mut loader = YamlLoader::<Yaml>::default();
+    loader.allow_duplicate_keys(true);
+    parser.load(&mut loader, true).unwrap();
+    assert!(loader.error().is_none());
+
+    // The last value associated with the key wins.
+    let docs = loader.into_documents();
+    assert_eq!(docs[0]["a"].as_integer(), Some(3));
+    assert_eq!(docs[0]["b"].as_integer(), Some(2));
+}

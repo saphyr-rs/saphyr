@@ -31,11 +31,16 @@ where
     // states
     // (current node, anchor_id, tag) tuple
     doc_stack: Vec<(Node, usize, Option<Cow<'input, Tag>>)>,
-    key_stack: Vec<Node>,
+    // (current key, marker at which the key started) tuple
+    key_stack: Vec<(Node, Marker)>,
     anchor_map: BTreeMap<usize, Node>,
     marker: PhantomData<&'input u32>,
     /// See [`Self::early_parse()`]
     early_parse: bool,
+    /// See [`Self::allow_duplicate_keys()`]
+    allow_duplicate_keys: bool,
+    /// The first error that was encountered while loading, if any.
+    error: Option<ScanError>,
 }
 
 /// A trait providing methods used by the [`YamlLoader`].
@@ -181,7 +186,11 @@ pub trait LoadableYamlNode<'input>: Clone + core::hash::Hash + Eq {
     /// ```
     ///
     /// # Errors
-    /// Returns [`ScanError`] when loading fails.
+    /// Returns [`ScanError`] when loading fails. As mandated by the YAML specification, a mapping
+    /// containing duplicate keys is an error. See [`allow_duplicate_keys`] to opt out of this
+    /// check.
+    ///
+    /// [`allow_duplicate_keys`]: YamlLoader::allow_duplicate_keys
     fn load_from_str(source: &str) -> Result<Vec<Self>, ScanError> {
         Self::load_from_iter(source.chars())
     }
@@ -210,6 +219,9 @@ pub trait LoadableYamlNode<'input>: Clone + core::hash::Hash + Eq {
     fn load_from_parser<I: Input>(parser: &mut Parser<'input, I>) -> Result<Vec<Self>, ScanError> {
         let mut loader = YamlLoader::default();
         parser.load(&mut loader, true)?;
+        if let Some(e) = loader.error.take() {
+            return Err(e);
+        }
         Ok(loader.into_documents())
     }
 }
@@ -232,6 +244,27 @@ where
         self.early_parse = enabled;
     }
 
+    /// Whether to accept mappings with duplicate keys while loading a YAML.
+    ///
+    /// The YAML specification mandates that keys in a mapping be unique. If set to `false`
+    /// (default), the loader errors out when a key appears twice in the same mapping. If set to
+    /// `true`, the loader keeps the last of the values associated with the key, as it did prior to
+    /// duplicate key detection being introduced.
+    pub fn allow_duplicate_keys(&mut self, enabled: bool) {
+        self.allow_duplicate_keys = enabled;
+    }
+
+    /// Return the first error that was encountered while loading, if any.
+    ///
+    /// Events fed to the loader after an error occurred are ignored. The documents returned by
+    /// [`into_documents`] must not be used if this returns `Some`.
+    ///
+    /// [`into_documents`]: YamlLoader::into_documents
+    #[must_use]
+    pub fn error(&self) -> Option<&ScanError> {
+        self.error.as_ref()
+    }
+
     /// Return the document nodes from `self`, consuming it in the process.
     #[must_use]
     pub fn into_documents(self) -> Vec<Node> {
@@ -244,6 +277,22 @@ where
     Node: LoadableYamlNode<'input>,
 {
     fn on_event(&mut self, ev: Event<'input>, span: Span) {
+        // Once an error occurred, the state of the loader is not to be trusted. Ignore the rest of
+        // the stream and keep the first error around for `load_from_parser` to return.
+        if self.error.is_some() {
+            return;
+        }
+        if let Err(e) = self.on_event_impl(ev, span) {
+            self.error = Some(e);
+        }
+    }
+}
+
+impl<'input, Node> YamlLoader<'input, Node>
+where
+    Node: LoadableYamlNode<'input>,
+{
+    fn on_event_impl(&mut self, ev: Event<'input>, span: Span) -> Result<(), ScanError> {
         let mark = span.start;
         match ev {
             Event::DocumentStart(_) | Event::Nothing | Event::StreamStart | Event::StreamEnd => {
@@ -272,7 +321,8 @@ where
                     aid,
                     tag,
                 ));
-                self.key_stack.push(Node::from_bare_yaml(Yaml::BadValue));
+                self.key_stack
+                    .push((Node::from_bare_yaml(Yaml::BadValue), mark));
             }
             Event::MappingEnd | Event::SequenceEnd => {
                 if ev == Event::MappingEnd {
@@ -286,7 +336,7 @@ where
                         node = node.into_tagged(tag);
                     }
                 }
-                self.insert_new_node(node, anchor_id, None);
+                self.insert_new_node(node, anchor_id, None, mark)?;
             }
             Event::Scalar(v, style, aid, tag) => {
                 let node = if self.early_parse {
@@ -294,24 +344,26 @@ where
                 } else {
                     Yaml::Representation(v, style, tag.clone())
                 };
-                self.insert_new_node(Node::from_bare_yaml(node).with_span(span), aid, tag);
+                self.insert_new_node(Node::from_bare_yaml(node).with_span(span), aid, tag, mark)?;
             }
             Event::Alias(id) => {
                 let n = match self.anchor_map.get(&id) {
                     Some(v) => v.clone(),
                     None => Node::from_bare_yaml(Yaml::BadValue),
                 };
-                self.insert_new_node(n.with_span(span), 0, None);
+                self.insert_new_node(n.with_span(span), 0, None, mark)?;
             }
         }
+        Ok(())
     }
-}
 
-impl<'input, Node> YamlLoader<'input, Node>
-where
-    Node: LoadableYamlNode<'input>,
-{
-    fn insert_new_node(&mut self, mut node: Node, anchor_id: usize, tag: Option<Cow<'input, Tag>>) {
+    fn insert_new_node(
+        &mut self,
+        mut node: Node,
+        anchor_id: usize,
+        tag: Option<Cow<'input, Tag>>,
+        mark: Marker,
+    ) -> Result<(), ScanError> {
         // valid anchor id starts from 1
         if anchor_id > 0 {
             self.anchor_map.insert(anchor_id, node.clone());
@@ -325,19 +377,25 @@ where
             if parent_node.is_sequence() {
                 parent_node.sequence_mut().push(node);
             } else if parent_node.is_mapping() {
-                let cur_key = self.key_stack.last_mut().unwrap();
+                let (cur_key, key_mark) = self.key_stack.last_mut().unwrap();
                 if cur_key.is_badvalue() {
                     // current node is a key
                     *cur_key = node;
+                    *key_mark = mark;
                 } else {
                     // current node is a value
+                    let key = cur_key.take();
+                    let key_mark = *key_mark;
                     let hash = parent_node.mapping_mut();
-                    hash.insert(cur_key.take().into(), node);
+                    if hash.insert(key.into(), node).is_some() && !self.allow_duplicate_keys {
+                        return Err(ScanError::new_str(key_mark, "duplicated key in mapping"));
+                    }
                 }
             }
         } else {
             self.doc_stack.push((node, anchor_id, tag));
         }
+        Ok(())
     }
 }
 
@@ -354,6 +412,8 @@ where
             anchor_map: BTreeMap::new(),
             marker: PhantomData,
             early_parse: true,
+            allow_duplicate_keys: false,
+            error: None,
         }
     }
 }
