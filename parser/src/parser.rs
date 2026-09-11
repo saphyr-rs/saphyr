@@ -135,8 +135,7 @@ impl Display for Tag {
 impl<'input> Event<'input> {
     /// Create an empty scalar.
     fn empty_scalar() -> Self {
-        // a null scalar
-        Event::Scalar("~".into(), ScalarStyle::Plain, 0, None)
+        Event::Scalar(Cow::default(), ScalarStyle::Plain, 0, None)
     }
 
     /// Create an empty scalar with the given anchor.
