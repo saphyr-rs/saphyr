@@ -84,6 +84,44 @@ a1: &DEFAULT
 }
 
 #[test]
+fn test_legitimate_alias_fanout_is_not_rejected() {
+    // Five levels of 9-way anchor reuse materialize ~14k nodes (well under the
+    // default 100_000-node alias budget) and must still load normally.
+    let s = "
+a: &a [\"lol\"]
+b: &b [*a,*a,*a,*a,*a,*a,*a,*a,*a]
+c: &c [*b,*b,*b,*b,*b,*b,*b,*b,*b]
+d: &d [*c,*c,*c,*c,*c,*c,*c,*c,*c]
+e: [*d,*d,*d,*d,*d,*d,*d,*d,*d]
+";
+    let docs = Yaml::load_from_str(s).unwrap();
+    assert_eq!(docs.len(), 1);
+}
+
+#[test]
+fn test_alias_bomb_is_rejected() {
+    // Regression test for https://github.com/saphyr-rs/saphyr/issues/109 (YAML
+    // "billion laughs" alias-bomb): unconditional deep-cloning of anchor subtrees
+    // during Event::Alias resolution let a tiny nested-anchor payload expand into
+    // an exponential number of nodes, exhausting memory. This is the same 9-way
+    // fan-out from the issue, but truncated to six anchor levels: that already
+    // materializes ~125k nodes through alias resolution alone (crossing the
+    // default 100_000-node budget), while staying cheap enough to actually
+    // allocate here -- the issue's full 9-level payload legitimately tries to
+    // produce ~43 million nodes, which is unsafe to run in a test.
+    let s = "
+a: &a [\"lol\"]
+b: &b [*a,*a,*a,*a,*a,*a,*a,*a,*a]
+c: &c [*b,*b,*b,*b,*b,*b,*b,*b,*b]
+d: &d [*c,*c,*c,*c,*c,*c,*c,*c,*c]
+e: &e [*d,*d,*d,*d,*d,*d,*d,*d,*d]
+f: [*e,*e,*e,*e,*e,*e,*e,*e,*e]
+";
+    let err = Yaml::load_from_str(s).expect_err("alias bomb should be rejected");
+    assert!(err.to_string().contains("alias"), "unexpected error: {err}");
+}
+
+#[test]
 fn test_plain_datatype() {
     let s = "
 - 'string'
