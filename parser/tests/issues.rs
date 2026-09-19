@@ -144,8 +144,8 @@ fn test_issue1() {
             Event::DocumentStart(false),
             Event::SequenceStart(0, None),
             Event::MappingStart(0, None),
-            Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),
-            Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),
+            Event::Scalar("".into(), ScalarStyle::Plain, 0, None),
+            Event::Scalar("".into(), ScalarStyle::Plain, 0, None),
             Event::MappingEnd,
             Event::SequenceEnd,
             Event::DocumentEnd,
@@ -161,11 +161,11 @@ fn test_issue1() {
             Event::DocumentStart(false),
             Event::SequenceStart(0, None),
             Event::MappingStart(0, None),
-            Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),
+            Event::Scalar("".into(), ScalarStyle::Plain, 0, None),
             Event::SequenceStart(0, None),
             Event::MappingStart(0, None),
-            Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),
-            Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),
+            Event::Scalar("".into(), ScalarStyle::Plain, 0, None),
+            Event::Scalar("".into(), ScalarStyle::Plain, 0, None),
             Event::MappingEnd,
             Event::SequenceEnd,
             Event::MappingEnd,
@@ -194,7 +194,7 @@ fn test_issue1() {
             Event::SequenceStart(0, None),
             Event::MappingStart(0, None),
             Event::Scalar("b".into(), ScalarStyle::Plain, 0, None),
-            Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),
+            Event::Scalar("".into(), ScalarStyle::Plain, 0, None),
             Event::MappingEnd,
             Event::SequenceEnd,
             // No `MappingEnd` here.
@@ -370,7 +370,7 @@ fn test_issue37() {
             (Event::MappingStart(0, None),                                                Span::new(Marker::new(8, 2, 4), Marker::new(8, 2, 4))),
             (Event::Scalar("hash_block_null_value".into(), ScalarStyle::Plain, 0, None),  Span::new(Marker::new(8, 2, 4), Marker::new(29, 2, 25))),
 
-            (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),                      Span::new(Marker::new(29, 2, 25), Marker::new(29, 2, 25))),
+            (Event::Scalar("".into(), ScalarStyle::Plain, 0, None),                      Span::new(Marker::new(29, 2, 25), Marker::new(29, 2, 25))),
 
             (Event::Scalar("hash_flow".into(), ScalarStyle::Plain, 0, None),              Span::new(Marker::new(35, 3, 4), Marker::new(44, 3, 13))),
             (Event::MappingStart(0, None),                                                Span::new(Marker::new(46, 3, 15), Marker::new(47, 3, 16))),
@@ -380,7 +380,7 @@ fn test_issue37() {
             (Event::Scalar("array_block_null_value".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(79, 4, 4), Marker::new(101, 4, 26))),
             (Event::SequenceStart(0, None),                                               Span::new(Marker::new(109, 5, 6), Marker::new(109, 5, 6))),
 
-            (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),                      Span::new(Marker::new(110, 5, 7), Marker::new(110, 5, 7))),
+            (Event::Scalar("".into(), ScalarStyle::Plain, 0, None),                      Span::new(Marker::new(110, 5, 7), Marker::new(110, 5, 7))),
 
             (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),                                 Span::new(Marker::new(119, 6, 8), Marker::new(120, 6, 9))),
             (Event::Scalar("null".into(), ScalarStyle::Plain, 0, None),                              Span::new(Marker::new(129, 7, 8), Marker::new(133, 7, 12))),
@@ -393,7 +393,7 @@ fn test_issue37() {
             (Event::Scalar("indentless_array_block_null_value".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(175, 9, 4), Marker::new(208, 9, 37))),
             (Event::SequenceStart(0, None),                                                          Span::new(Marker::new(215, 10, 5), Marker::new(215, 10, 5))),
 
-            (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),    Span::new(Marker::new(215, 10, 5), Marker::new(215, 10, 5))),
+            (Event::Scalar("".into(), ScalarStyle::Plain, 0, None),    Span::new(Marker::new(215, 10, 5), Marker::new(215, 10, 5))),
 
             (Event::Scalar("~".into(), ScalarStyle::Plain, 0, None),    Span::new(Marker::new(222, 11, 6), Marker::new(223, 11, 7))),
             (Event::Scalar("null".into(), ScalarStyle::Plain, 0, None), Span::new(Marker::new(230, 12, 6), Marker::new(234, 12, 10))),

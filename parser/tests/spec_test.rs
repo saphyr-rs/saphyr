@@ -32,8 +32,9 @@ impl EventReceiver<'_> for YamlChecker {
             Event::SequenceEnd => TestEvent::OnSequenceEnd,
             Event::MappingStart(..) => TestEvent::OnMapStart,
             Event::MappingEnd => TestEvent::OnMapEnd,
-            Event::Scalar(ref v, style, _, _) => {
-                if v == "~" && style == ScalarStyle::Plain {
+            Event::Scalar(ref v, style, _, ref tag) => {
+                // An untagged plain node that is empty or "~" resolves to null.
+                if style == ScalarStyle::Plain && tag.is_none() && (v == "~" || v.is_empty()) {
                     TestEvent::OnNull
                 } else {
                     TestEvent::OnScalar
