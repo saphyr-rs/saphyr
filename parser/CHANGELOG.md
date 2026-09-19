@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.0
+
+**Breaking Changes**:
+
+- Empty scalars are now emitted for empty nodes instead of `~`.
+([+129](https://github.com/saphyr-rs/saphyr/pull/129))
+
+
 ## v0.0.12
 
 **Changes**:

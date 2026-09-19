@@ -1,10 +1,20 @@
 # Changelog
 
-## Upcoming
+## v0.1.0
+
+**Breaking Changes**:
+
+- Update to [saphyr-parser v0.1.0](https://crates.io/crates/saphyr-parser/0.1.0)
+which now emits empty scalars for empty nodes instead of `~`.
+([+129](https://github.com/saphyr-rs/saphyr/pull/129))
 
 **Changes**:
-- ([yaml-rust2#82](https://github.com/Ethiraric/yaml-rust2/issues/82)) `encoding_rs` was
-  pinned to versions prior to `v0.8.40` to maintain the current MSRV.
+
+- `encoding_rs` was pinned to versions prior to `v0.8.40` to maintain the current MSRV.
+([yaml-rust2#82](https://github.com/Ethiraric/yaml-rust2/issues/82))
+
+- `Yaml::load_from_read(std::io::Read)` was added for reading Yaml documents from a `std::io::Read` stream.
+([+127](https://github.com/saphyr-rs/saphyr/pull/127))
 
 
 ## v0.0.12
