@@ -61,6 +61,7 @@ trees:
       workspace: "--workspace"
     remotes:
       bourumir-wyngs: "https://github.com/bourumir-wyngs/saphyr.git"
+      chrisjr404: "https://github.com/ChrisJr404/saphyr.git"
       duckduckwhale: "https://github.com/DuckDuckWhale/saphyr.git"
       facet-rs: "https://github.com/facet-rs/saphyr.git"
       jeanmertz: "https://github.com/JeanMertz/saphyr.git"
