@@ -75,6 +75,102 @@ fn run_parser(input: &str) -> Result<Vec<Event<'_>>, ScanError> {
 }
 
 #[test]
+fn test_issue113_literal_supplementary_control() {
+    assert!(run_parser("\"😀\"").is_ok());
+}
+
+#[test]
+fn test_issue113_eight_digit_supplementary_control() {
+    assert_eq!(
+        run_parser(r#""\U0001D11E""#).unwrap(),
+        run_parser("\"𝄞\"").unwrap()
+    );
+}
+
+#[test]
+fn test_issue113_paired_surrogate_minimum() {
+    assert_eq!(
+        run_parser(r#""\uD800\uDC00""#).unwrap(),
+        run_parser("\"𐀀\"").unwrap()
+    );
+}
+
+#[test]
+fn test_issue113_paired_surrogate_maximum() {
+    assert_eq!(
+        run_parser(r#""\uDBFF\uDFFF""#).unwrap(),
+        run_parser("\"􏿿\"").unwrap()
+    );
+}
+
+#[test]
+fn test_issue113_paired_surrogate_g_clef() {
+    assert_eq!(
+        run_parser(r#""\uD834\uDD1E""#).unwrap(),
+        run_parser("\"𝄞\"").unwrap()
+    );
+}
+
+#[test]
+fn test_issue113_paired_surrogate_flow_span() {
+    let events = run_parser_with_span(r#"["\uD83D\uDE00", tail]"#).unwrap();
+    assert_eq!(
+        events[3].0,
+        Event::Scalar("😀".into(), ScalarStyle::DoubleQuoted, 0, None)
+    );
+    assert_eq!(
+        events[4].0,
+        Event::Scalar("tail".into(), ScalarStyle::Plain, 0, None)
+    );
+    assert_eq!(
+        events[4].1,
+        Span::new(Marker::new(17, 1, 17), Marker::new(21, 1, 21))
+    );
+}
+
+#[test]
+fn test_issue113_valid_escape_controls() {
+    assert_eq!(
+        run_parser(r#""\u263A""#).unwrap(),
+        run_parser("\"☺\"").unwrap()
+    );
+
+    let events = run_parser_with_span(r#"["\u263A\u263A", tail]"#).unwrap();
+    assert_eq!(
+        events[3].0,
+        Event::Scalar("☺☺".into(), ScalarStyle::DoubleQuoted, 0, None)
+    );
+    assert_eq!(
+        events[4].0,
+        Event::Scalar("tail".into(), ScalarStyle::Plain, 0, None)
+    );
+    assert_eq!(
+        events[4].1,
+        Span::new(Marker::new(17, 1, 17), Marker::new(21, 1, 21))
+    );
+}
+
+#[test]
+fn test_issue113_rejects_invalid_surrogate_escapes() {
+    for input in [
+        r#""\uD83D""#,
+        r#""\uDE00""#,
+        r#""\uDE00\uD83D""#,
+        r#""\uD83D\u0041""#,
+        r#""\uD83D\uDE0""#,
+        r#""\uD83G\uDE00""#,
+        r#""\U00110000""#,
+        r#""\uD834 \uDD1E""#,
+        r#""\uD834\U0000DD1E""#,
+    ] {
+        assert!(
+            run_parser(input).is_err(),
+            "input should be rejected: {input}"
+        );
+    }
+}
+
+#[test]
 #[allow(clippy::too_many_lines)]
 fn test_issue1() {
     // https://github.com/saphyr-rs/saphyr-parser/issues/1
