@@ -58,6 +58,8 @@ fn test_numberlike_strings() {
         r#"" 01234""#,
         r#""0x1234""#,
         r#"" 0x1234""#,
+        r#""0o1234""#,
+        r#""+.inf""#,
     ];
 
     for doc in &docs {
