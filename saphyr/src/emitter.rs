@@ -279,22 +279,26 @@ impl<'a> YamlEmitter<'a> {
     }
 
     fn emit_literal_block(&mut self, v: &str) -> EmitResult {
-        let ends_with_newline = v.ends_with('\n');
-        if ends_with_newline {
-            self.writer.write_str("|")?;
-        } else {
-            self.writer.write_str("|-")?;
+        let needs_indent_indicator = v.trim_start_matches('\n').starts_with([' ', '\t']);
+        self.writer.write_str("|")?;
+        if needs_indent_indicator {
+            write!(self.writer, "{}", self.best_indent)?;
+        }
+        if !v.ends_with('\n') {
+            self.writer.write_str("-")?;
         }
 
+        let previous_level = self.level;
         self.level += 1;
-        // lines() will omit the last line if it is empty.
+        if needs_indent_indicator && self.level == 0 {
+            self.level = 1;
+        }
         for line in v.lines() {
             writeln!(self.writer)?;
             self.write_indent()?;
-            // It's literal text, so don't escape special chars.
             self.writer.write_str(line)?;
         }
-        self.level -= 1;
+        self.level = previous_level;
         Ok(())
     }
 
