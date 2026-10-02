@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.1
+
+**Changes**:
+
+- Strings starting with `Oo` and `+.` strings are now quoted so that they roundtrip.
+([+131](https://github.com/saphyr-rs/saphyr/pull/127))
+
+
 ## v0.1.0
 
 **Breaking Changes**:
