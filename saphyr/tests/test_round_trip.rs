@@ -1,4 +1,4 @@
-use saphyr::{LoadableYamlNode, Scalar, Yaml, YamlEmitter};
+use saphyr::{LoadableYamlNode, Mapping, Scalar, Yaml, YamlEmitter};
 
 fn roundtrip(original: &Yaml) {
     let mut emitted = String::new();
@@ -18,8 +18,8 @@ fn roundtrip_multiline(original: &Yaml) {
     emitter.multiline_strings(true);
     emitter.dump(original).unwrap();
 
-    let documents = Yaml::load_from_str(&emitted).unwrap();
     println!("emitted {emitted}");
+    let documents = Yaml::load_from_str(&emitted).unwrap();
 
     assert_eq!(documents.len(), 1);
     assert_eq!(documents[0], *original);
@@ -114,4 +114,40 @@ fn test_multiline_trailing_newline() {
 fn test_multiline_leading_newline() {
     let y = Yaml::Sequence(vec![Yaml::Value(Scalar::String("\na".into()))]);
     roundtrip_multiline(&y);
+}
+
+const MULTILINE_LEADING_WHITESPACE: [&str; 5] = [
+    " First line with a leading space.\nSecond line at margin.",
+    " First line with a leading space.\nSecond line at margin.\n",
+    "\n First line\nSecond line",
+    "  \nFirst line\nSecond line",
+    "\tFirst line\nSecond line",
+];
+
+#[test]
+fn test_multiline_leading_whitespace_root() {
+    for value in MULTILINE_LEADING_WHITESPACE {
+        let scalar = Yaml::Value(Scalar::String(value.into()));
+        roundtrip_multiline(&scalar);
+    }
+}
+
+#[test]
+fn test_multiline_leading_whitespace_sequence() {
+    for value in MULTILINE_LEADING_WHITESPACE {
+        let scalar = Yaml::Value(Scalar::String(value.into()));
+        roundtrip_multiline(&Yaml::Sequence(vec![scalar]));
+    }
+}
+
+#[test]
+fn test_multiline_leading_whitespace_mapping() {
+    for value in MULTILINE_LEADING_WHITESPACE {
+        let scalar = Yaml::Value(Scalar::String(value.into()));
+        let mapping: Mapping = [(Yaml::Value(Scalar::String("key".into())), scalar)]
+            .into_iter()
+            .collect();
+        roundtrip(&Yaml::Mapping(mapping.clone()));
+        roundtrip_multiline(&Yaml::Mapping(mapping));
+    }
 }
