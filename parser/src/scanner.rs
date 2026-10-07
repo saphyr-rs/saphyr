@@ -62,11 +62,11 @@ pub enum ScalarStyle {
 /// A location in a yaml document.
 #[derive(Clone, Copy, PartialEq, Debug, Eq, Default)]
 pub struct Marker {
-    /// The index (in bytes) in the input string.
+    /// The index (in characters) in the input string.
     index: usize,
     /// The line (1-indexed).
     line: usize,
-    /// The column (1-indexed).
+    /// The column (0-indexed, in characters).
     col: usize,
 }
 
@@ -77,19 +77,19 @@ impl Marker {
         Marker { index, line, col }
     }
 
-    /// Return the index (in bytes) of the marker in the source.
+    /// Return the index (in characters) of the marker in the source.
     #[must_use]
     pub fn index(&self) -> usize {
         self.index
     }
 
-    /// Return the line of the marker in the source.
+    /// Return the line (1-indexed) of the marker in the source.
     #[must_use]
     pub fn line(&self) -> usize {
         self.line
     }
 
-    /// Return the column of the marker in the source.
+    /// Return the column (0-indexed, in characters) of the marker in the source.
     #[must_use]
     pub fn col(&self) -> usize {
         self.col

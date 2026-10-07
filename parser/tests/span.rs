@@ -213,3 +213,16 @@ fn test_empty_node_properties() {
         [("", "&a"), ("", "!b")]
     );
 }
+
+#[test]
+fn test_marker_position() {
+    // `é` is one character but two bytes.
+    let (_, span) = Parser::new_from_str("é: x")
+        .map(Result::unwrap)
+        .find(|(event, _)| matches!(event, Event::Scalar(s, ..) if s == "x"))
+        .unwrap();
+    assert_eq!(
+        (span.start.index(), span.start.line(), span.start.col()),
+        (3, 1, 3)
+    );
+}
