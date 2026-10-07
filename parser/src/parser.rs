@@ -708,8 +708,8 @@ impl<'input, T: Input> Parser<'input, T> {
 
     fn parser_process_directives(&mut self) -> Result<(), ScanError> {
         let mut version_directive_received = false;
+        let mut tags = BTreeMap::new();
         loop {
-            let mut tags = BTreeMap::new();
             match self.peek_token()? {
                 Token(span, TokenType::VersionDirective(_, _)) => {
                     // XXX parsing with warning according to spec
@@ -739,9 +739,9 @@ impl<'input, T: Input> Parser<'input, T> {
                 }
                 _ => break,
             }
-            self.tags = tags;
             self.skip();
         }
+        self.tags.extend(tags);
         Ok(())
     }
 
