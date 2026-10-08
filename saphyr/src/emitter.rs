@@ -224,6 +224,7 @@ impl<'a> YamlEmitter<'a> {
                 Ok(())
             }
             Yaml::Value(Scalar::Integer(v)) => Ok(write!(self.writer, "{v}")?),
+            Yaml::Value(Scalar::StringInteger(ref v)) => Ok(write!(self.writer, "{}", v.as_str())?),
             Yaml::Value(Scalar::FloatingPoint(ref v)) => Ok(write!(
                 self.writer,
                 "{v}{}",
