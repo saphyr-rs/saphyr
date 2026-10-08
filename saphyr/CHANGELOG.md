@@ -1,23 +1,12 @@
 # Changelog
 
-## Unreleased
+## v0.1.1
 
-**Breaking Changes**:
+**Changes**:
 
-- Duplicate keys in a mapping are no longer allowed
-([#116](https://github.com/saphyr-rs/saphyr/issues/116))
+- Strings starting with `Oo` and `+.` strings are now quoted so that they roundtrip.
+([+131](https://github.com/saphyr-rs/saphyr/pull/131))
 
-  Instead of silently keeping one of the values sharing the same key in a
-  mapping, the loader now returns a `ScanError` pointing at the duplicate key.
-  Keys being unique is part of the YAML specification, but is not tested by the
-  `yaml-test-suite` (the parser needs to emit events for both key-values).
-  Additionally, there is no standard way of defining which value should be
-  chosen in case of a duplicate. This mirrors the behavior `yaml-rust2` adopted
-  in its v0.9.0.
-
-  Users who relied on the previous "last one wins" behavior can restore it by
-  driving a `YamlLoader` themselves and calling
-  `YamlLoader::allow_duplicate_keys(true)` on it.
 
 ## v0.1.0
 
