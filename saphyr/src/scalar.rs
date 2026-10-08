@@ -142,15 +142,12 @@ impl<'input> Scalar<'input> {
         } else if let Some(tag) = tag.map(Cow::as_ref) {
             if tag.is_yaml_core_schema() {
                 match tag.suffix.as_ref() {
-                    "bool" => v.parse::<bool>().ok().map(Self::Boolean),
-                    "int" => v.parse::<i64>().ok().map(Self::Integer),
+                    "bool" => parse_core_schema_bool(&v).map(Self::Boolean),
+                    "int" => parse_core_schema_int(&v).map(Self::Integer),
                     "float" => parse_core_schema_fp(&v)
                         .map(OrderedFloat)
                         .map(Self::FloatingPoint),
-                    "null" => match v.as_ref() {
-                        "~" | "null" => Some(Self::Null),
-                        _ => None,
-                    },
+                    "null" => is_core_schema_null(&v).then_some(Self::Null),
                     "str" => Some(Self::String(v)),
                     // If we have a tag we do not recognize, return `None`.
                     _ => None,
@@ -176,54 +173,18 @@ impl<'input> Scalar<'input> {
     #[must_use]
     pub fn parse_from_cow(v: Cow<'input, str>) -> Self {
         let s = &*v;
-        let bytes = s.as_bytes();
 
-        if bytes.len() >= 2 {
-            match (bytes[0], bytes[1]) {
-                (b'0', b'x') => {
-                    if let Ok(i) = i64::from_str_radix(&s[2..], 16) {
-                        return Self::Integer(i);
-                    }
-                }
-                (b'0', b'o') => {
-                    if let Ok(i) = i64::from_str_radix(&s[2..], 8) {
-                        return Self::Integer(i);
-                    }
-                }
-                (b'+', _) => {
-                    if let Ok(i) = s[1..].parse::<i64>() {
-                        return Self::Integer(i);
-                    }
-                }
-                _ => {}
-            }
+        if is_core_schema_null(s) {
+            Self::Null
+        } else if let Some(b) = parse_core_schema_bool(s) {
+            Self::Boolean(b)
+        } else if let Some(i) = parse_core_schema_int(s) {
+            Self::Integer(i)
+        } else if let Some(f) = parse_core_schema_fp(s) {
+            Self::FloatingPoint(f.into())
+        } else {
+            Self::String(v)
         }
-
-        match bytes.len() {
-            1 if bytes[0] == b'~' => return Self::Null,
-            4 => {
-                let f = bytes[0] & 0xDF;
-                if f == b'N' && matches!(s, "null" | "Null" | "NULL") {
-                    return Self::Null;
-                } else if f == b'T' && matches!(s, "true" | "True" | "TRUE") {
-                    return Self::Boolean(true);
-                }
-            }
-            5 if matches!(s, "false" | "False" | "FALSE") => {
-                return Self::Boolean(false);
-            }
-            _ => {}
-        }
-
-        if let Ok(integer) = s.parse::<i64>() {
-            return Self::Integer(integer);
-        }
-
-        if let Some(float) = parse_core_schema_fp(s) {
-            return Self::FloatingPoint(float.into());
-        }
-
-        Self::String(v)
     }
 }
 
@@ -296,6 +257,58 @@ impl<'input> From<&'input ScalarOwned> for Scalar<'input> {
     fn from(value: &'input ScalarOwned) -> Self {
         value.as_scalar()
     }
+}
+
+/// Return whether the given string is a null according to the core schema.
+///
+/// See [10.2.1.1](https://yaml.org/spec/1.2.2/#10211-null) for the null definition. Note that an
+/// empty representation resolves to null, which is how an anchored-but-valueless node such as
+/// `key: &anchor` is spelled.
+#[must_use]
+pub fn is_core_schema_null(v: &str) -> bool {
+    matches!(v, "" | "~" | "null" | "Null" | "NULL")
+}
+
+/// Parse the given string as a boolean according to the core schema.
+///
+/// See [10.2.1.2](https://yaml.org/spec/1.2.2/#10212-boolean) for the boolean definition.
+///
+/// # Return
+/// Returns `Some` if parsing succeeded, `None` otherwise. As with [`parse_core_schema_fp`], failing
+/// to parse is not an error, so this does not return a `Result`.
+#[must_use]
+pub fn parse_core_schema_bool(v: &str) -> Option<bool> {
+    match v {
+        "true" | "True" | "TRUE" => Some(true),
+        "false" | "False" | "FALSE" => Some(false),
+        _ => None,
+    }
+}
+
+/// Parse the given string as an integer according to the core schema.
+///
+/// See [10.2.1.3](https://yaml.org/spec/1.2.2/#10213-integer) for the integer definition.
+///
+/// # Return
+/// Returns `Some` if parsing succeeded, `None` otherwise. As with [`parse_core_schema_fp`], failing
+/// to parse is not an error, so this does not return a `Result`.
+#[must_use]
+pub fn parse_core_schema_int(v: &str) -> Option<i64> {
+    // `0x`/`0o` take no sign, but `from_str_radix` accepts one, hence the digit check.
+    if let Some(digits) = v.strip_prefix("0x") {
+        if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return None;
+        }
+        return i64::from_str_radix(digits, 16).ok();
+    }
+    if let Some(digits) = v.strip_prefix("0o") {
+        if digits.is_empty() || !digits.bytes().all(|b| matches!(b, b'0'..=b'7')) {
+            return None;
+        }
+        return i64::from_str_radix(digits, 8).ok();
+    }
+    // Base 10 is `[-+]?[0-9]+`, which is exactly what `i64`'s own parser accepts.
+    v.parse::<i64>().ok()
 }
 
 /// Parse the given string as a floating point according to the core schema.
