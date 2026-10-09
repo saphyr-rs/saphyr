@@ -5,6 +5,30 @@ use alloc::{borrow::Cow, string::String};
 use ordered_float::OrderedFloat;
 use saphyr_parser::{ScalarStyle, Tag};
 
+/// A canonical decimal integer that does not fit in `i64`.
+///
+/// Ordering compares canonical decimal text lexicographically, not numerically.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct StringInteger<'input>(Cow<'input, str>);
+
+impl<'input> StringInteger<'input> {
+    /// Validate canonical decimal text and reject values that fit in `i64`.
+    #[must_use]
+    pub fn new(value: Cow<'input, str>) -> Option<Self> {
+        let text = value.as_ref();
+        if !is_canonical_decimal(text) || text.parse::<i64>().is_ok() {
+            return None;
+        }
+        Some(Self(value))
+    }
+
+    /// Return the canonical decimal representation.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// The resolved value of a scalar YAML node.
 ///
 /// Scalar nodes are any leaf nodes when parsing YAML. In the [10.1 Failsafe
@@ -17,6 +41,8 @@ pub enum Scalar<'input> {
     Boolean(bool),
     /// An integer value ([10.2.1.3 Integer](https://yaml.org/spec/1.2.2/#integer)).
     Integer(i64),
+    /// An integer value that does not fit in `i64`.
+    StringInteger(StringInteger<'input>),
     /// A floating point value ([10.2.1.4 Floating
     /// Point](https://yaml.org/spec/1.2.2/#floating-point)).
     FloatingPoint(OrderedFloat<f64>),
@@ -38,6 +64,8 @@ pub enum ScalarOwned {
     Boolean(bool),
     /// An integer value ([10.2.1.3 Integer](https://yaml.org/spec/1.2.2/#integer)).
     Integer(i64),
+    /// An integer value that does not fit in `i64`.
+    StringInteger(StringInteger<'static>),
     /// A floating point value ([10.2.1.4 Floating
     /// Point](https://yaml.org/spec/1.2.2/#floating-point)).
     FloatingPoint(OrderedFloat<f64>),
@@ -57,6 +85,9 @@ impl<'input> Scalar<'input> {
             Self::Null => ScalarOwned::Null,
             Self::Boolean(v) => ScalarOwned::Boolean(v),
             Self::Integer(v) => ScalarOwned::Integer(v),
+            Self::StringInteger(v) => {
+                ScalarOwned::StringInteger(StringInteger(Cow::Owned(v.0.into_owned())))
+            }
             Self::FloatingPoint(v) => ScalarOwned::FloatingPoint(v),
             Self::String(v) => ScalarOwned::String(v.into_owned()),
         }
@@ -143,7 +174,7 @@ impl<'input> Scalar<'input> {
             if tag.is_yaml_core_schema() {
                 match tag.suffix.as_ref() {
                     "bool" => v.parse::<bool>().ok().map(Self::Boolean),
-                    "int" => v.parse::<i64>().ok().map(Self::Integer),
+                    "int" => parse_integer(v).ok(),
                     "float" => parse_core_schema_fp(&v)
                         .map(OrderedFloat)
                         .map(Self::FloatingPoint),
@@ -175,29 +206,12 @@ impl<'input> Scalar<'input> {
     /// Returns the parsed [`Scalar`].
     #[must_use]
     pub fn parse_from_cow(v: Cow<'input, str>) -> Self {
+        let v = match parse_integer(v) {
+            Ok(integer) => return integer,
+            Err(v) => v,
+        };
         let s = &*v;
         let bytes = s.as_bytes();
-
-        if bytes.len() >= 2 {
-            match (bytes[0], bytes[1]) {
-                (b'0', b'x') => {
-                    if let Ok(i) = i64::from_str_radix(&s[2..], 16) {
-                        return Self::Integer(i);
-                    }
-                }
-                (b'0', b'o') => {
-                    if let Ok(i) = i64::from_str_radix(&s[2..], 8) {
-                        return Self::Integer(i);
-                    }
-                }
-                (b'+', _) => {
-                    if let Ok(i) = s[1..].parse::<i64>() {
-                        return Self::Integer(i);
-                    }
-                }
-                _ => {}
-            }
-        }
 
         match bytes.len() {
             1 if bytes[0] == b'~' => return Self::Null,
@@ -213,10 +227,6 @@ impl<'input> Scalar<'input> {
                 return Self::Boolean(false);
             }
             _ => {}
-        }
-
-        if let Ok(integer) = s.parse::<i64>() {
-            return Self::Integer(integer);
         }
 
         if let Some(float) = parse_core_schema_fp(s) {
@@ -256,6 +266,9 @@ impl ScalarOwned {
             Self::Null => Scalar::Null,
             Self::Boolean(v) => Scalar::Boolean(*v),
             Self::Integer(v) => Scalar::Integer(*v),
+            Self::StringInteger(v) => {
+                Scalar::StringInteger(StringInteger(Cow::Borrowed(v.as_str())))
+            }
             Self::FloatingPoint(v) => Scalar::FloatingPoint(*v),
             Self::String(v) => Scalar::String(v.as_str().into()),
         }
@@ -290,6 +303,103 @@ impl ScalarOwned {
     pub fn parse_from_cow(v: Cow<'_, str>) -> Self {
         Scalar::parse_from_cow(v).into_owned()
     }
+}
+
+fn parse_integer(value: Cow<'_, str>) -> Result<Scalar<'_>, Cow<'_, str>> {
+    let text = value.as_ref();
+    let bytes = text.as_bytes();
+    let (negative, digits, radix) = match bytes.first().copied() {
+        Some(b'0') if bytes.get(1) == Some(&b'x') && text.is_char_boundary(2) => {
+            (false, &text[2..], 16u16)
+        }
+        Some(b'0') if bytes.get(1) == Some(&b'o') && text.is_char_boundary(2) => {
+            (false, &text[2..], 8u16)
+        }
+        Some(b'0') if bytes.get(1) == Some(&b'x') || bytes.get(1) == Some(&b'o') => {
+            return Err(value);
+        }
+        Some(b'-') => (true, &text[1..], 10u16),
+        Some(b'+') => (false, &text[1..], 10u16),
+        _ => (false, text, 10u16),
+    };
+    if digits.is_empty()
+        || !digits.bytes().all(|byte| match radix {
+            8 => (b'0'..=b'7').contains(&byte),
+            10 => byte.is_ascii_digit(),
+            16 => byte.is_ascii_hexdigit(),
+            _ => false,
+        })
+    {
+        return Err(value);
+    }
+
+    if radix == 10 {
+        if let Ok(integer) = text.parse::<i64>() {
+            return Ok(Scalar::Integer(integer));
+        }
+        let canonical_digits = digits.trim_start_matches('0');
+        let canonical_digits = if canonical_digits.is_empty() {
+            "0"
+        } else {
+            canonical_digits
+        };
+        if !negative {
+            if let Ok(integer) = canonical_digits.parse::<i64>() {
+                return Ok(Scalar::Integer(integer));
+            }
+        } else if canonical_digits == "0" {
+            return Ok(Scalar::Integer(0));
+        }
+        let canonical = if text == canonical_digits || (negative && digits == canonical_digits) {
+            value
+        } else if negative {
+            Cow::Owned(alloc::format!("-{canonical_digits}"))
+        } else {
+            Cow::Owned(String::from(canonical_digits))
+        };
+        return Ok(Scalar::StringInteger(StringInteger(canonical)));
+    }
+
+    if let Ok(integer) = i64::from_str_radix(digits, u32::from(radix)) {
+        return Ok(Scalar::Integer(integer));
+    }
+
+    let mut decimal = alloc::vec![0u8];
+    for byte in digits.bytes() {
+        let digit = match byte {
+            b'0'..=b'9' => byte - b'0',
+            b'a'..=b'f' => byte - b'a' + 10,
+            b'A'..=b'F' => byte - b'A' + 10,
+            _ => unreachable!(),
+        };
+        let mut carry = u16::from(digit);
+        for decimal_digit in &mut decimal {
+            let value = u16::from(*decimal_digit) * radix + carry;
+            *decimal_digit = (value % 10) as u8;
+            carry = value / 10;
+        }
+        while carry > 0 {
+            decimal.push((carry % 10) as u8);
+            carry /= 10;
+        }
+    }
+    while decimal.len() > 1 && decimal.last() == Some(&0) {
+        decimal.pop();
+    }
+    let canonical: String = decimal
+        .iter()
+        .rev()
+        .map(|digit| char::from(b'0' + digit))
+        .collect();
+    Ok(Scalar::StringInteger(StringInteger(Cow::Owned(canonical))))
+}
+
+fn is_canonical_decimal(text: &str) -> bool {
+    let digits = text.strip_prefix('-').unwrap_or(text);
+    !digits.is_empty()
+        && digits.bytes().all(|byte| byte.is_ascii_digit())
+        && (digits == "0" || !digits.starts_with('0'))
+        && !(text.starts_with('-') && digits == "0")
 }
 
 impl<'input> From<&'input ScalarOwned> for Scalar<'input> {

@@ -29,6 +29,14 @@ define_as!(as_floating_point, f64,               FloatingPoint);
 
 define_as_ref!(as_str,        &str,              String);
 
+/// Return canonical decimal text when this scalar does not fit in `i64`.
+pub fn as_large_integer_text(&self) -> Option<&str> {
+    match self {
+        Self::StringInteger(value) => Some(value.as_str()),
+        _ => None,
+    }
+}
+
 define_as_ref_mut!(as_bool_mut,           &mut bool,             Boolean);
 define_as_ref_mut!(as_integer_mut,        &mut i64,              Integer);
 define_as_ref_mut!(as_floating_point_mut, &mut f64,              FloatingPoint);
@@ -42,7 +50,10 @@ define_into!(into_string,  alloc::string::String,           String);
 // ---------- VARIANT TESTING ----------
 define_is!(is_null,           Self::Null);
 define_is!(is_boolean,        Self::Boolean(_));
-define_is!(is_integer,        Self::Integer(_));
+/// Return whether this scalar is an integer, including values beyond `i64`.
+pub fn is_integer(&self) -> bool {
+    matches!(self, Self::Integer(_) | Self::StringInteger(_))
+}
 define_is!(is_floating_point, Self::FloatingPoint(_));
 define_is!(is_string,         Self::String(_));
     );
@@ -321,7 +332,18 @@ impl $(< $( $generic ),+ >)? $yaml $(where $($whereclause)+)? {
 
     // ---------- VARIANT TESTING ----------
     define_is!(is_boolean,        Self::Value($scalartype::Boolean(_)));
-    define_is!(is_integer,        Self::Value($scalartype::Integer(_)));
+    /// Return canonical decimal text when this node contains an integer that does not fit in `i64`.
+    pub fn as_large_integer_text(&self) -> Option<&str> {
+        match self {
+            Self::Value($scalartype::StringInteger(value)) => Some(value.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Return whether this node contains an integer, including values beyond `i64`.
+    pub fn is_integer(&self) -> bool {
+        matches!(self, Self::Value($scalartype::Integer(_) | $scalartype::StringInteger(_)))
+    }
     define_is!(is_null,           Self::Value($scalartype::Null));
     define_is!(is_floating_point, Self::Value($scalartype::FloatingPoint(_)));
     define_is!(is_string,         Self::Value($scalartype::String(_)));
