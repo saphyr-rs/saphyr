@@ -19,11 +19,9 @@
   driving a `YamlLoader` themselves and calling
   `YamlLoader::allow_duplicate_keys(true)` on it.
 
-## v0.1.1
-
 **Changes**:
 
-- Strings starting with `Oo` and `+.` strings are now quoted so that they roundtrip.
+- Strings starting with `Oo` and `+.` are now quoted so that they roundtrip.
 ([+131](https://github.com/saphyr-rs/saphyr/pull/131))
 
 
