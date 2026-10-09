@@ -335,7 +335,12 @@ impl<'a> YamlEmitter<'a> {
                     write!(self.writer, ":")?;
                     self.emit_val(true, v)?;
                 } else {
-                    self.emit_node(k)?;
+                    // A literal block cannot be used as an implicit key, so multiline keys are
+                    // always written as quoted strings.
+                    let multiline_strings = core::mem::replace(&mut self.multiline_strings, false);
+                    let res = self.emit_node(k);
+                    self.multiline_strings = multiline_strings;
+                    res?;
                     write!(self.writer, ":")?;
                     self.emit_val(false, v)?;
                 }

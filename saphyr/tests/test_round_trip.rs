@@ -1,4 +1,4 @@
-use saphyr::{LoadableYamlNode, Scalar, Yaml, YamlEmitter};
+use saphyr::{LoadableYamlNode, Mapping, Scalar, Yaml, YamlEmitter};
 
 fn roundtrip(original: &Yaml) {
     let mut emitted = String::new();
@@ -114,4 +114,18 @@ fn test_multiline_trailing_newline() {
 fn test_multiline_leading_newline() {
     let y = Yaml::Sequence(vec![Yaml::Value(Scalar::String("\na".into()))]);
     roundtrip_multiline(&y);
+}
+
+#[test]
+fn test_multiline_key() {
+    let mut mapping = Mapping::new();
+    mapping.insert(
+        Yaml::Value(Scalar::String("a\nb".into())),
+        Yaml::Value(Scalar::String("c".into())),
+    );
+    mapping.insert(
+        Yaml::Value(Scalar::String("d\n".into())),
+        Yaml::Value(Scalar::String("e\nf".into())),
+    );
+    roundtrip_multiline(&Yaml::Mapping(mapping));
 }
