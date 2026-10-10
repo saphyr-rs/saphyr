@@ -29,6 +29,8 @@ pub struct BufferedInput<T: Iterator<Item = char>> {
     input: T,
     /// Buffer for the next characters to consume.
     buffer: ArrayDeque<char, BUFFER_LEN>,
+    /// Number of NUL padding characters currently held at the end of `buffer`.
+    padding: usize,
 }
 
 impl<T: Iterator<Item = char>> BufferedInput<T> {
@@ -37,6 +39,7 @@ impl<T: Iterator<Item = char>> BufferedInput<T> {
         Self {
             input,
             buffer: ArrayDeque::default(),
+            padding: 0,
         }
     }
 }
@@ -48,9 +51,12 @@ impl<T: Iterator<Item = char>> Input for BufferedInput<T> {
             return;
         }
         for _ in 0..(count - self.buffer.len()) {
-            self.buffer
-                .push_back(self.input.next().unwrap_or('\0'))
-                .unwrap();
+            if let Some(c) = self.input.next() {
+                self.buffer.push_back(c).unwrap();
+            } else {
+                self.padding += 1;
+                self.buffer.push_back('\0').unwrap();
+            }
         }
     }
 
@@ -85,12 +91,18 @@ impl<T: Iterator<Item = char>> Input for BufferedInput<T> {
 
     #[inline]
     fn skip(&mut self) {
+        if self.buffer.len() == self.padding {
+            self.padding = self.padding.saturating_sub(1);
+        }
         self.buffer.pop_front();
     }
 
     #[inline]
     fn skip_n(&mut self, count: usize) {
         self.buffer.drain(0..count);
+        if self.buffer.len() < self.padding {
+            self.padding = self.buffer.len();
+        }
     }
 
     #[inline]
@@ -101,5 +113,14 @@ impl<T: Iterator<Item = char>> Input for BufferedInput<T> {
     #[inline]
     fn peek_nth(&self, n: usize) -> char {
         self.buffer[n]
+    }
+
+    #[inline]
+    fn peek_opt(&self) -> Option<char> {
+        if self.buffer.len() > self.padding {
+            Some(self.buffer[0])
+        } else {
+            None
+        }
     }
 }

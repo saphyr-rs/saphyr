@@ -434,3 +434,26 @@ fn test_issue84() {
         ]
     );
 }
+
+#[test]
+fn test_raw_nul_truncates_document() {
+    for s in [
+        "key: a\0b\n",
+        "key: a\0b\nother: c\n",
+        "k\0ey: a\n",
+        "# note\0\nkey: a\n",
+    ] {
+        assert!(run_parser(s).is_err(), "expected an error for {s:?}");
+    }
+}
+
+#[test]
+fn test_escaped_nul_is_preserved() {
+    let events = run_parser(r#"key: "a\0b""#).unwrap();
+    assert!(events.contains(&Event::Scalar(
+        "a\0b".into(),
+        ScalarStyle::DoubleQuoted,
+        0,
+        None
+    )));
+}
