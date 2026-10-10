@@ -237,6 +237,18 @@ c: ~
 }
 
 #[test]
+fn test_empty_node_is_null() {
+    let out = Yaml::load_from_str("email:\n-\n? \n: v\nempty: ''\n").unwrap();
+    let doc = &out[0];
+    assert_eq!(doc["email"][0], Yaml::Value(Scalar::Null));
+    assert_eq!(
+        doc.as_mapping().unwrap().get(&Yaml::Value(Scalar::Null)),
+        Some(&Yaml::Value(Scalar::String("v".into())))
+    );
+    assert_eq!(doc["empty"], Yaml::Value(Scalar::String("".into())));
+}
+
+#[test]
 fn test_integer_key() {
     let s = "
 0:
