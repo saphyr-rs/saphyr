@@ -202,11 +202,19 @@ impl<'a> YamlEmitter<'a> {
     }
 
     fn emit_node(&mut self, node: &Yaml) -> EmitResult {
+        self.emit_node_with_multiline_strings(node, self.multiline_strings)
+    }
+
+    fn emit_node_with_multiline_strings(
+        &mut self,
+        node: &Yaml,
+        multiline_strings: bool,
+    ) -> EmitResult {
         match *node {
             Yaml::Sequence(ref v) => self.emit_sequence(v),
             Yaml::Mapping(ref h) => self.emit_mapping(h),
             Yaml::Value(Scalar::String(ref v)) => {
-                if self.should_emit_string_as_block(v) {
+                if multiline_strings && self.should_emit_string_as_block(v) {
                     self.emit_literal_block(v)?;
                 } else if need_quotes(v) {
                     escape_str(self.writer, v)?;
@@ -271,7 +279,7 @@ impl<'a> YamlEmitter<'a> {
                     self.write_indent()?;
                     self.level -= 1;
                 }
-                self.emit_node(node.as_ref())
+                self.emit_node_with_multiline_strings(node.as_ref(), multiline_strings)
             }
             // XXX(chenyh) Alias
             Yaml::Alias(_) => Ok(()),
@@ -337,10 +345,7 @@ impl<'a> YamlEmitter<'a> {
                 } else {
                     // A literal block cannot be used as an implicit key, so multiline keys are
                     // always written as quoted strings.
-                    let multiline_strings = core::mem::replace(&mut self.multiline_strings, false);
-                    let res = self.emit_node(k);
-                    self.multiline_strings = multiline_strings;
-                    res?;
+                    self.emit_node_with_multiline_strings(k, false)?;
                     write!(self.writer, ":")?;
                     self.emit_val(false, v)?;
                 }
