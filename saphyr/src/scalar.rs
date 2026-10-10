@@ -161,6 +161,10 @@ impl<'input> Scalar<'input> {
                 // `!degree 50`.
                 Some(Self::parse_from_cow(v))
             }
+        } else if v.is_empty() {
+            // An empty node is an untagged empty plain scalar, which the core schema resolves to
+            // null.
+            Some(Self::Null)
         } else {
             // No tag means we have to guess.
             Some(Self::parse_from_cow(v))
