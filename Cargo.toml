@@ -29,7 +29,7 @@ readme = "README.md"
 edition = "2024"
 # Keep the rust-version in sync with the version used for lints and tests in .github/workflows/ci.yml
 rust-version = "1.85.0"
-version = "0.1.0"
+version = "0.1.1"
 
 [workspace.dependencies]
 # Keep the saphyr-parser version in sync with workspace.package.version
