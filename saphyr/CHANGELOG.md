@@ -19,7 +19,13 @@
   driving a `YamlLoader` themselves and calling
   `YamlLoader::allow_duplicate_keys(true)` on it.
 
+
+## v0.1.1
+
 **Changes**:
+
+- Empty scalars were incorrectly being interpreted as empty strings instead of `null`.
+  ([+136](https://github.com/saphyr-rs/saphyr/pull/136))
 
 - Strings starting with `Oo` and `+.` are now quoted so that they roundtrip.
   ([+131](https://github.com/saphyr-rs/saphyr/pull/131))
