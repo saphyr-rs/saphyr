@@ -7,6 +7,13 @@
 - Version bump to align with crate workspaces. No functional changes.
 
 
+## v0.1.2
+
+**Development**:
+
+- Version bump to align with crate workspaces. No functional changes.
+
+
 ## v0.1.1
 
 **Development**:

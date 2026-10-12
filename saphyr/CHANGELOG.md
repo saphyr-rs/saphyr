@@ -20,6 +20,16 @@
   `YamlLoader::allow_duplicate_keys(true)` on it.
 
 
+## v0.1.2
+
+**Changes**:
+
+- Multi-line string keys were incorrectly written using YAML literal block syntax
+  when multi-line strings were enabled. The emitter was updated to never use the
+  YAML literal block syntax for string keys.
+  ([#134](https://github.com/saphyr-rs/saphyr/pull/134))
+
+
 ## v0.1.1
 
 **Changes**:
