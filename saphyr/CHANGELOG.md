@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.1
+
+**Changes**:
+
+- Patch to integrate the multi-line YAML literal block string key fix from `v0.1.2`.
+
+
 ## v0.2.0
 
 **Breaking Changes**:

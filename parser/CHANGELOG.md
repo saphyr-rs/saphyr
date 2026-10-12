@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.1
+
+**Development**:
+
+- Version bump to align with crate workspaces. No functional changes.
+
+
 ## v0.2.0
 
 **Development**:
