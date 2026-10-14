@@ -18,11 +18,25 @@ fn roundtrip_multiline(original: &Yaml) {
     emitter.multiline_strings(true);
     emitter.dump(original).unwrap();
 
-    let documents = Yaml::load_from_str(&emitted).unwrap();
     println!("emitted {emitted}");
+    let documents = Yaml::load_from_str(&emitted).unwrap();
 
     assert_eq!(documents.len(), 1);
     assert_eq!(documents[0], *original);
+}
+
+fn assert_emits_yaml(input: &str, expected: &str) {
+    let original = Yaml::load_from_str(input).unwrap();
+    assert_eq!(original.len(), 1);
+
+    let mut emitted = String::new();
+    let mut emitter = YamlEmitter::new(&mut emitted);
+    emitter.multiline_strings(true);
+    emitter.dump(&original[0]).unwrap();
+
+    assert_eq!(emitted, expected);
+    let reparsed = Yaml::load_from_str(&emitted).unwrap();
+    assert_eq!(reparsed, original);
 }
 
 fn double_roundtrip(original: &str) {
@@ -128,4 +142,124 @@ fn test_multiline_key() {
         Yaml::Value(Scalar::String("e\nf".into())),
     );
     roundtrip_multiline(&Yaml::Mapping(mapping));
+}
+
+const MULTILINE_LEADING_WHITESPACE: [&str; 5] = [
+    " First line with a leading space.\nSecond line at margin.",
+    " First line with a leading space.\nSecond line at margin.\n",
+    "\n First line\nSecond line",
+    "  \nFirst line\nSecond line",
+    "\tFirst line\nSecond line",
+];
+const EXPECTED_LEADING_WHITESPACE_VALUE: &str =
+    " First line with a leading space.\nSecond line at margin.";
+
+#[test]
+fn test_multiline_leading_whitespace_root() {
+    for value in MULTILINE_LEADING_WHITESPACE {
+        let scalar = Yaml::Value(Scalar::String(value.into()));
+        roundtrip_multiline(&scalar);
+    }
+}
+
+#[test]
+fn test_multiline_leading_whitespace_sequence() {
+    for value in MULTILINE_LEADING_WHITESPACE {
+        let scalar = Yaml::Value(Scalar::String(value.into()));
+        roundtrip_multiline(&Yaml::Sequence(vec![scalar]));
+    }
+}
+
+#[test]
+fn test_multiline_leading_whitespace_mapping() {
+    for value in MULTILINE_LEADING_WHITESPACE {
+        let scalar = Yaml::Value(Scalar::String(value.into()));
+        let mapping: Mapping = [(Yaml::Value(Scalar::String("key".into())), scalar)]
+            .into_iter()
+            .collect();
+        roundtrip(&Yaml::Mapping(mapping.clone()));
+        roundtrip_multiline(&Yaml::Mapping(mapping));
+    }
+}
+
+#[test]
+fn test_multiline_leading_whitespace_yaml_root() {
+    let input = r#"---
+|2-
+   First line with a leading space.
+  Second line at margin."#;
+    let documents = Yaml::load_from_str(input).unwrap();
+    assert_eq!(
+        documents[0].as_str().unwrap(),
+        EXPECTED_LEADING_WHITESPACE_VALUE
+    );
+    assert_emits_yaml(
+        input,
+        r#"---
+|2-
+   First line with a leading space.
+  Second line at margin."#,
+    );
+}
+
+#[test]
+fn test_multiline_leading_whitespace_yaml_sequence() {
+    let input = r#"---
+- |2-
+   First line with a leading space.
+  Second line at margin."#;
+    let documents = Yaml::load_from_str(input).unwrap();
+    assert_eq!(
+        documents[0][0].as_str().unwrap(),
+        EXPECTED_LEADING_WHITESPACE_VALUE
+    );
+    assert_emits_yaml(
+        input,
+        r#"---
+- |2-
+   First line with a leading space.
+  Second line at margin."#,
+    );
+}
+
+#[test]
+fn test_multiline_leading_whitespace_yaml_mapping() {
+    let input = r#"---
+key: |2-
+   First line with a leading space.
+  Second line at margin."#;
+    let documents = Yaml::load_from_str(input).unwrap();
+    assert_eq!(
+        documents[0]["key"].as_str().unwrap(),
+        EXPECTED_LEADING_WHITESPACE_VALUE
+    );
+    assert_emits_yaml(
+        input,
+        r#"---
+key: |2-
+   First line with a leading space.
+  Second line at margin."#,
+    );
+}
+
+#[test]
+fn test_multiline_leading_whitespace_yaml_nested_mapping() {
+    let input = r#"---
+outer:
+  key: |2-
+     First line with a leading space.
+    Second line at margin."#;
+    let documents = Yaml::load_from_str(input).unwrap();
+    assert_eq!(
+        documents[0]["outer"]["key"].as_str().unwrap(),
+        EXPECTED_LEADING_WHITESPACE_VALUE
+    );
+    assert_emits_yaml(
+        input,
+        r#"---
+outer:
+  key: |2-
+     First line with a leading space.
+    Second line at margin."#,
+    );
 }
