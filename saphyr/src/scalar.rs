@@ -1,6 +1,7 @@
 //! Wrapper around a [YAML scalar](https://yaml.org/spec/1.2.2/#23-scalars).
 
 use alloc::{borrow::Cow, string::String};
+use core::num::IntErrorKind;
 
 use ordered_float::OrderedFloat;
 use saphyr_parser::{ScalarStyle, Tag};
@@ -307,23 +308,41 @@ impl ScalarOwned {
 
 fn parse_integer(value: Cow<'_, str>) -> Result<Scalar<'_>, Cow<'_, str>> {
     let text = value.as_ref();
-    let bytes = text.as_bytes();
-    let (negative, digits, radix) = match bytes.first().copied() {
-        Some(b'0') if bytes.get(1) == Some(&b'x') && text.is_char_boundary(2) => {
-            (false, &text[2..], 16u16)
-        }
-        Some(b'0') if bytes.get(1) == Some(&b'o') && text.is_char_boundary(2) => {
-            (false, &text[2..], 8u16)
-        }
-        Some(b'0') if bytes.get(1) == Some(&b'x') || bytes.get(1) == Some(&b'o') => {
+    let (digits, radix) = if let Some(digits) = text.strip_prefix("0x") {
+        (digits, 16u16)
+    } else if let Some(digits) = text.strip_prefix("0o") {
+        (digits, 8u16)
+    } else {
+        (text, 10u16)
+    };
+    if radix != 10 && (digits.starts_with('+') || digits.starts_with('-')) {
+        return Err(value);
+    }
+
+    let parsed = i64::from_str_radix(if radix == 10 { text } else { digits }, u32::from(radix));
+    match parsed {
+        Ok(integer) => return Ok(Scalar::Integer(integer)),
+        Err(error)
+            if !matches!(
+                error.kind(),
+                IntErrorKind::PosOverflow | IntErrorKind::NegOverflow
+            ) =>
+        {
             return Err(value);
         }
-        Some(b'-') => (true, &text[1..], 10u16),
-        Some(b'+') => (false, &text[1..], 10u16),
-        _ => (false, text, 10u16),
+        Err(_) => {}
+    }
+
+    let negative = radix == 10 && text.starts_with('-');
+    let unsigned_digits = if radix == 10 {
+        text.strip_prefix('+')
+            .or_else(|| text.strip_prefix('-'))
+            .unwrap_or(text)
+    } else {
+        digits
     };
-    if digits.is_empty()
-        || !digits.bytes().all(|byte| match radix {
+    if unsigned_digits.is_empty()
+        || !unsigned_digits.bytes().all(|byte| match radix {
             8 => (b'0'..=b'7').contains(&byte),
             10 => byte.is_ascii_digit(),
             16 => byte.is_ascii_hexdigit(),
@@ -334,38 +353,20 @@ fn parse_integer(value: Cow<'_, str>) -> Result<Scalar<'_>, Cow<'_, str>> {
     }
 
     if radix == 10 {
-        if let Ok(integer) = text.parse::<i64>() {
-            return Ok(Scalar::Integer(integer));
-        }
-        let canonical_digits = digits.trim_start_matches('0');
-        let canonical_digits = if canonical_digits.is_empty() {
-            "0"
-        } else {
-            canonical_digits
-        };
-        if !negative {
-            if let Ok(integer) = canonical_digits.parse::<i64>() {
-                return Ok(Scalar::Integer(integer));
-            }
-        } else if canonical_digits == "0" {
-            return Ok(Scalar::Integer(0));
-        }
-        let canonical = if text == canonical_digits || (negative && digits == canonical_digits) {
-            value
-        } else if negative {
-            Cow::Owned(alloc::format!("-{canonical_digits}"))
-        } else {
-            Cow::Owned(String::from(canonical_digits))
-        };
+        let canonical_digits = unsigned_digits.trim_start_matches('0');
+        let canonical =
+            if text == canonical_digits || (negative && unsigned_digits == canonical_digits) {
+                value
+            } else if negative {
+                Cow::Owned(alloc::format!("-{canonical_digits}"))
+            } else {
+                Cow::Owned(String::from(canonical_digits))
+            };
         return Ok(Scalar::StringInteger(StringInteger(canonical)));
     }
 
-    if let Ok(integer) = i64::from_str_radix(digits, u32::from(radix)) {
-        return Ok(Scalar::Integer(integer));
-    }
-
     let mut decimal = alloc::vec![0u8];
-    for byte in digits.bytes() {
+    for byte in unsigned_digits.bytes() {
         let digit = match byte {
             b'0'..=b'9' => byte - b'0',
             b'a'..=b'f' => byte - b'a' + 10,

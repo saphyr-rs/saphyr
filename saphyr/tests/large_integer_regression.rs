@@ -57,6 +57,38 @@ fn large_decimal_and_radix_values_keep_exact_integer_identity() {
 }
 
 #[test]
+fn radix_overflow_matches_u128_formatting_at_boundaries() {
+    for exponent in 63..128 {
+        for value in [
+            (1u128 << exponent) - 1,
+            1u128 << exponent,
+            (1u128 << exponent) + 1,
+        ] {
+            if value <= i64::MAX as u128 {
+                continue;
+            }
+            let decimal = value.to_string();
+            let hexadecimal = format!("0x{:x}", value);
+            let octal = format!("0o{:o}", value);
+            let leading_zero_hexadecimal = format!("0x0{:x}", value);
+            let leading_zero_octal = format!("0o0{:o}", value);
+            let values = [
+                scalar(&decimal),
+                scalar(&hexadecimal),
+                scalar(&octal),
+                scalar(&leading_zero_hexadecimal),
+                scalar(&leading_zero_octal),
+            ];
+            for parsed in &values {
+                assert_eq!(parsed.as_large_integer_text(), Some(decimal.as_str()));
+                assert_eq!(parsed, &values[0]);
+                assert_eq!(hash(parsed), hash(&values[0]));
+            }
+        }
+    }
+}
+
+#[test]
 fn canonical_decimal_and_boundary_values_are_preserved() {
     for (input, expected) in [
         ("0", "0"),
@@ -110,6 +142,33 @@ fn malformed_integer_grammar_does_not_become_integer() {
         )
         .is_none()
     );
+}
+
+#[test]
+fn malformed_overflow_suffixes_remain_explicit_errors() {
+    let cases = [
+        format!("{}x", "9".repeat(300)),
+        format!("{}_0", "9".repeat(300)),
+        format!("{}é", "9".repeat(300)),
+        format!("0x{}g", "f".repeat(200)),
+        format!("0x{}_0", "f".repeat(200)),
+        format!("0x{}é", "f".repeat(200)),
+        format!("0o{}8", "7".repeat(300)),
+        format!("0o{}_0", "7".repeat(300)),
+        format!("0o{}é", "7".repeat(300)),
+    ];
+    for input in cases {
+        assert!(!scalar(&input).is_integer(), "{input}");
+        assert!(
+            Scalar::parse_from_cow_and_metadata(
+                input.clone().into(),
+                saphyr::ScalarStyle::Plain,
+                Some(&int_tag())
+            )
+            .is_none(),
+            "{input}"
+        );
+    }
 }
 
 #[test]
