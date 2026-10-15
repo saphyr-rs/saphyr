@@ -6,6 +6,14 @@
   contain no functional changes.
 
 
+## v0.2.2
+
+**Changes**:
+
+- YAML streams that contain raw NUL characters are now rejected.
+  ([+135](https://github.com/saphyr-rs/saphyr/pull/135))
+
+
 ## v0.2.1
 
 - Version bump.

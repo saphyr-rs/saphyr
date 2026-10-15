@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.2.2
+
+**Changes**:
+
+- Multi-line literal block strings with leading whitespace are now properly emitted.
+  ([#132](https://github.com/saphyr-rs/saphyr/pull/132))
+  ([#121](https://github.com/saphyr-rs/saphyr/issues/121))
+
+- YAML streams that contain raw NUL characters are now rejected.
+  ([+135](https://github.com/saphyr-rs/saphyr/pull/135))
+
+- Update to [saphyr-parser v0.2.2](https://crates.io/crates/saphyr-parser/0.2.2).
+
+
 ## v0.2.1
 
 **Changes**:
