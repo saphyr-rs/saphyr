@@ -164,3 +164,65 @@ fn test_block_utf8() {
         ],
     );
 }
+
+#[test]
+fn test_node_properties() {
+    assert_eq!(
+        deref_pairs(&run_parser_and_deref_scalar_spans("foo: !!str bar").unwrap()),
+        [("foo", "foo"), ("bar", "!!str bar")]
+    );
+    assert_eq!(
+        deref_pairs(&run_parser_and_deref_scalar_spans("foo: &a !!str bar").unwrap()),
+        [("foo", "foo"), ("bar", "&a !!str bar")]
+    );
+    assert_eq!(
+        deref_pairs(&run_parser_and_deref_scalar_spans("foo: !!str &a\n  bar").unwrap()),
+        [("foo", "foo"), ("bar", "!!str &a\n  bar")]
+    );
+    assert_eq!(
+        deref_pairs(&run_parser_and_deref_scalar_spans("!a foo: bar").unwrap()),
+        [("foo", "!a foo"), ("bar", "bar")]
+    );
+    assert_eq!(
+        run_parser_and_deref_seq_spans("foo: !!seq [a]").unwrap(),
+        ["!!seq [a]"]
+    );
+    assert_eq!(
+        run_parser_and_deref_seq_spans("foo: &a\n  - a").unwrap(),
+        ["&a\n  - a"]
+    );
+}
+
+#[test]
+fn test_empty_node_properties() {
+    assert_eq!(
+        deref_pairs(&run_parser_and_deref_scalar_spans("foo: !!str").unwrap()),
+        [("foo", "foo"), ("", "!!str")]
+    );
+    assert_eq!(
+        deref_pairs(&run_parser_and_deref_scalar_spans("foo: &a !!str\nbar: baz").unwrap()),
+        [
+            ("foo", "foo"),
+            ("", "&a !!str"),
+            ("bar", "bar"),
+            ("baz", "baz")
+        ]
+    );
+    assert_eq!(
+        deref_pairs(&run_parser_and_deref_scalar_spans("[&a , !b ]").unwrap()),
+        [("", "&a"), ("", "!b")]
+    );
+}
+
+#[test]
+fn test_marker_position() {
+    // `é` is one character but two bytes.
+    let (_, span) = Parser::new_from_str("é: x")
+        .map(Result::unwrap)
+        .find(|(event, _)| matches!(event, Event::Scalar(s, ..) if s == "x"))
+        .unwrap();
+    assert_eq!(
+        (span.start.index(), span.start.line(), span.start.col()),
+        (3, 1, 3)
+    );
+}

@@ -251,6 +251,8 @@ pub trait Input {
         match self.peek() {
             // indicators can end a plain scalar, see 7.3.3. Plain Style
             ':' if is_blank_or_breakz(nc) || (in_flow && is_flow(nc)) => false,
+            // A byte order mark isn't a plain scalar character, see 5.2. Character Encodings
+            '\u{FEFF}' => false,
             c if in_flow && is_flow(c) => false,
             _ => true,
         }

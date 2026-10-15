@@ -62,11 +62,11 @@ pub enum ScalarStyle {
 /// A location in a yaml document.
 #[derive(Clone, Copy, PartialEq, Debug, Eq, Default)]
 pub struct Marker {
-    /// The index (in bytes) in the input string.
+    /// The index (in characters) in the input string.
     index: usize,
     /// The line (1-indexed).
     line: usize,
-    /// The column (1-indexed).
+    /// The column (0-indexed, in characters).
     col: usize,
 }
 
@@ -77,19 +77,19 @@ impl Marker {
         Marker { index, line, col }
     }
 
-    /// Return the index (in bytes) of the marker in the source.
+    /// Return the index (in characters) of the marker in the source.
     #[must_use]
     pub fn index(&self) -> usize {
         self.index
     }
 
-    /// Return the line of the marker in the source.
+    /// Return the line (1-indexed) of the marker in the source.
     #[must_use]
     pub fn line(&self) -> usize {
         self.line
     }
 
-    /// Return the column of the marker in the source.
+    /// Return the column (0-indexed, in characters) of the marker in the source.
     #[must_use]
     pub fn col(&self) -> usize {
         self.col
@@ -779,6 +779,10 @@ impl<'input, T: Input> Scanner<'input, T> {
                 self.mark,
                 format!("unexpected character: `{c}'"),
             )),
+            '\u{FEFF}' => Err(ScanError::new_str(
+                self.mark,
+                "a byte order mark must not appear inside a document",
+            )),
             _ => self.fetch_plain_scalar(),
         }
     }
@@ -863,6 +867,17 @@ impl<'input, T: Input> Scanner<'input, T> {
         Ok(())
     }
 
+    /// Return whether the next character, a byte order mark, may be a document prefix: it starts a
+    /// line outside of any collection or is followed by a document marker (`---` or `...`).
+    fn at_document_prefix(&mut self) -> bool {
+        self.input.lookahead(5);
+        let marker = |c| (1..4).all(|i| self.input.peek_nth(i) == c);
+        self.mark.col == 0
+            && self.flow_level == 0
+            && (self.indent == -1
+                || (marker('-') || marker('.')) && is_blank_or_breakz(self.input.peek_nth(4)))
+    }
+
     /// Skip over all whitespace (`\t`, ` `, `\n`, `\r`) and comments until the next token.
     ///
     /// # Errors
@@ -870,8 +885,13 @@ impl<'input, T: Input> Scanner<'input, T> {
     /// one.
     fn skip_to_next_token(&mut self) -> ScanResult {
         loop {
-            // TODO(chenyh) BOM
             match self.input.look_ch() {
+                // A byte order mark may precede a document, see 9.1.1. Document Prefix. It isn't
+                // content, so it doesn't occupy a column.
+                '\u{FEFF}' if self.at_document_prefix() => {
+                    self.input.skip();
+                    self.mark.index += 1;
+                }
                 // Tabs may not be used as indentation.
                 // "Indentation" only exists as long as a block is started, but does not exist
                 // inside of flow-style constructs. Tabs are allowed as part of leading

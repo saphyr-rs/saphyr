@@ -708,8 +708,8 @@ impl<'input, T: Input> Parser<'input, T> {
 
     fn parser_process_directives(&mut self) -> Result<(), ScanError> {
         let mut version_directive_received = false;
+        let mut tags = BTreeMap::new();
         loop {
-            let mut tags = BTreeMap::new();
             match self.peek_token()? {
                 Token(span, TokenType::VersionDirective(_, _)) => {
                     // XXX parsing with warning according to spec
@@ -739,9 +739,9 @@ impl<'input, T: Input> Parser<'input, T> {
                 }
                 _ => break,
             }
-            self.tags = tags;
             self.skip();
         }
+        self.tags.extend(tags);
         Ok(())
     }
 
@@ -842,6 +842,8 @@ impl<'input, T: Input> Parser<'input, T> {
     {
         let mut anchor_id = 0;
         let mut tag = None;
+        let start_mark = self.peek_token()?.0.start;
+        let mut end_mark = start_mark;
         match *self.peek_token()? {
             Token(_, TokenType::Alias(_)) => {
                 self.pop_state();
@@ -861,9 +863,11 @@ impl<'input, T: Input> Parser<'input, T> {
             Token(_, TokenType::Anchor(_)) => {
                 if let Token(span, TokenType::Anchor(name)) = self.fetch_token() {
                     anchor_id = self.register_anchor(name, &span);
+                    end_mark = span.end;
                     if let TokenType::Tag(..) = self.peek_token()?.1 {
-                        if let TokenType::Tag(handle, suffix) = self.fetch_token().1 {
+                        if let Token(mark, TokenType::Tag(handle, suffix)) = self.fetch_token() {
                             tag = Some(self.resolve_tag(span, &handle, suffix)?);
+                            end_mark = mark.end;
                         } else {
                             unreachable!()
                         }
@@ -875,9 +879,11 @@ impl<'input, T: Input> Parser<'input, T> {
             Token(mark, TokenType::Tag(..)) => {
                 if let TokenType::Tag(handle, suffix) = self.fetch_token().1 {
                     tag = Some(self.resolve_tag(mark, &handle, suffix)?);
+                    end_mark = mark.end;
                     if let TokenType::Anchor(_) = &self.peek_token()?.1 {
                         if let Token(mark, TokenType::Anchor(name)) = self.fetch_token() {
                             anchor_id = self.register_anchor(name, &mark);
+                            end_mark = mark.end;
                         } else {
                             unreachable!()
                         }
@@ -888,45 +894,48 @@ impl<'input, T: Input> Parser<'input, T> {
             }
             _ => {}
         }
-        match *self.peek_token()? {
+        let (event, end_mark) = match *self.peek_token()? {
             Token(mark, TokenType::BlockEntry) if indentless_sequence => {
                 self.state = State::IndentlessSequenceEntry;
-                Ok((Event::SequenceStart(anchor_id, tag), mark))
+                (Event::SequenceStart(anchor_id, tag), mark.end)
             }
             Token(_, TokenType::Scalar(..)) => {
                 self.pop_state();
                 if let Token(mark, TokenType::Scalar(style, v)) = self.fetch_token() {
-                    Ok((Event::Scalar(v, style, anchor_id, tag), mark))
+                    (Event::Scalar(v, style, anchor_id, tag), mark.end)
                 } else {
                     unreachable!()
                 }
             }
             Token(mark, TokenType::FlowSequenceStart) => {
                 self.state = State::FlowSequenceFirstEntry;
-                Ok((Event::SequenceStart(anchor_id, tag), mark))
+                (Event::SequenceStart(anchor_id, tag), mark.end)
             }
             Token(mark, TokenType::FlowMappingStart) => {
                 self.state = State::FlowMappingFirstKey;
-                Ok((Event::MappingStart(anchor_id, tag), mark))
+                (Event::MappingStart(anchor_id, tag), mark.end)
             }
             Token(mark, TokenType::BlockSequenceStart) if block => {
                 self.state = State::BlockSequenceFirstEntry;
-                Ok((Event::SequenceStart(anchor_id, tag), mark))
+                (Event::SequenceStart(anchor_id, tag), mark.end)
             }
             Token(mark, TokenType::BlockMappingStart) if block => {
                 self.state = State::BlockMappingFirstKey;
-                Ok((Event::MappingStart(anchor_id, tag), mark))
+                (Event::MappingStart(anchor_id, tag), mark.end)
             }
             // ex 7.2, an empty scalar can follow a secondary tag
-            Token(mark, _) if tag.is_some() || anchor_id > 0 => {
+            Token(..) if tag.is_some() || anchor_id > 0 => {
                 self.pop_state();
-                Ok((Event::empty_scalar_with_anchor(anchor_id, tag), mark))
+                (Event::empty_scalar_with_anchor(anchor_id, tag), end_mark)
             }
-            Token(span, _) => Err(ScanError::new_str(
-                span.start,
-                "while parsing a node, did not find expected node content",
-            )),
-        }
+            Token(span, _) => {
+                return Err(ScanError::new_str(
+                    span.start,
+                    "while parsing a node, did not find expected node content",
+                ));
+            }
+        };
+        Ok((event, Span::new(start_mark, end_mark)))
     }
 
     fn block_mapping_key<'a>(&mut self, first: bool) -> ParseResult<'a>
