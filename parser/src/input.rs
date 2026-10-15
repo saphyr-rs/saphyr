@@ -90,6 +90,19 @@ pub trait Input {
     #[must_use]
     fn peek_nth(&self, n: usize) -> char;
 
+    /// Return the next character in the input source, without consuming it, unless the input
+    /// source is exhausted.
+    ///
+    /// Unlike [`Input::peek`], this function does not conflate a NUL character with the
+    /// end-of-stream sentinel: a raw NUL character in the stream is returned as `Some('\0')`,
+    /// while an exhausted input source returns `None`. Padding characters introduced by
+    /// [`Input::lookahead`] are never returned.
+    ///
+    /// This function assumes that the next character in the input has already been fetched through
+    /// [`Input::lookahead`].
+    #[must_use]
+    fn peek_opt(&self) -> Option<char>;
+
     /// Look for the next character and return it.
     ///
     /// The character is not consumed.

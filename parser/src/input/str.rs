@@ -114,6 +114,11 @@ impl Input for StrInput<'_> {
     }
 
     #[inline]
+    fn peek_opt(&self) -> Option<char> {
+        self.buffer.chars().next()
+    }
+
+    #[inline]
     fn look_ch(&mut self) -> char {
         self.lookahead(1);
         self.peek()
