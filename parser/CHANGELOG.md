@@ -1,31 +1,29 @@
 # Changelog
 
+## Conventions
+
+- "Version bump" releases increment their version to match the crate workspace and
+  contain no functional changes.
+
+
 ## v0.2.1
 
-**Development**:
-
-- Version bump to align with crate workspaces. No functional changes.
+- Version bump.
 
 
 ## v0.2.0
 
-**Development**:
-
-- Version bump to align with crate workspaces. No functional changes.
+- Version bump.
 
 
 ## v0.1.2
 
-**Development**:
-
-- Version bump to align with crate workspaces. No functional changes.
+- Version bump.
 
 
 ## v0.1.1
 
-**Development**:
-
-- Version bump to align with crate workspaces. No functional changes.
+- Version bump.
 
 
 ## v0.1.0
