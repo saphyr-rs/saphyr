@@ -445,23 +445,22 @@ fn need_quotes(string: &str) -> bool {
             )
         })
         || string.contains(|character: char| {
-            matches!(character, ':'
-            | '{'
-            | '}'
-            | '['
-            | ']'
-            | ','
-            | '#'
-            | '`'
-            | '\"'
-            | '\''
-            | '\\'
-            | '\0'..='\x06'
-            | '\t'
-            | '\n'
-            | '\r'
-            | '\x0e'..='\x1a'
-            | '\x1c'..='\x1f')
+            matches!(
+                character,
+                '\0'..='\x1f'
+                    | '\x7f'
+                    | ':'
+                    | '{'
+                    | '}'
+                    | '['
+                    | ']'
+                    | ','
+                    | '#'
+                    | '`'
+                    | '\"'
+                    | '\''
+                    | '\\'
+            )
         })
         || [
             // http://yaml.org/type/bool.html
@@ -517,6 +516,25 @@ mod test {
                 .unwrap();
             assert_eq!(writer.writes[0], header);
             assert_eq!(writer.writes[1], "\n");
+        }
+    }
+
+    #[test]
+    fn test_control_characters_are_quoted() {
+        // Plain scalars cannot hold these characters (YAML 1.2, c-printable),
+        // so they must be emitted as escapes inside double quotes.
+        for (input, expected) in [
+            ("a\x07b", "\"a\\u0007b\""),
+            ("a\x08b", "\"a\\bb\""),
+            ("a\x0bb", "\"a\\u000bb\""),
+            ("a\x0cb", "\"a\\fb\""),
+            ("a\x1bb", "\"a\\u001bb\""),
+            ("a\x7fb", "\"a\\u007fb\""),
+        ] {
+            let yaml = Yaml::Value(crate::Scalar::String(input.into()));
+            let mut output = String::new();
+            YamlEmitter::new(&mut output).dump(&yaml).unwrap();
+            assert_eq!(output, alloc::format!("---\n{expected}"), "input {input:?}");
         }
     }
 
