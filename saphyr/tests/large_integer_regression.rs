@@ -38,8 +38,10 @@ fn large_decimal_and_radix_values_keep_exact_integer_identity() {
     let octal = scalar(RADIX_OCTAL);
     for value in [&decimal, &hex, &octal] {
         assert!(matches!(value, Scalar::StringInteger(_)));
-        assert_eq!(value.as_large_integer_text(), Some(RADIX_DECIMAL));
-        assert!(value.is_integer());
+        assert_eq!(value.as_string_integer(), Some(RADIX_DECIMAL));
+        assert!(!value.is_integer());
+        assert!(value.is_string_integer());
+        assert_eq!(value.as_str(), None);
         assert_eq!(value.as_integer(), None);
     }
     assert_eq!(decimal, hex);
@@ -51,7 +53,7 @@ fn large_decimal_and_radix_values_keep_exact_integer_identity() {
     let next = scalar("1461501637330902918203684832716283019656055999766");
     assert_ne!(decimal, next);
     assert_eq!(
-        scalar("-1461501637330902918203684832716283019656055999765").as_large_integer_text(),
+        scalar("-1461501637330902918203684832716283019656055999765").as_string_integer(),
         Some("-1461501637330902918203684832716283019656055999765")
     );
 }
@@ -80,7 +82,7 @@ fn radix_overflow_matches_u128_formatting_at_boundaries() {
                 scalar(&leading_zero_octal),
             ];
             for parsed in &values {
-                assert_eq!(parsed.as_large_integer_text(), Some(decimal.as_str()));
+                assert_eq!(parsed.as_string_integer(), Some(decimal.as_str()));
                 assert_eq!(parsed, &values[0]);
                 assert_eq!(hash(parsed), hash(&values[0]));
             }
@@ -102,7 +104,7 @@ fn canonical_decimal_and_boundary_values_are_preserved() {
         if expected.parse::<i64>().is_ok() {
             assert!(matches!(value, Scalar::Integer(_)));
         } else {
-            assert_eq!(value.as_large_integer_text(), Some(expected));
+            assert_eq!(value.as_string_integer(), Some(expected));
         }
     }
     assert_eq!(scalar(&i64::MIN.to_string()), Scalar::Integer(i64::MIN));
@@ -110,7 +112,7 @@ fn canonical_decimal_and_boundary_values_are_preserved() {
 
     let hundreds = format!("1{}", "0".repeat(300));
     assert_eq!(
-        scalar(&hundreds).as_large_integer_text(),
+        scalar(&hundreds).as_string_integer(),
         Some(hundreds.as_str())
     );
 }
@@ -200,6 +202,8 @@ fn floats_strings_and_explicit_integer_tags_keep_their_types() {
     )
     .unwrap();
     assert_eq!(tagged, scalar(RADIX_DECIMAL));
+    assert!(tagged.is_string_integer());
+    assert!(!tagged.is_integer());
     assert!(matches!(
         parse("!!int 9223372036854775808"),
         Yaml::Value(Scalar::StringInteger(_))
@@ -208,17 +212,27 @@ fn floats_strings_and_explicit_integer_tags_keep_their_types() {
 
 #[test]
 fn all_scalar_ownership_families_expose_large_integers() {
+    let ordinary = scalar("42");
+    let owned_ordinary = ordinary.clone().into_owned();
+    assert!(ordinary.is_integer());
+    assert!(!ordinary.is_string_integer());
+    assert!(owned_ordinary.is_integer());
+    assert!(!owned_ordinary.is_string_integer());
+    assert_eq!(owned_ordinary.as_integer(), Some(42));
+    assert_eq!(owned_ordinary.as_string_integer(), None);
+
     let borrowed = scalar("9223372036854775808");
     let owned = borrowed.clone().into_owned();
-    assert_eq!(owned.as_large_integer_text(), Some("9223372036854775808"));
-    assert!(owned.is_integer());
+    assert_eq!(owned.as_string_integer(), Some("9223372036854775808"));
+    assert!(!owned.is_integer());
+    assert!(owned.is_string_integer());
     assert_eq!(owned.as_integer(), None);
     assert_eq!(owned.clone().into_i64(), None);
     assert_eq!(owned.as_scalar(), borrowed);
 
     let parsed_owned = ScalarOwned::parse_from_cow("9223372036854775808".into());
     assert_eq!(
-        parsed_owned.as_large_integer_text(),
+        parsed_owned.as_string_integer(),
         Some("9223372036854775808")
     );
     assert_eq!(
@@ -231,29 +245,44 @@ fn all_scalar_ownership_families_expose_large_integers() {
     assert!(StringInteger::new("01".into()).is_none());
 
     let node = parse("9223372036854775808");
-    assert!(node.is_integer());
-    assert_eq!(node.as_large_integer_text(), Some("9223372036854775808"));
+    assert!(!node.is_integer());
+    assert!(node.is_string_integer());
+    assert_eq!(node.as_string_integer(), Some("9223372036854775808"));
     assert_eq!(node.as_integer(), None);
     assert_eq!(node.clone().into_integer(), None);
     let owned_node = saphyr::YamlOwned::load_from_str("9223372036854775808")
         .unwrap()
         .remove(0);
-    assert!(owned_node.is_integer());
-    assert_eq!(
-        owned_node.as_large_integer_text(),
-        Some("9223372036854775808")
-    );
+    assert!(!owned_node.is_integer());
+    assert!(owned_node.is_string_integer());
+    assert_eq!(owned_node.as_string_integer(), Some("9223372036854775808"));
+    assert_eq!(owned_node.as_integer(), None);
+    let ordinary_owned_node = saphyr::YamlOwned::load_from_str("42").unwrap().remove(0);
+    assert!(ordinary_owned_node.is_integer());
+    assert!(!ordinary_owned_node.is_string_integer());
+    assert_eq!(ordinary_owned_node.as_integer(), Some(42));
 
     let marked = saphyr::MarkedYaml::value_from_str("9223372036854775808");
-    assert_eq!(
-        marked.data.as_large_integer_text(),
-        Some("9223372036854775808")
-    );
+    assert!(!marked.data.is_integer());
+    assert!(marked.data.is_string_integer());
+    assert_eq!(marked.data.as_integer(), None);
+    assert_eq!(marked.data.as_string_integer(), Some("9223372036854775808"));
+    let ordinary_marked = saphyr::MarkedYaml::value_from_str("42");
+    assert!(ordinary_marked.data.is_integer());
+    assert!(!ordinary_marked.data.is_string_integer());
+    assert_eq!(ordinary_marked.data.as_integer(), Some(42));
     let marked_owned = saphyr::MarkedYamlOwned::value_from_str("9223372036854775808");
+    assert!(!marked_owned.data.is_integer());
+    assert!(marked_owned.data.is_string_integer());
+    assert_eq!(marked_owned.data.as_integer(), None);
     assert_eq!(
-        marked_owned.data.as_large_integer_text(),
+        marked_owned.data.as_string_integer(),
         Some("9223372036854775808")
     );
+    let ordinary_marked_owned = saphyr::MarkedYamlOwned::value_from_str("42");
+    assert!(ordinary_marked_owned.data.is_integer());
+    assert!(!ordinary_marked_owned.data.is_string_integer());
+    assert_eq!(ordinary_marked_owned.data.as_integer(), Some(42));
 }
 
 #[test]
@@ -266,7 +295,7 @@ fn deferred_representation_resolves_to_the_same_large_integer() {
     let mut deferred = loader.into_documents().remove(0);
     assert!(matches!(deferred, Yaml::Representation(_, _, _)));
     assert!(deferred.parse_representation());
-    assert_eq!(deferred.as_large_integer_text(), Some(source));
+    assert_eq!(deferred.as_string_integer(), Some(source));
 }
 
 #[test]
@@ -276,12 +305,18 @@ fn map_keys_values_and_emission_round_trip_exactly() {
     );
     let mapping = map.as_mapping().unwrap();
     assert_eq!(mapping.len(), 2);
-    assert!(mapping.keys().all(Yaml::is_integer));
+    assert!(mapping.keys().all(Yaml::is_string_integer));
     let sequence = parse("[9223372036854775808, 0x8000000000000000]");
-    assert!(sequence.as_vec().unwrap().iter().all(Yaml::is_integer));
+    assert!(
+        sequence
+            .as_vec()
+            .unwrap()
+            .iter()
+            .all(Yaml::is_string_integer)
+    );
     let map_value = parse("{value: 9223372036854775808}");
     assert_eq!(
-        map_value["value"].as_large_integer_text(),
+        map_value["value"].as_string_integer(),
         Some("9223372036854775808")
     );
 
@@ -316,4 +351,59 @@ fn map_keys_values_and_emission_round_trip_exactly() {
         parse(&quoted_output),
         Yaml::Value(Scalar::String(_))
     ));
+}
+
+#[test]
+fn is_integer_reports_only_fixed_width_values() {
+    assert!(scalar("42").is_integer());
+    assert!(!scalar("42").is_string_integer());
+    assert_eq!(scalar("42").as_integer(), Some(42));
+    assert!(!scalar("9223372036854775808").is_integer());
+    assert!(scalar("9223372036854775808").is_string_integer());
+    for input in ["true", "null", "1.0", "word"] {
+        assert!(!scalar(input).is_integer(), "{input}");
+        assert!(!scalar(input).is_string_integer(), "{input}");
+    }
+
+    let ordinary_node = parse("42");
+    assert!(ordinary_node.is_integer());
+    assert!(!ordinary_node.is_string_integer());
+    assert_eq!(ordinary_node.as_integer(), Some(42));
+    let oversized_node = parse("9223372036854775808");
+    assert!(!oversized_node.is_integer());
+    assert!(oversized_node.is_string_integer());
+    for input in ["true", "null", "1.0", "word"] {
+        let node = parse(input);
+        assert!(!node.is_integer(), "{input}");
+        assert!(!node.is_string_integer(), "{input}");
+    }
+
+    let ordinary_marked = saphyr::MarkedYaml::value_from_str("42");
+    assert!(ordinary_marked.data.is_integer());
+    assert!(!ordinary_marked.data.is_string_integer());
+    let oversized_marked = saphyr::MarkedYaml::value_from_str("9223372036854775808");
+    assert!(!oversized_marked.data.is_integer());
+    assert!(oversized_marked.data.is_string_integer());
+    let ordinary_marked_owned = saphyr::MarkedYamlOwned::value_from_str("42");
+    assert!(ordinary_marked_owned.data.is_integer());
+    assert!(!ordinary_marked_owned.data.is_string_integer());
+    let oversized_marked_owned = saphyr::MarkedYamlOwned::value_from_str("9223372036854775808");
+    assert!(!oversized_marked_owned.data.is_integer());
+    assert!(oversized_marked_owned.data.is_string_integer());
+    assert_eq!(
+        oversized_marked.data.as_string_integer(),
+        Some("9223372036854775808")
+    );
+    assert_eq!(
+        oversized_marked_owned.data.as_string_integer(),
+        Some("9223372036854775808")
+    );
+    for input in ["true", "null", "1.0", "word"] {
+        let marked = saphyr::MarkedYaml::value_from_str(input);
+        assert!(!marked.data.is_integer(), "{input}");
+        assert!(!marked.data.is_string_integer(), "{input}");
+        let marked_owned = saphyr::MarkedYamlOwned::value_from_str(input);
+        assert!(!marked_owned.data.is_integer(), "{input}");
+        assert!(!marked_owned.data.is_string_integer(), "{input}");
+    }
 }

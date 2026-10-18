@@ -207,10 +207,6 @@ impl<'input> Scalar<'input> {
     /// Returns the parsed [`Scalar`].
     #[must_use]
     pub fn parse_from_cow(v: Cow<'input, str>) -> Self {
-        let v = match parse_integer(v) {
-            Ok(integer) => return integer,
-            Err(v) => v,
-        };
         let s = &*v;
         let bytes = s.as_bytes();
 
@@ -230,7 +226,12 @@ impl<'input> Scalar<'input> {
             _ => {}
         }
 
-        if let Some(float) = parse_core_schema_fp(s) {
+        let v = match parse_integer(v) {
+            Ok(integer) => return integer,
+            Err(v) => v,
+        };
+
+        if let Some(float) = parse_core_schema_fp(&v) {
             return Self::FloatingPoint(float.into());
         }
 
