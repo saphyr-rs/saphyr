@@ -124,7 +124,9 @@ fn malformed_integer_grammar_does_not_become_integer() {
         "++7", "+-7", "0x-1", "0o+1", "-0x1", "+0o1", "1_000", "0xg", "0o8", "12tail", "-é", "0xé",
         "0oé",
     ] {
-        assert!(!scalar(input).is_integer(), "{input}");
+        let value = scalar(input);
+        assert!(!value.is_integer(), "{input}");
+        assert!(!value.is_string_integer(), "{input}");
         assert!(
             Scalar::parse_from_cow_and_metadata(
                 input.into(),
@@ -135,7 +137,9 @@ fn malformed_integer_grammar_does_not_become_integer() {
         );
     }
     let malformed = format!("{long}tail");
-    assert!(!scalar(&malformed).is_integer());
+    let value = scalar(&malformed);
+    assert!(!value.is_integer());
+    assert!(!value.is_string_integer());
     assert!(
         Scalar::parse_from_cow_and_metadata(
             malformed.into(),
@@ -160,7 +164,9 @@ fn malformed_overflow_suffixes_remain_explicit_errors() {
         format!("0o{}é", "7".repeat(300)),
     ];
     for input in cases {
-        assert!(!scalar(&input).is_integer(), "{input}");
+        let value = scalar(&input);
+        assert!(!value.is_integer(), "{input}");
+        assert!(!value.is_string_integer(), "{input}");
         assert!(
             Scalar::parse_from_cow_and_metadata(
                 input.clone().into(),
@@ -300,12 +306,22 @@ fn deferred_representation_resolves_to_the_same_large_integer() {
 
 #[test]
 fn map_keys_values_and_emission_round_trip_exactly() {
-    let map = parse(
-        "{9223372036854775808: one, 9223372036854775809: two, 0x8000000000000000: equivalent}",
-    );
+    let map = parse("{9223372036854775808: one, 9223372036854775809: two}");
     let mapping = map.as_mapping().unwrap();
     assert_eq!(mapping.len(), 2);
     assert!(mapping.keys().all(Yaml::is_string_integer));
+    assert_eq!(
+        mapping
+            .get(&parse("9223372036854775808"))
+            .and_then(Yaml::as_str),
+        Some("one")
+    );
+    assert_eq!(
+        mapping
+            .get(&parse("9223372036854775809"))
+            .and_then(Yaml::as_str),
+        Some("two")
+    );
     let sequence = parse("[9223372036854775808, 0x8000000000000000]");
     assert!(
         sequence
@@ -351,6 +367,13 @@ fn map_keys_values_and_emission_round_trip_exactly() {
         parse(&quoted_output),
         Yaml::Value(Scalar::String(_))
     ));
+}
+
+#[test]
+fn equivalent_large_integer_mapping_keys_are_rejected() {
+    let error = Yaml::load_from_str("{9223372036854775808: one, 0x8000000000000000: equivalent}")
+        .expect_err("equivalent large integer keys must be rejected");
+    assert_eq!(error.info(), "duplicated key in mapping");
 }
 
 #[test]

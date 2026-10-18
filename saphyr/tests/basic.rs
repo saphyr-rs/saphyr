@@ -237,6 +237,18 @@ c: ~
 }
 
 #[test]
+fn test_empty_node_is_null() {
+    let out = Yaml::load_from_str("email:\n-\n? \n: v\nempty: ''\n").unwrap();
+    let doc = &out[0];
+    assert_eq!(doc["email"][0], Yaml::Value(Scalar::Null));
+    assert_eq!(
+        doc.as_mapping().unwrap().get(&Yaml::Value(Scalar::Null)),
+        Some(&Yaml::Value(Scalar::String("v".into())))
+    );
+    assert_eq!(doc["empty"], Yaml::Value(Scalar::String("".into())));
+}
+
+#[test]
 fn test_integer_key() {
     let s = "
 0:
@@ -308,4 +320,73 @@ fn test_load_from_read_invalid_utf8() {
 fn test_load_from_read_malformed_yaml() {
     let err = Yaml::load_from_read("[unterminated".as_bytes()).unwrap_err();
     assert!(matches!(err, saphyr::LoadError::Scan(_)));
+}
+
+#[test]
+fn test_mapping_duplicate_keys() {
+    // https://github.com/saphyr-rs/saphyr/issues/116
+    let s = "
+a: 1
+b: 2
+a: 3
+";
+    let err = Yaml::load_from_str(s).expect_err("duplicate key must not load");
+    assert_eq!(err.info(), "duplicated key in mapping");
+    // The error points at the second occurrence of `a`.
+    assert_eq!(err.marker().line(), 4);
+    assert_eq!(err.marker().col(), 0);
+}
+
+#[test]
+fn test_mapping_duplicate_keys_nested() {
+    let s = "
+outer:
+  - inner: 1
+    inner: 2
+";
+    assert!(Yaml::load_from_str(s).is_err());
+}
+
+#[test]
+fn test_mapping_duplicate_keys_flow() {
+    assert!(Yaml::load_from_str("{ a: 1, a: 2 }").is_err());
+}
+
+#[test]
+fn test_mapping_distinct_keys() {
+    // The same key used in 2 different mappings is not a duplicate.
+    let s = "
+- a: 1
+  b: 2
+- a: 3
+  b: 4
+";
+    let docs = Yaml::load_from_str(s).unwrap();
+    let doc = &docs[0];
+    assert_eq!(doc[0]["a"].as_integer(), Some(1));
+    assert_eq!(doc[0]["b"].as_integer(), Some(2));
+    assert_eq!(doc[1]["a"].as_integer(), Some(3));
+    assert_eq!(doc[1]["b"].as_integer(), Some(4));
+}
+
+#[test]
+fn test_mapping_duplicate_keys_allowed() {
+    use saphyr::YamlLoader;
+    use saphyr_parser::Parser;
+
+    let s = "
+a: 1
+b: 2
+a: 3
+";
+    let mut parser = Parser::new_from_str(s);
+    let mut loader = YamlLoader::<Yaml>::default();
+    loader.allow_duplicate_keys(true);
+    parser.load(&mut loader, true).unwrap();
+    assert!(loader.error().is_none());
+
+    // The last value associated with the key wins.
+    let docs = loader.into_documents();
+    assert_eq!(docs[0]["a"].as_integer(), Some(3));
+    assert_eq!(docs[0]["b"].as_integer(), Some(2));
 }

@@ -1,11 +1,45 @@
 # Changelog
 
+## Conventions
+
+- "Version bump" releases increment their version to match the crate workspace and
+  contain no functional changes.
+
+
+## v0.2.2
+
+**Changes**:
+
+- YAML streams that contain raw NUL characters are now rejected.
+  ([+135](https://github.com/saphyr-rs/saphyr/pull/135))
+
+
+## v0.2.1
+
+- Version bump.
+
+
+## v0.2.0
+
+- Version bump.
+
+
+## v0.1.2
+
+- Version bump.
+
+
+## v0.1.1
+
+- Version bump.
+
+
 ## v0.1.0
 
 **Breaking Changes**:
 
 - Empty scalars are now emitted for empty nodes instead of `~`.
-([+129](https://github.com/saphyr-rs/saphyr/pull/129))
+  ([+129](https://github.com/saphyr-rs/saphyr/pull/129))
 
 
 ## v0.0.12
@@ -19,10 +53,10 @@
 **Fixes**:
 
 - Reserved `%` directives such as `%YAML 1.1 1.2` are now recognized and ignored.
-([+100](https://github.com/saphyr-rs/saphyr/pull/100))
+  ([+100](https://github.com/saphyr-rs/saphyr/pull/100))
 
 - Comments intercepting muliline text is now correctly handled.
-([+93](https://github.com/saphyr-rs/saphyr/pull/93))
+  ([+93](https://github.com/saphyr-rs/saphyr/pull/93))
 
 
 ## v0.0.10
@@ -30,20 +64,20 @@
 **Changes**:
 
 - `Parser` and `Scanner` now implement `Clone`.
-([+91](https://github.com/saphyr-rs/saphyr/pull/91))
+  ([+91](https://github.com/saphyr-rs/saphyr/pull/91))
 
 **Fixes**:
 
 - Indented end-of-document (`---`) markers no longer trigger an unexpected end
-of plain scalar while parsing strings.
-([#84](https://github.com/saphyr-rs/saphyr/issue/84))
-([+87](https://github.com/saphyr-rs/saphyr/pull/87))
+  of plain scalar while parsing strings.
+  ([#84](https://github.com/saphyr-rs/saphyr/issue/84))
+  ([+87](https://github.com/saphyr-rs/saphyr/pull/87))
 
 - Carriage return is now correctly handled as being a valid literal block scalar.
-([+90](https://github.com/saphyr-rs/saphyr/pull/90))
+  ([+90](https://github.com/saphyr-rs/saphyr/pull/90))
 
 - YAML test suite case 4H7K (extra closing bracket should fail) was corrected.
-([+92](https://github.com/saphyr-rs/saphyr/pull/92))
+  ([+92](https://github.com/saphyr-rs/saphyr/pull/92))
 
 
 ## v0.0.9
@@ -113,20 +147,20 @@ of plain scalar while parsing strings.
 **Breaking Changes**:
 
 - 926fdfb: Events now use spans rather than markers, allowing for tracking both
-the beginning and the end of scalars.
+  the beginning and the end of scalars.
 
 - 6c57b5b: Add a boolean to `DocumentStart` to know whether the start was
-explicit (`---`) or implicit.
+  explicit (`---`) or implicit.
 
 **Features**:
 
 - Add an `Input` interface to prepare the ground to future input-specific.
-optimizations (such as returning `Cow`'d strings when possible). This also
-potentially allows for user-defined optimizations.
+  optimizations (such as returning `Cow`'d strings when possible). This also
+  potentially allows for user-defined optimizations.
 
 - Add `Parser::new_from_iter` to load from an iterator. This automatically
-wraps using `BufferedInput`, which implements the new `Input` trait the
-`Parser` needs.
+  wraps using `BufferedInput`, which implements the new `Input` trait the
+  `Parser` needs.
 
 **Fixes**:
 
@@ -157,12 +191,13 @@ depend on the new features.
 **Features**:
 
 - Add `Marker::default()`
+
 - Rework string handling in `ScanError`
 
 **Fixes**:
 
 - Fix parser failing when a comment immediately follows a tag.
-([yaml-rust2 #21](https://github.com/Ethiraric/yaml-rust2/issues/21#issuecomment-2053513507))
+  ([yaml-rust2 #21](https://github.com/Ethiraric/yaml-rust2/issues/21#issuecomment-2053513507))
 
 **Internal changes**:
 

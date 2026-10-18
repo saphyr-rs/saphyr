@@ -30,6 +30,7 @@ define_as!(as_floating_point, f64,               FloatingPoint);
 define_as_ref!(as_str,        &str,              String);
 
 /// Return canonical decimal text for a string-backed integer.
+#[must_use]
 pub fn as_string_integer(&self) -> Option<&str> {
     match self {
         Self::StringInteger(value) => Some(value.as_str()),
@@ -50,10 +51,7 @@ define_into!(into_string,  alloc::string::String,           String);
 // ---------- VARIANT TESTING ----------
 define_is!(is_null,           Self::Null);
 define_is!(is_boolean,        Self::Boolean(_));
-/// Return whether this scalar contains a fixed-width integer.
-pub fn is_integer(&self) -> bool {
-    matches!(self, Self::Integer(_))
-}
+define_is!(is_integer,        Self::Integer(_));
 define_is!(is_string_integer, Self::StringInteger(_));
 define_is!(is_floating_point, Self::FloatingPoint(_));
 define_is!(is_string,         Self::String(_));
@@ -334,6 +332,7 @@ impl $(< $( $generic ),+ >)? $yaml $(where $($whereclause)+)? {
     // ---------- VARIANT TESTING ----------
     define_is!(is_boolean,        Self::Value($scalartype::Boolean(_)));
     /// Return canonical decimal text when this node contains a string-backed integer.
+    #[must_use]
     pub fn as_string_integer(&self) -> Option<&str> {
         match self {
             Self::Value($scalartype::StringInteger(value)) => Some(value.as_str()),
@@ -341,10 +340,7 @@ impl $(< $( $generic ),+ >)? $yaml $(where $($whereclause)+)? {
         }
     }
 
-    /// Return whether this node contains a fixed-width integer.
-    pub fn is_integer(&self) -> bool {
-        matches!(self, Self::Value($scalartype::Integer(_)))
-    }
+    define_is!(is_integer,        Self::Value($scalartype::Integer(_)));
     define_is!(is_string_integer, Self::Value($scalartype::StringInteger(_)));
     define_is!(is_null,           Self::Value($scalartype::Null));
     define_is!(is_floating_point, Self::Value($scalartype::FloatingPoint(_)));

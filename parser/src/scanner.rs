@@ -714,6 +714,9 @@ impl<'input, T: Input> Scanner<'input, T> {
         self.input.lookahead(4);
 
         if self.input.next_is_z() {
+            if self.input.peek_opt() == Some('\0') {
+                return Err(ScanError::new_str(self.mark, "found unprintable character"));
+            }
             self.fetch_stream_end()?;
             return Ok(());
         }

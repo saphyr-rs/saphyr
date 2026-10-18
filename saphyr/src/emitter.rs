@@ -1,5 +1,6 @@
 //! YAML serialization helpers.
 
+use alloc::format;
 use core::fmt;
 
 use ordered_float::FloatCore;
@@ -202,11 +203,19 @@ impl<'a> YamlEmitter<'a> {
     }
 
     fn emit_node(&mut self, node: &Yaml) -> EmitResult {
+        self.emit_node_with_multiline_strings(node, self.multiline_strings)
+    }
+
+    fn emit_node_with_multiline_strings(
+        &mut self,
+        node: &Yaml,
+        allow_multiline_strings: bool,
+    ) -> EmitResult {
         match *node {
             Yaml::Sequence(ref v) => self.emit_sequence(v),
             Yaml::Mapping(ref h) => self.emit_mapping(h),
             Yaml::Value(Scalar::String(ref v)) => {
-                if self.should_emit_string_as_block(v) {
+                if allow_multiline_strings && self.should_emit_string_as_block(v) {
                     self.emit_literal_block(v)?;
                 } else if need_quotes(v) {
                     escape_str(self.writer, v)?;
@@ -272,7 +281,7 @@ impl<'a> YamlEmitter<'a> {
                     self.write_indent()?;
                     self.level -= 1;
                 }
-                self.emit_node(node.as_ref())
+                self.emit_node_with_multiline_strings(node.as_ref(), allow_multiline_strings)
             }
             // XXX(chenyh) Alias
             Yaml::Alias(_) => Ok(()),
@@ -280,14 +289,27 @@ impl<'a> YamlEmitter<'a> {
     }
 
     fn emit_literal_block(&mut self, v: &str) -> EmitResult {
+        let needs_indent_indicator = v.trim_start_matches('\n').starts_with([' ', '\t']);
         let ends_with_newline = v.ends_with('\n');
-        if ends_with_newline {
+        if ends_with_newline && !needs_indent_indicator {
             self.writer.write_str("|")?;
-        } else {
+        } else if !ends_with_newline && !needs_indent_indicator {
             self.writer.write_str("|-")?;
+        } else {
+            self.writer.write_str(&format!(
+                "|{}{}",
+                self.best_indent,
+                if ends_with_newline { "" } else { "-" }
+            ))?;
         }
 
+        let previous_level = self.level;
         self.level += 1;
+        if needs_indent_indicator && self.level == 0 {
+            // At root, write_indent() emits none; |2 needs two spaces to preserve
+            // leading scalar whitespace.
+            self.level = 1;
+        }
         // lines() will omit the last line if it is empty.
         for line in v.lines() {
             writeln!(self.writer)?;
@@ -295,7 +317,7 @@ impl<'a> YamlEmitter<'a> {
             // It's literal text, so don't escape special chars.
             self.writer.write_str(line)?;
         }
-        self.level -= 1;
+        self.level = previous_level;
         Ok(())
     }
 
@@ -336,7 +358,9 @@ impl<'a> YamlEmitter<'a> {
                     write!(self.writer, ":")?;
                     self.emit_val(true, v)?;
                 } else {
-                    self.emit_node(k)?;
+                    // A literal block cannot be used as an implicit key, so multiline keys are
+                    // always written as quoted strings.
+                    self.emit_node_with_multiline_strings(k, false)?;
                     write!(self.writer, ":")?;
                     self.emit_val(false, v)?;
                 }
@@ -461,9 +485,41 @@ fn need_quotes(string: &str) -> bool {
 
 #[cfg(test)]
 mod test {
-    use alloc::string::String;
+    use alloc::{string::String, vec::Vec};
+    use core::fmt;
 
     use crate::{LoadableYamlNode, Yaml, YamlEmitter};
+
+    #[test]
+    fn test_literal_block_header_single_write() {
+        #[derive(Default)]
+        struct RecordingWriter {
+            writes: Vec<String>,
+        }
+
+        impl fmt::Write for RecordingWriter {
+            fn write_str(&mut self, value: &str) -> fmt::Result {
+                self.writes.push(value.into());
+                Ok(())
+            }
+        }
+
+        for (value, header) in [
+            ("first\nsecond\n", "|"),
+            ("first\nsecond", "|-"),
+            (" first\nsecond\n", "|2"),
+            (" first\nsecond", "|2-"),
+            ("\n first\nsecond", "|2-"),
+            ("\tfirst\nsecond\n", "|2"),
+        ] {
+            let mut writer = RecordingWriter::default();
+            YamlEmitter::new(&mut writer)
+                .emit_literal_block(value)
+                .unwrap();
+            assert_eq!(writer.writes[0], header);
+            assert_eq!(writer.writes[1], "\n");
+        }
+    }
 
     #[test]
     fn test_multiline_string() {
