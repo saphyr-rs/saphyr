@@ -91,6 +91,46 @@ fn radix_overflow_matches_u128_formatting_at_boundaries() {
 }
 
 #[test]
+fn radix_chunks_preserve_decimal_output_and_mapping_identity() {
+    const ZERO_LIMBS_DECIMAL: &str = "123456789000000000000000000000000001";
+    const ZERO_LIMBS_HEXADECIMAL: &str = "0x17C6E3BFCCD99252C9C2C708000001";
+    const ZERO_LIMBS_OCTAL: &str = "0o574334357746331444513116054341000000001";
+
+    for (input, expected) in [
+        ("0xFFFFFFFFFFFFFFFF", "18446744073709551615"),
+        ("0x10000000000000001", "18446744073709551617"),
+        ("0xFFFFFFFFFFFFFFFFF", "295147905179352825855"),
+        ("0x000000010000000000000001", "18446744073709551617"),
+        (ZERO_LIMBS_HEXADECIMAL, ZERO_LIMBS_DECIMAL),
+        ("0x17c6e3bfccd99252c9c2c708000001", ZERO_LIMBS_DECIMAL),
+        ("0o1777777777777777777777", "18446744073709551615"),
+        ("0o10000000000000000000001", "73786976294838206465"),
+        (ZERO_LIMBS_OCTAL, ZERO_LIMBS_DECIMAL),
+        (
+            "0o000574334357746331444513116054341000000001",
+            ZERO_LIMBS_DECIMAL,
+        ),
+    ] {
+        let parsed = scalar(input);
+        assert!(matches!(&parsed, Scalar::StringInteger(_)), "{input}");
+        assert_eq!(parsed.as_string_integer(), Some(expected), "{input}");
+    }
+
+    let equivalents = [ZERO_LIMBS_DECIMAL, ZERO_LIMBS_HEXADECIMAL, ZERO_LIMBS_OCTAL];
+    for left in 0..equivalents.len() {
+        for right in left + 1..equivalents.len() {
+            let input = format!(
+                "{{{}: one, {}: two}}",
+                equivalents[left], equivalents[right]
+            );
+            let error = Yaml::load_from_str(&input)
+                .expect_err("equivalent decimal, hexadecimal, and octal keys must be rejected");
+            assert_eq!(error.info(), "duplicated key in mapping");
+        }
+    }
+}
+
+#[test]
 fn canonical_decimal_and_boundary_values_are_preserved() {
     for (input, expected) in [
         ("0", "0"),

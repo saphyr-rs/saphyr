@@ -1,7 +1,7 @@
 //! Wrapper around a [YAML scalar](https://yaml.org/spec/1.2.2/#23-scalars).
 
 use alloc::{borrow::Cow, string::String};
-use core::num::IntErrorKind;
+use core::{fmt::Write as _, num::IntErrorKind};
 
 use ordered_float::OrderedFloat;
 use saphyr_parser::{ScalarStyle, Tag};
@@ -312,6 +312,8 @@ impl ScalarOwned {
 }
 
 fn parse_integer(value: Cow<'_, str>) -> Result<Scalar<'_>, Cow<'_, str>> {
+    const DECIMAL_LIMB_BASE: u64 = 1_000_000_000;
+
     let text = value.as_ref();
     let (digits, radix) = if let Some(digits) = text.strip_prefix("0x") {
         (digits, 16u16)
@@ -370,33 +372,41 @@ fn parse_integer(value: Cow<'_, str>) -> Result<Scalar<'_>, Cow<'_, str>> {
         return Ok(Scalar::StringInteger(StringInteger(canonical)));
     }
 
-    let mut decimal = alloc::vec![0u8];
-    for byte in unsigned_digits.bytes() {
-        let digit = match byte {
-            b'0'..=b'9' => byte - b'0',
-            b'a'..=b'f' => byte - b'a' + 10,
-            b'A'..=b'F' => byte - b'A' + 10,
-            _ => unreachable!(),
-        };
-        let mut carry = u16::from(digit);
-        for decimal_digit in &mut decimal {
-            let value = u16::from(*decimal_digit) * radix + carry;
-            *decimal_digit = (value % 10) as u8;
-            carry = value / 10;
+    let chunk_digits = if radix == 16 { 8 } else { 10 };
+    let bits_per_digit = if radix == 16 { 4 } else { 3 };
+    let mut decimal = alloc::vec![0u32];
+    for chunk in unsigned_digits.as_bytes().chunks(chunk_digits) {
+        let mut chunk_value = 0u64;
+        for &byte in chunk {
+            let digit = match byte {
+                b'0'..=b'9' => byte - b'0',
+                b'a'..=b'f' => byte - b'a' + 10,
+                b'A'..=b'F' => byte - b'A' + 10,
+                _ => unreachable!(),
+            };
+            chunk_value = chunk_value * u64::from(radix) + u64::from(digit);
+        }
+
+        let scale = 1u64 << (bits_per_digit * chunk.len());
+        let mut carry = chunk_value;
+        for limb in &mut decimal {
+            let value = u64::from(*limb) * scale + carry;
+            *limb = (value % DECIMAL_LIMB_BASE) as u32;
+            carry = value / DECIMAL_LIMB_BASE;
         }
         while carry > 0 {
-            decimal.push((carry % 10) as u8);
-            carry /= 10;
+            decimal.push((carry % DECIMAL_LIMB_BASE) as u32);
+            carry /= DECIMAL_LIMB_BASE;
         }
     }
     while decimal.len() > 1 && decimal.last() == Some(&0) {
         decimal.pop();
     }
-    let canonical: String = decimal
-        .iter()
-        .rev()
-        .map(|digit| char::from(b'0' + digit))
-        .collect();
+    let mut limbs = decimal.into_iter().rev();
+    let mut canonical = alloc::format!("{}", limbs.next().expect("decimal result has a limb"));
+    for limb in limbs {
+        write!(&mut canonical, "{limb:09}").expect("writing to a String cannot fail");
+    }
     Ok(Scalar::StringInteger(StringInteger(Cow::Owned(canonical))))
 }
 
