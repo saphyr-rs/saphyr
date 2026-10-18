@@ -673,7 +673,7 @@ impl<'input, T: Input> Parser<'input, T> {
     where
         'input: 'a,
     {
-        while let TokenType::DocumentEnd = self.peek_token()?.1 {
+        while let TokenType::DocumentEnd | TokenType::ByteOrderMark = self.peek_token()?.1 {
             self.skip();
         }
 
@@ -757,6 +757,10 @@ impl<'input, T: Input> Parser<'input, T> {
                 self.skip();
                 Ok((Event::DocumentStart(true), mark))
             }
+            Token(span, TokenType::ByteOrderMark) => Err(ScanError::new_str(
+                span.start,
+                "a byte order mark must not appear inside a document",
+            )),
             Token(span, _) => Err(ScanError::new_str(
                 span.start,
                 "did not find expected <document start>",
@@ -776,6 +780,7 @@ impl<'input, T: Input> Parser<'input, T> {
                 | TokenType::ReservedDirective(..)
                 | TokenType::DocumentStart
                 | TokenType::DocumentEnd
+                | TokenType::ByteOrderMark
                 | TokenType::StreamEnd,
             ) => {
                 self.pop_state();
@@ -790,6 +795,25 @@ impl<'input, T: Input> Parser<'input, T> {
     where
         'input: 'a,
     {
+        // A byte order mark ends the document, and only more byte order marks, comments, or
+        // document markers may follow it (see 9.2. Streams). Anything else is rejected when the
+        // next document starts anyway, but checking here points the error at the byte order mark.
+        if let Token(span, TokenType::ByteOrderMark) = *self.peek_token()? {
+            while let TokenType::ByteOrderMark = self.peek_token()?.1 {
+                self.skip();
+            }
+
+            match self.peek_token()?.1 {
+                TokenType::DocumentStart | TokenType::DocumentEnd | TokenType::StreamEnd => {}
+                _ => {
+                    return Err(ScanError::new_str(
+                        span.start,
+                        "a byte order mark must not appear inside a document",
+                    ));
+                }
+            }
+        }
+
         let mut explicit_end = false;
         let span: Span = match *self.peek_token()? {
             Token(span, TokenType::DocumentEnd) => {
