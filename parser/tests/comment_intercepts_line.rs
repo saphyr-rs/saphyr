@@ -1,4 +1,7 @@
+#[path = "common/syntax.rs"]
+mod syntax;
 use saphyr_parser::{Event, Parser, ScalarStyle};
+use syntax::syntax_error;
 
 /// Comment intercepting the multiline text is invalid YAML (case BS4K)
 #[test]
@@ -15,7 +18,7 @@ word2
             }
             Err(err) => {
                 assert_eq!(
-                    err.info(),
+                    syntax_error(&err).info(),
                     "comment intercepting the multiline text",
                     "BS4K: comment intercepting the multiline text is invalid YAML"
                 );
@@ -38,7 +41,7 @@ key: word1  # comment
     for next in parser {
         if let Err(err) = next {
             assert_eq!(
-                err.info(),
+                syntax_error(&err).info(),
                 "comment intercepting the multiline text",
                 "BS4K: comment intercepting the multiline text is invalid YAML in a map"
             );

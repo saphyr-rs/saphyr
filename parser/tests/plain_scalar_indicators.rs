@@ -1,4 +1,9 @@
-use saphyr_parser::{Event, Parser, ScalarStyle, ScanError};
+mod common;
+#[path = "common/syntax.rs"]
+mod syntax;
+use common::ParserError;
+use saphyr_parser::{Event, Parser, ScalarStyle};
+use syntax::syntax_error;
 
 // Regression guards for StrInput::next_can_be_plain_scalar simplification.
 // YAML 1.2 7.3.3: indicator characters can end a plain scalar in certain positions.
@@ -12,7 +17,7 @@ fn colon_followed_by_space_ends_plain_scalar_not_part_of_value() {
     let s = "foo: a: b\n";
 
     let it = Parser::new_from_str(s);
-    let mut got_err: Option<ScanError> = None;
+    let mut got_err: Option<ParserError> = None;
     for res in it {
         if let Err(e) = res {
             got_err = Some(e);
@@ -20,7 +25,10 @@ fn colon_followed_by_space_ends_plain_scalar_not_part_of_value() {
         }
     }
     let err = got_err.expect("no error on inline nested mapping without indentation");
-    assert_eq!(err.info(), "mapping values are not allowed in this context");
+    assert_eq!(
+        syntax_error(&err).info(),
+        "mapping values are not allowed in this context"
+    );
 }
 
 #[test]

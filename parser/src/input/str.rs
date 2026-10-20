@@ -2,9 +2,10 @@ use crate::{
     char_traits::{
         is_alpha, is_blank, is_blank_or_breakz, is_break, is_breakz, is_digit, is_flow, is_z,
     },
-    input::{Input, SkipTabs},
+    input::{Input, InputResult, SkipTabs},
 };
 use alloc::string::String;
+use core::convert::Infallible;
 
 /// A parser input that uses a `&str` as source.
 #[allow(clippy::module_name_repetitions)]
@@ -31,12 +32,12 @@ impl<'a> StrInput<'a> {
 }
 
 impl Input for StrInput<'_> {
+    type Error = Infallible;
+
     #[inline]
-    fn lookahead(&mut self, x: usize) {
-        // We already have all characters that we need.
-        // We cannot add '\0's to the buffer should we prematurely reach EOF.
-        // Returning '\0's befalls the character-retrieving functions.
+    fn lookahead(&mut self, x: usize) -> InputResult<(), Self::Error> {
         self.lookahead = self.lookahead.max(x);
+        Ok(())
     }
 
     #[inline]
@@ -54,40 +55,37 @@ impl Input for StrInput<'_> {
     }
 
     #[inline]
-    fn raw_read_ch(&mut self) -> char {
+    fn raw_read_ch(&mut self) -> InputResult<char, Self::Error> {
         let mut chars = self.buffer.chars();
-        if let Some(c) = chars.next() {
+        let c = chars.next().unwrap_or('\0');
+        if chars.as_str().len() < self.buffer.len() {
             self.buffer = chars.as_str();
-            c
-        } else {
-            '\0'
         }
+        Ok(c)
     }
 
     #[inline]
-    fn raw_read_non_breakz_ch(&mut self) -> Option<char> {
-        if let Some((c, sub_str)) = split_first_char(self.buffer) {
-            if is_breakz(c) {
-                None
-            } else {
-                self.buffer = sub_str;
+    fn raw_read_non_breakz_ch(&mut self) -> InputResult<Option<char>, Self::Error> {
+        Ok(match split_first_char(self.buffer) {
+            Some((c, rest)) if !is_breakz(c) => {
+                self.buffer = rest;
                 Some(c)
             }
-        } else {
-            None
-        }
+            _ => None,
+        })
     }
 
     #[inline]
-    fn skip(&mut self) {
+    fn skip(&mut self) -> InputResult<(), Self::Error> {
         let mut chars = self.buffer.chars();
         if chars.next().is_some() {
             self.buffer = chars.as_str();
         }
+        Ok(())
     }
 
     #[inline]
-    fn skip_n(&mut self, count: usize) {
+    fn skip_n(&mut self, count: usize) -> InputResult<(), Self::Error> {
         let mut chars = self.buffer.chars();
         for _ in 0..count {
             if chars.next().is_none() {
@@ -95,303 +93,279 @@ impl Input for StrInput<'_> {
             }
         }
         self.buffer = chars.as_str();
+        Ok(())
     }
 
     #[inline]
-    fn peek(&self) -> char {
-        self.buffer.chars().next().unwrap_or('\0')
+    fn peek(&mut self) -> InputResult<char, Self::Error> {
+        Ok(self.buffer.chars().next().unwrap_or('\0'))
     }
 
     #[inline]
-    fn peek_nth(&self, n: usize) -> char {
+    fn peek_nth(&mut self, n: usize) -> InputResult<char, Self::Error> {
+        Ok(self.buffer.chars().nth(n).unwrap_or('\0'))
+    }
+
+    #[inline]
+    fn peek_opt(&mut self) -> InputResult<Option<char>, Self::Error> {
+        Ok(self.buffer.chars().next())
+    }
+
+    #[inline]
+    fn next_2_are(&mut self, c1: char, c2: char) -> InputResult<bool, Self::Error> {
         let mut chars = self.buffer.chars();
-        for _ in 0..n {
-            if chars.next().is_none() {
-                return '\0';
-            }
-        }
-        chars.next().unwrap_or('\0')
+        Ok(chars.next() == Some(c1) && chars.next() == Some(c2))
     }
 
     #[inline]
-    fn peek_opt(&self) -> Option<char> {
-        self.buffer.chars().next()
-    }
-
-    #[inline]
-    fn look_ch(&mut self) -> char {
-        self.lookahead(1);
-        self.peek()
-    }
-
-    #[inline]
-    fn next_char_is(&self, c: char) -> bool {
-        self.peek() == c
-    }
-
-    #[inline]
-    fn nth_char_is(&self, n: usize, c: char) -> bool {
-        self.peek_nth(n) == c
-    }
-
-    #[inline]
-    fn next_2_are(&self, c1: char, c2: char) -> bool {
+    fn next_3_are(&mut self, c1: char, c2: char, c3: char) -> InputResult<bool, Self::Error> {
         let mut chars = self.buffer.chars();
-        chars.next() == Some(c1) && chars.next() == Some(c2)
+        Ok(chars.next() == Some(c1) && chars.next() == Some(c2) && chars.next() == Some(c3))
     }
 
     #[inline]
-    fn next_3_are(&self, c1: char, c2: char, c3: char) -> bool {
-        let mut chars = self.buffer.chars();
-        chars.next() == Some(c1) && chars.next() == Some(c2) && chars.next() == Some(c3)
-    }
-
-    #[inline]
-    fn next_is_document_indicator(&self) -> bool {
+    fn next_is_document_indicator(&mut self) -> InputResult<bool, Self::Error> {
         if self.buffer.len() < 3 {
-            false
-        } else {
-            // Since all characters we look for are ascii, we can directly use the byte API of str.
-            let bytes = self.buffer.as_bytes();
-            (bytes.len() == 3 || is_blank_or_breakz(bytes[3] as char))
-                && (bytes[0] == b'.' || bytes[0] == b'-')
-                && bytes[0] == bytes[1]
-                && bytes[1] == bytes[2]
+            return Ok(false);
         }
+
+        let bytes = self.buffer.as_bytes();
+        Ok((bytes.len() == 3 || is_blank_or_breakz(bytes[3] as char))
+            && (bytes[0] == b'.' || bytes[0] == b'-')
+            && bytes[0] == bytes[1]
+            && bytes[1] == bytes[2])
     }
 
     #[inline]
-    fn next_is_document_start(&self) -> bool {
+    fn next_is_document_start(&mut self) -> InputResult<bool, Self::Error> {
         if self.buffer.len() < 3 {
-            false
-        } else {
-            // Since all characters we look for are ascii, we can directly use the byte API of str.
-            let bytes = self.buffer.as_bytes();
-            (bytes.len() == 3 || is_blank_or_breakz(bytes[3] as char))
-                && bytes[0] == b'-'
-                && bytes[1] == b'-'
-                && bytes[2] == b'-'
+            return Ok(false);
         }
+
+        let bytes = self.buffer.as_bytes();
+        Ok((bytes.len() == 3 || is_blank_or_breakz(bytes[3] as char))
+            && bytes[0] == b'-'
+            && bytes[1] == b'-'
+            && bytes[2] == b'-')
     }
 
     #[inline]
-    fn next_is_document_end(&self) -> bool {
+    fn next_is_document_end(&mut self) -> InputResult<bool, Self::Error> {
         if self.buffer.len() < 3 {
-            false
-        } else {
-            // Since all characters we look for are ascii, we can directly use the byte API of str.
-            let bytes = self.buffer.as_bytes();
-            (bytes.len() == 3 || is_blank_or_breakz(bytes[3] as char))
-                && bytes[0] == b'.'
-                && bytes[1] == b'.'
-                && bytes[2] == b'.'
+            return Ok(false);
         }
+
+        let bytes = self.buffer.as_bytes();
+        Ok((bytes.len() == 3 || is_blank_or_breakz(bytes[3] as char))
+            && bytes[0] == b'.'
+            && bytes[1] == b'.'
+            && bytes[2] == b'.')
     }
 
-    fn skip_ws_to_eol(&mut self, skip_tabs: SkipTabs) -> (usize, Result<SkipTabs, &'static str>) {
+    fn skip_ws_to_eol(
+        &mut self,
+        skip_tabs: SkipTabs,
+    ) -> InputResult<(usize, Result<SkipTabs, &'static str>), Self::Error> {
         assert!(!matches!(skip_tabs, SkipTabs::Result(..)));
 
-        let mut new_str = self.buffer;
+        let mut remaining = self.buffer;
         let mut has_yaml_ws = false;
         let mut encountered_tab = false;
-
-        // This ugly pair of loops is the fastest way of trimming spaces (and maybe tabs) I found
-        // while keeping track of whether we encountered spaces and/or tabs.
         if skip_tabs == SkipTabs::Yes {
             loop {
-                if let Some(sub_str) = new_str.strip_prefix(' ') {
+                if let Some(rest) = remaining.strip_prefix(' ') {
                     has_yaml_ws = true;
-                    new_str = sub_str;
-                } else if let Some(sub_str) = new_str.strip_prefix('\t') {
+                    remaining = rest;
+                } else if let Some(rest) = remaining.strip_prefix('\t') {
                     encountered_tab = true;
-                    new_str = sub_str;
+                    remaining = rest;
                 } else {
                     break;
                 }
             }
         } else {
-            while let Some(sub_str) = new_str.strip_prefix(' ') {
+            while let Some(rest) = remaining.strip_prefix(' ') {
                 has_yaml_ws = true;
-                new_str = sub_str;
+                remaining = rest;
             }
         }
 
-        // All characters consumed were ascii. We can use the byte length difference to count the
-        // number of whitespace ignored.
-        let mut chars_consumed = self.buffer.len() - new_str.len();
-
-        if !new_str.is_empty() && new_str.as_bytes()[0] == b'#' {
+        let mut consumed = self.buffer.len() - remaining.len();
+        if remaining.as_bytes().first() == Some(&b'#') {
             if !encountered_tab && !has_yaml_ws {
-                return (
-                    chars_consumed,
+                return Ok((
+                    consumed,
                     Err("comments must be separated from other tokens by whitespace"),
-                );
+                ));
             }
 
-            // Skip remaining characters until we hit a breakz.
-            while let Some((c, sub_str)) = split_first_char(new_str) {
+            while let Some((c, rest)) = split_first_char(remaining) {
                 if is_breakz(c) {
                     break;
                 }
-                new_str = sub_str;
-                chars_consumed += 1;
+                remaining = rest;
+                consumed += 1;
             }
         }
 
-        self.buffer = new_str;
-
-        (
-            chars_consumed,
-            Ok(SkipTabs::Result(encountered_tab, has_yaml_ws)),
-        )
+        self.buffer = remaining;
+        Ok((consumed, Ok(SkipTabs::Result(encountered_tab, has_yaml_ws))))
     }
 
     #[allow(clippy::inline_always)]
     #[inline(always)]
-    fn next_can_be_plain_scalar(&self, in_flow: bool) -> bool {
-        let nc = self.peek_nth(1);
-        match self.peek() {
-            // indicators can end a plain scalar, see 7.3.3. Plain Style
-            ':' if is_blank_or_breakz(nc) || (in_flow && is_flow(nc)) => false,
+    fn next_can_be_plain_scalar(&mut self, in_flow: bool) -> InputResult<bool, Self::Error> {
+        let next = self.peek_nth(1)?;
+        Ok(match self.peek()? {
+            ':' if is_blank_or_breakz(next) || (in_flow && is_flow(next)) => false,
             c if in_flow && is_flow(c) => false,
             _ => true,
-        }
+        })
     }
 
     #[inline]
-    fn next_is_blank_or_break(&self) -> bool {
-        !self.buffer.is_empty()
-            && (is_blank(self.buffer.as_bytes()[0] as char)
-                || is_break(self.buffer.as_bytes()[0] as char))
+    fn next_is_blank_or_break(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(self
+            .buffer
+            .as_bytes()
+            .first()
+            .is_some_and(|byte| is_blank(*byte as char) || is_break(*byte as char)))
     }
 
     #[inline]
-    fn next_is_blank_or_breakz(&self) -> bool {
-        self.buffer.is_empty()
-            || (is_blank(self.buffer.as_bytes()[0] as char)
-                || is_breakz(self.buffer.as_bytes()[0] as char))
+    fn next_is_blank_or_breakz(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(self
+            .buffer
+            .as_bytes()
+            .first()
+            .is_none_or(|byte| is_blank(*byte as char) || is_breakz(*byte as char)))
     }
 
     #[inline]
-    fn next_is_blank(&self) -> bool {
-        !self.buffer.is_empty() && is_blank(self.buffer.as_bytes()[0] as char)
+    fn next_is_blank(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(self
+            .buffer
+            .as_bytes()
+            .first()
+            .is_some_and(|byte| is_blank(*byte as char)))
     }
 
     #[inline]
-    fn next_is_break(&self) -> bool {
-        !self.buffer.is_empty() && is_break(self.buffer.as_bytes()[0] as char)
+    fn next_is_break(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(self
+            .buffer
+            .as_bytes()
+            .first()
+            .is_some_and(|byte| is_break(*byte as char)))
     }
 
     #[inline]
-    fn next_is_breakz(&self) -> bool {
-        self.buffer.is_empty() || is_breakz(self.buffer.as_bytes()[0] as char)
+    fn next_is_breakz(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(self
+            .buffer
+            .as_bytes()
+            .first()
+            .is_none_or(|byte| is_breakz(*byte as char)))
     }
 
     #[inline]
-    fn next_is_z(&self) -> bool {
-        self.buffer.is_empty() || is_z(self.buffer.as_bytes()[0] as char)
+    fn next_is_z(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(self
+            .buffer
+            .as_bytes()
+            .first()
+            .is_none_or(|byte| is_z(*byte as char)))
     }
 
     #[inline]
-    fn next_is_flow(&self) -> bool {
-        !self.buffer.is_empty() && is_flow(self.buffer.as_bytes()[0] as char)
+    fn next_is_flow(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(self
+            .buffer
+            .as_bytes()
+            .first()
+            .is_some_and(|byte| is_flow(*byte as char)))
     }
 
     #[inline]
-    fn next_is_digit(&self) -> bool {
-        !self.buffer.is_empty() && is_digit(self.buffer.as_bytes()[0] as char)
+    fn next_is_digit(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(self
+            .buffer
+            .as_bytes()
+            .first()
+            .is_some_and(|byte| is_digit(*byte as char)))
     }
 
     #[inline]
-    fn next_is_alpha(&self) -> bool {
-        !self.buffer.is_empty() && is_alpha(self.buffer.as_bytes()[0] as char)
+    fn next_is_alpha(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(self
+            .buffer
+            .as_bytes()
+            .first()
+            .is_some_and(|byte| is_alpha(*byte as char)))
     }
 
-    fn skip_while_non_breakz(&mut self) -> usize {
-        let mut new_str = self.buffer;
+    fn skip_while_non_breakz(&mut self) -> InputResult<usize, Self::Error> {
+        let mut remaining = self.buffer;
         let mut count = 0;
-
-        // Skip over all non-breaks.
-        while let Some((c, sub_str)) = split_first_char(new_str) {
+        while let Some((c, rest)) = split_first_char(remaining) {
             if is_breakz(c) {
                 break;
             }
-            new_str = sub_str;
+            remaining = rest;
             count += 1;
         }
-
-        self.buffer = new_str;
-
-        count
+        self.buffer = remaining;
+        Ok(count)
     }
 
-    fn skip_while_blank(&mut self) -> usize {
-        // Since all characters we look for are ascii, we can directly use the byte API of str.
-        let mut i = 0;
-        while i < self.buffer.len() {
-            if !is_blank(self.buffer.as_bytes()[i] as char) {
-                break;
-            }
-            i += 1;
+    fn skip_while_blank(&mut self) -> InputResult<usize, Self::Error> {
+        let mut bytes = 0;
+        while bytes < self.buffer.len() && is_blank(self.buffer.as_bytes()[bytes] as char) {
+            bytes += 1;
         }
-        self.buffer = &self.buffer[i..];
-        i
+        self.buffer = &self.buffer[bytes..];
+        Ok(bytes)
     }
 
-    fn fetch_while_is_alpha(&mut self, out: &mut String) -> usize {
-        let mut not_alpha = None;
-
-        // Skip while we have alpha characters.
+    fn fetch_while_is_alpha(&mut self, out: &mut String) -> InputResult<usize, Self::Error> {
         let mut chars = self.buffer.chars();
         for c in chars.by_ref() {
             if !is_alpha(c) {
-                not_alpha = Some(c);
-                break;
+                let bytes = self.buffer.len() - chars.as_str().len() - c.len_utf8();
+                out.reserve(bytes);
+                out.push_str(&self.buffer[..bytes]);
+                self.buffer = &self.buffer[bytes..];
+                return Ok(bytes);
             }
         }
 
-        let remaining_string = if let Some(c) = not_alpha {
-            let n_bytes_read = chars.as_str().as_ptr() as usize - self.buffer.as_ptr() as usize;
-            let last_char_bytes = c.len_utf8();
-            &self.buffer[n_bytes_read - last_char_bytes..]
-        } else {
-            chars.as_str()
-        };
-
-        let n_bytes_to_append = remaining_string.as_ptr() as usize - self.buffer.as_ptr() as usize;
-        out.reserve(n_bytes_to_append);
-        out.push_str(&self.buffer[..n_bytes_to_append]);
-        self.buffer = remaining_string;
-
-        n_bytes_to_append
+        let bytes = self.buffer.len() - chars.as_str().len();
+        out.reserve(bytes);
+        out.push_str(&self.buffer[..bytes]);
+        self.buffer = chars.as_str();
+        Ok(bytes)
     }
 
-    fn fetch_while_is_yaml_non_space(&mut self, out: &mut String) -> usize {
-        let mut not_non_space = None;
-
-        // Skip while we have non-space characters.
+    fn fetch_while_is_yaml_non_space(
+        &mut self,
+        out: &mut String,
+    ) -> InputResult<usize, Self::Error> {
         let mut chars = self.buffer.chars();
         for c in chars.by_ref() {
             if !crate::char_traits::is_yaml_non_space(c) {
-                not_non_space = Some(c);
-                break;
+                let bytes = self.buffer.len() - chars.as_str().len() - c.len_utf8();
+                out.reserve(bytes);
+                out.push_str(&self.buffer[..bytes]);
+                self.buffer = &self.buffer[bytes..];
+                return Ok(bytes);
             }
         }
 
-        let remaining_string = if let Some(c) = not_non_space {
-            let n_bytes_read = chars.as_str().as_ptr() as usize - self.buffer.as_ptr() as usize;
-            let last_char_bytes = c.len_utf8();
-            &self.buffer[n_bytes_read - last_char_bytes..]
-        } else {
-            chars.as_str()
-        };
-
-        let n_bytes_to_append = remaining_string.as_ptr() as usize - self.buffer.as_ptr() as usize;
-        out.reserve(n_bytes_to_append);
-        out.push_str(&self.buffer[..n_bytes_to_append]);
-        self.buffer = remaining_string;
-
-        n_bytes_to_append
+        let bytes = self.buffer.len() - chars.as_str().len();
+        out.reserve(bytes);
+        out.push_str(&self.buffer[..bytes]);
+        self.buffer = chars.as_str();
+        Ok(bytes)
     }
 }
 
@@ -436,33 +410,41 @@ mod test {
 
     #[test]
     pub fn is_document_start() {
-        let input = StrInput::new("---\n");
-        assert!(input.next_is_document_start());
-        assert!(input.next_is_document_indicator());
-        let input = StrInput::new("---");
-        assert!(input.next_is_document_start());
-        assert!(input.next_is_document_indicator());
-        let input = StrInput::new("...\n");
-        assert!(!input.next_is_document_start());
-        assert!(input.next_is_document_indicator());
-        let input = StrInput::new("--- ");
-        assert!(input.next_is_document_start());
-        assert!(input.next_is_document_indicator());
+        let mut input = StrInput::new("---\n");
+        input.lookahead(4).unwrap();
+        assert!(input.next_is_document_start().unwrap());
+        assert!(input.next_is_document_indicator().unwrap());
+        let mut input = StrInput::new("---");
+        input.lookahead(4).unwrap();
+        assert!(input.next_is_document_start().unwrap());
+        assert!(input.next_is_document_indicator().unwrap());
+        let mut input = StrInput::new("...\n");
+        input.lookahead(4).unwrap();
+        assert!(!input.next_is_document_start().unwrap());
+        assert!(input.next_is_document_indicator().unwrap());
+        let mut input = StrInput::new("--- ");
+        input.lookahead(4).unwrap();
+        assert!(input.next_is_document_start().unwrap());
+        assert!(input.next_is_document_indicator().unwrap());
     }
 
     #[test]
     pub fn is_document_end() {
-        let input = StrInput::new("...\n");
-        assert!(input.next_is_document_end());
-        assert!(input.next_is_document_indicator());
-        let input = StrInput::new("...");
-        assert!(input.next_is_document_end());
-        assert!(input.next_is_document_indicator());
-        let input = StrInput::new("---\n");
-        assert!(!input.next_is_document_end());
-        assert!(input.next_is_document_indicator());
-        let input = StrInput::new("... ");
-        assert!(input.next_is_document_end());
-        assert!(input.next_is_document_indicator());
+        let mut input = StrInput::new("...\n");
+        input.lookahead(4).unwrap();
+        assert!(input.next_is_document_end().unwrap());
+        assert!(input.next_is_document_indicator().unwrap());
+        let mut input = StrInput::new("...");
+        input.lookahead(4).unwrap();
+        assert!(input.next_is_document_end().unwrap());
+        assert!(input.next_is_document_indicator().unwrap());
+        let mut input = StrInput::new("---\n");
+        input.lookahead(4).unwrap();
+        assert!(!input.next_is_document_end().unwrap());
+        assert!(input.next_is_document_indicator().unwrap());
+        let mut input = StrInput::new("... ");
+        input.lookahead(4).unwrap();
+        assert!(input.next_is_document_end().unwrap());
+        assert!(input.next_is_document_indicator().unwrap());
     }
 }

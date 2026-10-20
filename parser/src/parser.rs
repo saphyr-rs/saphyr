@@ -5,9 +5,9 @@
 //! YAML objects.
 
 use crate::{
-    BufferedInput, Marker,
+    BufferedInput, InfallibleChars, Marker,
     input::{Input, str::StrInput},
-    scanner::{ScalarStyle, ScanError, Scanner, Span, Token, TokenType},
+    scanner::{ParseError, ScalarStyle, Scanner, Span, Token, TokenType},
 };
 
 use alloc::{
@@ -16,6 +16,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use core::convert::Infallible;
 use core::fmt::Display;
 
 #[derive(Clone, Copy, PartialEq, Debug, Eq)]
@@ -176,9 +177,14 @@ pub struct Parser<'input, T: Input> {
     /// Emitted means that it has been returned from [`Self::next`]. If it is stored in
     /// [`Self::token`], this is set to `false`.
     stream_end_emitted: bool,
+    iterator_terminated: bool,
     /// Make tags global across all documents.
     keep_tags: bool,
 }
+
+/// The result of peeking at the next parser event.
+pub type ParserPeek<'event, 'input, E> =
+    Option<Result<&'event (Event<'input>, Span), ParseError<E>>>;
 
 impl<T: Input + Clone> Clone for Parser<'_, T> {
     fn clone(&self) -> Self {
@@ -192,6 +198,7 @@ impl<T: Input + Clone> Clone for Parser<'_, T> {
             anchor_id_count: self.anchor_id_count,
             tags: self.tags.clone(),
             stream_end_emitted: self.stream_end_emitted,
+            iterator_terminated: self.iterator_terminated,
             keep_tags: self.keep_tags,
         }
     }
@@ -286,10 +293,21 @@ impl<'input, R: EventReceiver<'input>> SpannedEventReceiver<'input> for R {
 }
 
 /// A convenience alias for a `Result` of a parser event.
-pub type ParseResult<'input> = Result<(Event<'input>, Span), ScanError>;
+pub type ParseResult<'input, E = core::convert::Infallible> =
+    Result<(Event<'input>, Span), ParseError<E>>;
 
 impl<'input> Parser<'input, StrInput<'input>> {
     /// Create a new instance of a parser from a &str.
+    ///
+    /// The parser borrows its input. Its events cannot outlive `value`.
+    ///
+    /// ```compile_fail
+    /// use saphyr_parser::{Event, Parser};
+    ///
+    /// fn event_outlives_source(source: &str) -> Event<'static> {
+    ///     Parser::new_from_str(source).next().unwrap().unwrap().0
+    /// }
+    /// ```
     #[must_use]
     pub fn new_from_str(value: &'input str) -> Self {
         debug_print!("\x1B[;31m>>>>>>>>>> New parser from str\x1B[;0m");
@@ -297,14 +315,33 @@ impl<'input> Parser<'input, StrInput<'input>> {
     }
 }
 
-impl<'input, T> Parser<'input, BufferedInput<T>>
-where
-    T: Iterator<Item = char> + 'input,
-{
+impl<'input> Parser<'input, StrInput<'input>> {
     /// Create a new instance of a parser from an iterator of `char`s.
+    ///
+    /// The iterator produces input characters and uses `None` as end of input.
     #[must_use]
-    pub fn new_from_iter(iter: T) -> Self {
+    pub fn new_from_iter<T>(
+        iter: T,
+    ) -> Parser<'input, BufferedInput<InfallibleChars<T>, Infallible>>
+    where
+        T: Iterator<Item = char>,
+    {
         debug_print!("\x1B[;31m>>>>>>>>>> New parser from iter\x1B[;0m");
+        Parser::new(BufferedInput::new(InfallibleChars::new(iter)))
+    }
+}
+
+impl<T, E> Parser<'_, BufferedInput<T, E>>
+where
+    T: Iterator<Item = Result<char, E>>,
+{
+    /// Create a parser from a fallible iterator of characters.
+    ///
+    /// The iterator returns `Ok` for each input character and `Err` for a source failure. `None`
+    /// means that the source reached end of input. The parser returns the first source error that
+    /// it needs to read and does not read the source again after that error.
+    #[must_use]
+    pub fn new_from_fallible_iter(iter: T) -> Self {
         Parser::new(BufferedInput::new(iter))
     }
 }
@@ -324,6 +361,7 @@ impl<'input, T: Input> Parser<'input, T> {
             anchor_id_count: 1,
             tags: BTreeMap::new(),
             stream_end_emitted: false,
+            iterator_terminated: false,
             keep_tags: false,
         }
     }
@@ -362,8 +400,8 @@ impl<'input, T: Input> Parser<'input, T> {
     /// [`Iterator::next`] or [`Parser::load`].
     ///
     /// # Errors
-    /// Returns `ScanError` when loading the next event fails.
-    pub fn peek(&mut self) -> Option<Result<&(Event<'input>, Span), ScanError>> {
+    /// Returns a syntax or input error when loading the next event fails.
+    pub fn peek(&mut self) -> ParserPeek<'_, 'input, T::Error> {
         if let Some(ref x) = self.current {
             Some(Ok(x))
         } else {
@@ -381,8 +419,8 @@ impl<'input, T: Input> Parser<'input, T> {
     /// Try to load the next event and return it, consuming it from `self`.
     ///
     /// # Errors
-    /// Returns `ScanError` when loading the next event fails.
-    pub fn next_event(&mut self) -> Option<ParseResult<'input>> {
+    /// Returns a syntax or input error when loading the next event fails.
+    pub fn next_event(&mut self) -> Option<ParseResult<'input, T::Error>> {
         if self.stream_end_emitted {
             return None;
         }
@@ -399,18 +437,22 @@ impl<'input, T: Input> Parser<'input, T> {
     /// [`Self::next_event`] should conform to the expectations of an [`Iterator`] and return an
     /// option. This burdens the parser code. This function is used internally when an option is
     /// undesirable.
-    fn next_event_impl<'a>(&mut self) -> ParseResult<'a>
+    fn next_event_impl<'a>(&mut self) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
-        match self.current.take() {
+        let result = match self.current.take() {
             None => self.parse(),
             Some(v) => Ok(v),
+        };
+        if matches!(&result, Err(ParseError::Source(_) | ParseError::Failed)) {
+            self.iterator_terminated = true;
         }
+        result
     }
 
     /// Peek at the next token from the scanner.
-    fn peek_token(&mut self) -> Result<&Token<'_>, ScanError> {
+    fn peek_token(&mut self) -> Result<&Token<'_>, ParseError<T::Error>> {
         match self.token {
             None => {
                 self.token = Some(self.scan_next_token()?);
@@ -423,15 +465,10 @@ impl<'input, T: Input> Parser<'input, T> {
     /// Extract and return the next token from the scanner.
     ///
     /// This function does _not_ make use of `self.token`.
-    fn scan_next_token(&mut self) -> Result<Token<'input>, ScanError> {
-        let token = self.scanner.next();
-        match token {
-            None => match self.scanner.get_error() {
-                None => Err(ScanError::new_str(self.scanner.mark(), "unexpected eof")),
-                Some(e) => Err(e),
-            },
-            Some(tok) => Ok(tok),
-        }
+    fn scan_next_token(&mut self) -> Result<Token<'input>, ParseError<T::Error>> {
+        self.scanner
+            .next_token()?
+            .ok_or_else(|| ParseError::new_str(self.scanner.mark(), "unexpected eof"))
     }
 
     fn fetch_token<'a>(&mut self) -> Token<'a>
@@ -456,7 +493,7 @@ impl<'input, T: Input> Parser<'input, T> {
         self.states.push(state);
     }
 
-    fn parse<'a>(&mut self) -> ParseResult<'a>
+    fn parse<'a>(&mut self) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -474,20 +511,22 @@ impl<'input, T: Input> Parser<'input, T> {
     ///
     /// If `multi` is set to `true`, the parser will allow parsing of multiple YAML documents
     /// inside the stream.
+    /// If `multi` is `false`, loading stops after the first document and does not validate an
+    /// unread suffix.
     ///
     /// Note that any [`EventReceiver`] is also a [`SpannedEventReceiver`], so implementing the
     /// former is enough to call this function.
     /// # Errors
-    /// Returns `ScanError` when loading fails.
+    /// Returns a syntax or input error when loading fails.
     pub fn load<R: SpannedEventReceiver<'input>>(
         &mut self,
         recv: &mut R,
         multi: bool,
-    ) -> Result<(), ScanError> {
+    ) -> Result<(), ParseError<T::Error>> {
         if !self.scanner.stream_started() {
             let (ev, span) = self.next_event_impl()?;
             if ev != Event::StreamStart {
-                return Err(ScanError::new_str(
+                return Err(ParseError::new_str(
                     span.start,
                     "did not find expected <stream-start>",
                 ));
@@ -521,9 +560,9 @@ impl<'input, T: Input> Parser<'input, T> {
         first_ev: Event<'input>,
         span: Span,
         recv: &mut R,
-    ) -> Result<(), ScanError> {
+    ) -> Result<(), ParseError<T::Error>> {
         if !matches!(first_ev, Event::DocumentStart(_)) {
-            return Err(ScanError::new_str(
+            return Err(ParseError::new_str(
                 span.start,
                 "did not find expected <document-start>",
             ));
@@ -546,7 +585,7 @@ impl<'input, T: Input> Parser<'input, T> {
         first_ev: Event<'input>,
         span: Span,
         recv: &mut R,
-    ) -> Result<(), ScanError> {
+    ) -> Result<(), ParseError<T::Error>> {
         match first_ev {
             Event::Alias(..) | Event::Scalar(..) => {
                 recv.on_event(first_ev, span);
@@ -571,7 +610,7 @@ impl<'input, T: Input> Parser<'input, T> {
     fn load_mapping<R: SpannedEventReceiver<'input>>(
         &mut self,
         recv: &mut R,
-    ) -> Result<(), ScanError> {
+    ) -> Result<(), ParseError<T::Error>> {
         let (mut key_ev, mut key_mark) = self.next_event_impl()?;
         while key_ev != Event::MappingEnd {
             // key
@@ -593,7 +632,7 @@ impl<'input, T: Input> Parser<'input, T> {
     fn load_sequence<R: SpannedEventReceiver<'input>>(
         &mut self,
         recv: &mut R,
-    ) -> Result<(), ScanError> {
+    ) -> Result<(), ParseError<T::Error>> {
         let (mut ev, mut mark) = self.next_event_impl()?;
         while ev != Event::SequenceEnd {
             self.load_node(ev, mark, recv)?;
@@ -607,7 +646,7 @@ impl<'input, T: Input> Parser<'input, T> {
         Ok(())
     }
 
-    fn state_machine<'a>(&mut self) -> ParseResult<'a>
+    fn state_machine<'a>(&mut self) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -652,7 +691,7 @@ impl<'input, T: Input> Parser<'input, T> {
         }
     }
 
-    fn stream_start<'a>(&mut self) -> ParseResult<'a>
+    fn stream_start<'a>(&mut self) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -662,14 +701,14 @@ impl<'input, T: Input> Parser<'input, T> {
                 self.skip();
                 Ok((Event::StreamStart, span))
             }
-            Token(span, _) => Err(ScanError::new_str(
+            Token(span, _) => Err(ParseError::new_str(
                 span.start,
                 "did not find expected <stream-start>",
             )),
         }
     }
 
-    fn document_start<'a>(&mut self, implicit: bool) -> ParseResult<'a>
+    fn document_start<'a>(&mut self, implicit: bool) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -706,7 +745,7 @@ impl<'input, T: Input> Parser<'input, T> {
         }
     }
 
-    fn parser_process_directives(&mut self) -> Result<(), ScanError> {
+    fn parser_process_directives(&mut self) -> Result<(), ParseError<T::Error>> {
         let mut version_directive_received = false;
         loop {
             let mut tags = BTreeMap::new();
@@ -714,11 +753,11 @@ impl<'input, T: Input> Parser<'input, T> {
                 Token(span, TokenType::VersionDirective(_, _)) => {
                     // XXX parsing with warning according to spec
                     //if major != 1 || minor > 2 {
-                    //    return Err(ScanError::new_str(tok.0,
+                    //    return Err(ParseError::new_str(tok.0,
                     //        "found incompatible YAML document"));
                     //}
                     if version_directive_received {
-                        return Err(ScanError::new_str(
+                        return Err(ParseError::new_str(
                             span.start,
                             "duplicate version directive",
                         ));
@@ -727,7 +766,7 @@ impl<'input, T: Input> Parser<'input, T> {
                 }
                 Token(mark, TokenType::TagDirective(handle, prefix)) => {
                     if tags.contains_key(&**handle) {
-                        return Err(ScanError::new_str(
+                        return Err(ParseError::new_str(
                             mark.start,
                             "the TAG directive must only be given at most once per handle in the same document",
                         ));
@@ -745,7 +784,7 @@ impl<'input, T: Input> Parser<'input, T> {
         Ok(())
     }
 
-    fn explicit_document_start<'a>(&mut self) -> ParseResult<'a>
+    fn explicit_document_start<'a>(&mut self) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -757,14 +796,14 @@ impl<'input, T: Input> Parser<'input, T> {
                 self.skip();
                 Ok((Event::DocumentStart(true), mark))
             }
-            Token(span, _) => Err(ScanError::new_str(
+            Token(span, _) => Err(ParseError::new_str(
                 span.start,
                 "did not find expected <document start>",
             )),
         }
     }
 
-    fn document_content<'a>(&mut self) -> ParseResult<'a>
+    fn document_content<'a>(&mut self) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -786,7 +825,7 @@ impl<'input, T: Input> Parser<'input, T> {
         }
     }
 
-    fn document_end<'a>(&mut self) -> ParseResult<'a>
+    fn document_end<'a>(&mut self) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -813,7 +852,7 @@ impl<'input, T: Input> Parser<'input, T> {
                 | TokenType::ReservedDirective(..),
             ) = *self.peek_token()?
             {
-                return Err(ScanError::new_str(
+                return Err(ParseError::new_str(
                     span.start,
                     "missing explicit document end marker before directive",
                 ));
@@ -827,7 +866,7 @@ impl<'input, T: Input> Parser<'input, T> {
     fn register_anchor(&mut self, name: Cow<'input, str>, _: &Span) -> usize {
         // anchors can be overridden/reused
         // if self.anchors.contains_key(name) {
-        //     return Err(ScanError::new_str(*mark,
+        //     return Err(ParseError::new_str(*mark,
         //         "while parsing anchor, found duplicated anchor"));
         // }
         let new_id = self.anchor_id_count;
@@ -836,7 +875,11 @@ impl<'input, T: Input> Parser<'input, T> {
         new_id
     }
 
-    fn parse_node<'a>(&mut self, block: bool, indentless_sequence: bool) -> ParseResult<'a>
+    fn parse_node<'a>(
+        &mut self,
+        block: bool,
+        indentless_sequence: bool,
+    ) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -848,7 +891,7 @@ impl<'input, T: Input> Parser<'input, T> {
                 if let Token(span, TokenType::Alias(name)) = self.fetch_token() {
                     match self.anchors.get(&*name) {
                         None => {
-                            return Err(ScanError::new_str(
+                            return Err(ParseError::new_str(
                                 span.start,
                                 "while parsing node, found unknown anchor",
                             ));
@@ -922,14 +965,14 @@ impl<'input, T: Input> Parser<'input, T> {
                 self.pop_state();
                 Ok((Event::empty_scalar_with_anchor(anchor_id, tag), mark))
             }
-            Token(span, _) => Err(ScanError::new_str(
+            Token(span, _) => Err(ParseError::new_str(
                 span.start,
                 "while parsing a node, did not find expected node content",
             )),
         }
     }
 
-    fn block_mapping_key<'a>(&mut self, first: bool) -> ParseResult<'a>
+    fn block_mapping_key<'a>(&mut self, first: bool) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -963,14 +1006,14 @@ impl<'input, T: Input> Parser<'input, T> {
                 self.skip();
                 Ok((Event::MappingEnd, mark))
             }
-            Token(span, _) => Err(ScanError::new_str(
+            Token(span, _) => Err(ParseError::new_str(
                 span.start,
                 "while parsing a block mapping, did not find expected key",
             )),
         }
     }
 
-    fn block_mapping_value<'a>(&mut self) -> ParseResult<'a>
+    fn block_mapping_value<'a>(&mut self) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -996,7 +1039,7 @@ impl<'input, T: Input> Parser<'input, T> {
         }
     }
 
-    fn flow_mapping_key<'a>(&mut self, first: bool) -> ParseResult<'a>
+    fn flow_mapping_key<'a>(&mut self, first: bool) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -1012,7 +1055,7 @@ impl<'input, T: Input> Parser<'input, T> {
                         match *self.peek_token()? {
                             Token(_, TokenType::FlowEntry) => self.skip(),
                             Token(span, _) => {
-                                return Err(ScanError::new_str(
+                                return Err(ParseError::new_str(
                                     span.start,
                                     "while parsing a flow mapping, did not find expected ',' or '}'",
                                 ));
@@ -1055,7 +1098,7 @@ impl<'input, T: Input> Parser<'input, T> {
         Ok((Event::MappingEnd, span))
     }
 
-    fn flow_mapping_value<'a>(&mut self, empty: bool) -> ParseResult<'a>
+    fn flow_mapping_value<'a>(&mut self, empty: bool) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -1085,7 +1128,7 @@ impl<'input, T: Input> Parser<'input, T> {
         Ok((Event::empty_scalar(), span))
     }
 
-    fn flow_sequence_entry<'a>(&mut self, first: bool) -> ParseResult<'a>
+    fn flow_sequence_entry<'a>(&mut self, first: bool) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -1105,7 +1148,7 @@ impl<'input, T: Input> Parser<'input, T> {
                 self.skip();
             }
             Token(span, _) if !first => {
-                return Err(ScanError::new_str(
+                return Err(ParseError::new_str(
                     span.start,
                     "while parsing a flow sequence, expected ',' or ']'",
                 ));
@@ -1130,7 +1173,7 @@ impl<'input, T: Input> Parser<'input, T> {
         }
     }
 
-    fn indentless_sequence_entry<'a>(&mut self) -> ParseResult<'a>
+    fn indentless_sequence_entry<'a>(&mut self) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -1156,7 +1199,7 @@ impl<'input, T: Input> Parser<'input, T> {
         }
     }
 
-    fn block_sequence_entry<'a>(&mut self, first: bool) -> ParseResult<'a>
+    fn block_sequence_entry<'a>(&mut self, first: bool) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -1182,14 +1225,14 @@ impl<'input, T: Input> Parser<'input, T> {
                     self.parse_node(true, false)
                 }
             }
-            Token(span, _) => Err(ScanError::new_str(
+            Token(span, _) => Err(ParseError::new_str(
                 span.start,
                 "while parsing a block collection, did not find expected '-' indicator",
             )),
         }
     }
 
-    fn flow_sequence_entry_mapping_key<'a>(&mut self) -> ParseResult<'a>
+    fn flow_sequence_entry_mapping_key<'a>(&mut self) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -1205,7 +1248,7 @@ impl<'input, T: Input> Parser<'input, T> {
         }
     }
 
-    fn flow_sequence_entry_mapping_value<'a>(&mut self) -> ParseResult<'a>
+    fn flow_sequence_entry_mapping_value<'a>(&mut self) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -1230,7 +1273,7 @@ impl<'input, T: Input> Parser<'input, T> {
     }
 
     #[allow(clippy::unnecessary_wraps)]
-    fn flow_sequence_entry_mapping_end<'a>(&mut self, mark: Marker) -> ParseResult<'a>
+    fn flow_sequence_entry_mapping_end<'a>(&mut self, mark: Marker) -> ParseResult<'a, T::Error>
     where
         'input: 'a,
     {
@@ -1244,7 +1287,7 @@ impl<'input, T: Input> Parser<'input, T> {
         span: Span,
         handle: &str,
         suffix: String,
-    ) -> Result<Cow<'input, Tag>, ScanError> {
+    ) -> Result<Cow<'input, Tag>, ParseError<T::Error>> {
         let tag = if handle == "!!" {
             // "!!" is a shorthand for "tag:yaml.org,2002:". However, that default can be
             // overridden.
@@ -1281,7 +1324,10 @@ impl<'input, T: Input> Parser<'input, T> {
                 // If the handle is of the form "!foo!", this cannot be a local handle and we need
                 // to error.
                 if handle.len() >= 2 && handle.starts_with('!') && handle.ends_with('!') {
-                    return Err(ScanError::new_str(span.start, "the handle wasn't declared"));
+                    return Err(ParseError::new_str(
+                        span.start,
+                        "the handle wasn't declared",
+                    ));
                 }
                 Tag {
                     handle: handle.to_string(),
@@ -1294,9 +1340,12 @@ impl<'input, T: Input> Parser<'input, T> {
 }
 
 impl<'input, T: Input> Iterator for Parser<'input, T> {
-    type Item = Result<(Event<'input>, Span), ScanError>;
+    type Item = Result<(Event<'input>, Span), ParseError<T::Error>>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.iterator_terminated {
+            return None;
+        }
         self.next_event()
     }
 }

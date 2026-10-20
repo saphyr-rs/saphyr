@@ -1,10 +1,12 @@
 #![allow(clippy::bool_assert_comparison)]
 #![allow(clippy::float_cmp)]
 
-use saphyr_parser::{Event, Parser, ScanError};
+mod common;
+use common::ParserError;
+use saphyr_parser::{Event, Parser};
 
 /// Run the parser through the string, returning all the scalars, and collecting their spans to strings.
-fn run_parser_and_deref_scalar_spans(input: &str) -> Result<Vec<(String, String)>, ScanError> {
+fn run_parser_and_deref_scalar_spans(input: &str) -> Result<Vec<(String, String)>, ParserError> {
     let mut events = vec![];
     for x in Parser::new_from_str(input) {
         let x = x?;
@@ -19,7 +21,7 @@ fn run_parser_and_deref_scalar_spans(input: &str) -> Result<Vec<(String, String)
 }
 
 /// Run the parser through the string, returning all the scalars, and collecting their spans to strings.
-fn run_parser_and_deref_seq_spans(input: &str) -> Result<Vec<String>, ScanError> {
+fn run_parser_and_deref_seq_spans(input: &str) -> Result<Vec<String>, ParserError> {
     let mut events = vec![];
     let mut start_stack = vec![];
     for x in Parser::new_from_str(input) {

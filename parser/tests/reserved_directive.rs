@@ -1,4 +1,9 @@
-use saphyr_parser::{Parser, ScanError};
+mod common;
+#[path = "common/syntax.rs"]
+mod syntax;
+use common::ParserError;
+use saphyr_parser::Parser;
+use syntax::syntax_error;
 
 // ZYU8: Directive variants
 // In YAML 1.2, a directive name is any non‑space, non‑line‑break sequence of characters
@@ -6,7 +11,7 @@ use saphyr_parser::{Parser, ScanError};
 #[test]
 fn yaml_zyu8_directive_variant_yaml11_null_document() {
     let yaml = "%YAML1.1\n---\n";
-    let mut got_err: Option<ScanError> = None;
+    let mut got_err: Option<ParserError> = None;
 
     for item in Parser::new_from_str(yaml) {
         match item {
@@ -17,13 +22,17 @@ fn yaml_zyu8_directive_variant_yaml11_null_document() {
             }
         }
     }
-    assert!(got_err.is_none(), "Error: {}", got_err.unwrap().info());
+    assert!(
+        got_err.is_none(),
+        "Error: {}",
+        syntax_error(&got_err.unwrap()).info()
+    );
 }
 
 #[test]
 fn yaml_reserved_directive_stars() {
     let yaml = "%***\n---\n";
-    let mut got_err: Option<ScanError> = None;
+    let mut got_err: Option<ParserError> = None;
 
     for item in Parser::new_from_str(yaml) {
         if let Err(e) = item {
@@ -31,13 +40,17 @@ fn yaml_reserved_directive_stars() {
             break;
         }
     }
-    assert!(got_err.is_none(), "Error: {}", got_err.unwrap().info());
+    assert!(
+        got_err.is_none(),
+        "Error: {}",
+        syntax_error(&got_err.unwrap()).info()
+    );
 }
 
 #[test]
 fn yaml_bad_yaml_directive() {
     let yaml = "%YAML 1.1 1.2\n---\n";
-    let mut got_err: Option<ScanError> = None;
+    let mut got_err: Option<ParserError> = None;
 
     for item in Parser::new_from_str(yaml) {
         if let Err(e) = item {
@@ -48,8 +61,7 @@ fn yaml_bad_yaml_directive() {
     // This should fail because "YAML" is a defined directive and it has too many parameters.
     assert!(got_err.is_some());
     assert!(
-        got_err
-            .unwrap()
+        syntax_error(&got_err.unwrap())
             .info()
             .contains("did not find expected comment or line break")
     );
@@ -58,7 +70,7 @@ fn yaml_bad_yaml_directive() {
 #[test]
 fn yaml_reserved_directive_with_params() {
     let yaml = "%FOO bar baz\n---\n";
-    let mut got_err: Option<ScanError> = None;
+    let mut got_err: Option<ParserError> = None;
 
     for item in Parser::new_from_str(yaml) {
         if let Err(e) = item {
@@ -66,5 +78,9 @@ fn yaml_reserved_directive_with_params() {
             break;
         }
     }
-    assert!(got_err.is_none(), "Error: {}", got_err.unwrap().info());
+    assert!(
+        got_err.is_none(),
+        "Error: {}",
+        syntax_error(&got_err.unwrap()).info()
+    );
 }

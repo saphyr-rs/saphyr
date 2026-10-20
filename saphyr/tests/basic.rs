@@ -330,7 +330,11 @@ a: 1
 b: 2
 a: 3
 ";
-    let err = Yaml::load_from_str(s).expect_err("duplicate key must not load");
+    let err = match Yaml::load_from_str(s).expect_err("duplicate key must not load") {
+        saphyr::ParseError::Syntax(err) => err,
+        saphyr::ParseError::Source(never) => match never {},
+        saphyr::ParseError::Failed => panic!("infallible string input cannot fail"),
+    };
     assert_eq!(err.info(), "duplicated key in mapping");
     // The error points at the second occurrence of `a`.
     assert_eq!(err.marker().line(), 4);

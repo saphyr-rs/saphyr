@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 
 use hashlink::LinkedHashMap;
 use saphyr_parser::{
-    BufferedInput, Event, Input, Marker, Parser, ScanError, Span, SpannedEventReceiver, Tag,
+    Event, Input, Marker, ParseError, Parser, ScanError, Span, SpannedEventReceiver, Tag,
 };
 use thiserror::Error;
 
@@ -186,33 +186,32 @@ pub trait LoadableYamlNode<'input>: Clone + core::hash::Hash + Eq {
     /// ```
     ///
     /// # Errors
-    /// Returns [`ScanError`] when loading fails. As mandated by the YAML specification, a mapping
+    /// Returns [`ParseError`] when loading fails. As mandated by the YAML specification, a mapping
     /// containing duplicate keys is an error. See [`allow_duplicate_keys`] to opt out of this
     /// check.
     ///
     /// [`allow_duplicate_keys`]: YamlLoader::allow_duplicate_keys
-    fn load_from_str(source: &str) -> Result<Vec<Self>, ScanError> {
+    fn load_from_str(source: &str) -> Result<Vec<Self>, ParseError<core::convert::Infallible>> {
         Self::load_from_iter(source.chars())
     }
 
     /// Load the contents of the given reader as an array of YAML documents.
     ///
-    /// The whole of `source` is read into memory as a UTF-8 string and then handed to
-    /// [`load_from_str`]. Parsing is not incremental, so there is nothing to gain from feeding the
-    /// reader in piecemeal, and reading it up-front keeps this a thin convenience wrapper. If you
-    /// need to decode input that isn't UTF-8, use [`YamlDecoder`] instead.
+    /// This reader path reads all of `source` into a UTF-8 string before it parses the YAML.
+    /// Use [`load_from_fallible_iter`] to parse characters from an iterator that can return source
+    /// errors. Use [`YamlDecoder`] to decode input that isn't UTF-8.
     ///
     /// # Errors
     /// Returns [`LoadError::IO`] if reading from `source` fails, which includes the input not being
     /// valid UTF-8, and [`LoadError::Scan`] if the YAML is malformed.
     ///
-    /// [`load_from_str`]: LoadableYamlNode::load_from_str
+    /// [`load_from_fallible_iter`]: LoadableYamlNode::load_from_fallible_iter
     /// [`YamlDecoder`]: crate::YamlDecoder
     #[cfg(feature = "encoding")]
     fn load_from_read<R: std::io::Read>(mut source: R) -> Result<Vec<Self>, LoadError> {
         let mut buffer = alloc::string::String::new();
         source.read_to_string(&mut buffer)?;
-        Self::load_from_str(&buffer).map_err(LoadError::Scan)
+        Self::load_from_str(&buffer).map_err(parse_error_to_load_error)
     }
 
     /// Load the contents of the given iterator as an array of YAML documents.
@@ -220,11 +219,29 @@ pub trait LoadableYamlNode<'input>: Clone + core::hash::Hash + Eq {
     /// See [`load_from_str`] for details.
     ///
     /// # Errors
-    /// Returns [`ScanError`] when loading fails.
+    /// Returns [`ParseError`] when loading fails.
     ///
     /// [`load_from_str`]: LoadableYamlNode::load_from_str
-    fn load_from_iter<I: Iterator<Item = char>>(source: I) -> Result<Vec<Self>, ScanError> {
-        let mut parser = Parser::new(BufferedInput::new(source));
+    fn load_from_iter<I: Iterator<Item = char>>(
+        source: I,
+    ) -> Result<Vec<Self>, ParseError<core::convert::Infallible>> {
+        let mut parser = Parser::new_from_iter(source);
+        Self::load_from_parser(&mut parser)
+    }
+
+    /// Load YAML documents from an iterator that can report an input error.
+    ///
+    /// The parser returns the first source error that it needs to read. It does not treat that
+    /// error as end of input. A source error returns no document collection, even if the parser
+    /// already emitted events for earlier input.
+    ///
+    /// # Errors
+    /// Returns the original input error or a YAML syntax error.
+    fn load_from_fallible_iter<I, E>(source: I) -> Result<Vec<Self>, ParseError<E>>
+    where
+        I: Iterator<Item = Result<char, E>>,
+    {
+        let mut parser = Parser::new_from_fallible_iter(source);
         Self::load_from_parser(&mut parser)
     }
 
@@ -233,14 +250,16 @@ pub trait LoadableYamlNode<'input>: Clone + core::hash::Hash + Eq {
     /// See [`load_from_str`] for details.
     ///
     /// # Errors
-    /// Returns [`ScanError`] when loading fails.
+    /// Returns [`ParseError`] when loading fails.
     ///
     /// [`load_from_str`]: LoadableYamlNode::load_from_str
-    fn load_from_parser<I: Input>(parser: &mut Parser<'input, I>) -> Result<Vec<Self>, ScanError> {
+    fn load_from_parser<I: Input>(
+        parser: &mut Parser<'input, I>,
+    ) -> Result<Vec<Self>, ParseError<I::Error>> {
         let mut loader = YamlLoader::default();
         parser.load(&mut loader, true)?;
         if let Some(e) = loader.error.take() {
-            return Err(e);
+            return Err(ParseError::Syntax(e));
         }
         Ok(loader.into_documents())
     }
@@ -452,6 +471,15 @@ pub enum LoadError {
     /// A decoding error (e.g.: Invalid UTF-8).
     #[error("{0}")]
     Decode(Cow<'static, str>),
+}
+
+#[cfg(feature = "encoding")]
+pub(crate) fn parse_error_to_load_error(error: ParseError<core::convert::Infallible>) -> LoadError {
+    match error {
+        ParseError::Syntax(error) => LoadError::Scan(error),
+        ParseError::Source(never) => match never {},
+        ParseError::Failed => LoadError::Decode(Cow::Borrowed("input parser failed")),
+    }
 }
 
 #[cfg(feature = "encoding")]

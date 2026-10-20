@@ -1,6 +1,11 @@
+mod common;
+#[path = "common/error_assertions.rs"]
+mod error_assertions;
+use common::ParserError;
 use core::str;
+use error_assertions::assert_errors_equal;
 
-use saphyr_parser::{Event, Parser, ScanError};
+use saphyr_parser::{Event, Parser};
 
 /// Run the parser through the string.
 ///
@@ -13,7 +18,7 @@ use saphyr_parser::{Event, Parser, ScanError};
 /// # Panics
 /// This function panics if there is a mismatch between the 2 parser invocations with the different
 /// input traits.
-fn run_parser(input: &str) -> Result<Vec<Event<'_>>, ScanError> {
+fn run_parser(input: &str) -> Result<Vec<Event<'_>>, ParserError> {
     let mut str_events = vec![];
     let mut str_error = None;
     let mut iter_events = vec![];
@@ -48,7 +53,7 @@ fn run_parser(input: &str) -> Result<Vec<Event<'_>>, ScanError> {
     // }
 
     assert_eq!(str_events, iter_events);
-    assert_eq!(str_error, iter_error);
+    assert_errors_equal(str_error.as_ref(), iter_error.as_ref());
 
     if let Some(err) = str_error {
         Err(err)
