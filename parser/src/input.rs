@@ -4,16 +4,49 @@
 //! covered by the [`BufferedInput`].
 
 use alloc::string::String;
+use core::{error::Error, fmt};
 
 pub(crate) mod buffered;
 pub(crate) mod str;
 
 #[allow(clippy::module_name_repetitions)]
-pub use buffered::BufferedInput;
+pub use buffered::{BufferedInput, InfallibleChars};
 
 pub use crate::char_traits::{
     is_alpha, is_blank, is_blank_or_breakz, is_break, is_breakz, is_digit, is_flow, is_z,
 };
+
+/// An input source failure or a call made after that failure.
+///
+/// The source error is returned once. Later input operations return [`InputError::Failed`].
+#[derive(Debug)]
+pub enum InputError<E> {
+    /// The original error returned by the input source.
+    Source(E),
+    /// The input source has already returned its error.
+    Failed,
+}
+
+impl<E: fmt::Display> fmt::Display for InputError<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Source(error) => write!(f, "input source error: {error}"),
+            Self::Failed => f.write_str("input has failed"),
+        }
+    }
+}
+
+impl<E: Error + 'static> Error for InputError<E> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Source(error) => Some(error),
+            Self::Failed => None,
+        }
+    }
+}
+
+/// A fallible result from an [`Input`] operation.
+pub type InputResult<T, E> = Result<T, InputError<E>>;
 
 /// Interface for a source of characters.
 ///
@@ -24,6 +57,8 @@ pub use crate::char_traits::{
 ///    allocations. Should users need an owned version of the data, they can always `.to_owned()`
 ///    their YAML object.
 pub trait Input {
+    /// Error type returned by the underlying input source.
+    type Error;
     /// A hint to the input source that we will need to read `count` characters.
     ///
     /// If the input is exhausted, `\0` can be used to pad the last characters and later returned.
@@ -33,7 +68,9 @@ pub trait Input {
     ///
     /// Implementers of [`Input`] must _not_ load more than `count` characters into the buffer. The
     /// parser tracks how many characters are loaded in the buffer and acts accordingly.
-    fn lookahead(&mut self, count: usize);
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn lookahead(&mut self, count: usize) -> InputResult<(), Self::Error>;
 
     /// Return the number of buffered characters in `self`.
     #[must_use]
@@ -53,8 +90,9 @@ pub trait Input {
     /// Read a character from the input stream and return it directly.
     ///
     /// The internal buffer (if any) is bypassed.
-    #[must_use]
-    fn raw_read_ch(&mut self) -> char;
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn raw_read_ch(&mut self) -> InputResult<char, Self::Error>;
 
     /// Read a non-breakz a character from the input stream and return it directly.
     ///
@@ -62,14 +100,19 @@ pub trait Input {
     ///
     /// If the next character is a breakz, it is either not consumed or placed into the buffer (if
     /// any).
-    #[must_use]
-    fn raw_read_non_breakz_ch(&mut self) -> Option<char>;
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn raw_read_non_breakz_ch(&mut self) -> InputResult<Option<char>, Self::Error>;
 
     /// Consume the next character.
-    fn skip(&mut self);
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn skip(&mut self) -> InputResult<(), Self::Error>;
 
     /// Consume the next `count` character.
-    fn skip_n(&mut self, count: usize);
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn skip_n(&mut self, count: usize) -> InputResult<(), Self::Error>;
 
     /// Return the next character, without consuming it.
     ///
@@ -80,15 +123,17 @@ pub trait Input {
     /// # Return
     /// If the input source is not exhausted, returns the next character to be fed into the
     /// scanner. Otherwise, returns `\0`.
-    #[must_use]
-    fn peek(&self) -> char;
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn peek(&mut self) -> InputResult<char, Self::Error>;
 
     /// Return the `n`-th character in the buffer, without consuming it.
     ///
     /// This function assumes that the n-th character in the input has already been fetched through
     /// [`Input::lookahead`].
-    #[must_use]
-    fn peek_nth(&self, n: usize) -> char;
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn peek_nth(&mut self, n: usize) -> InputResult<char, Self::Error>;
 
     /// Return the next character in the input source, without consuming it, unless the input
     /// source is exhausted.
@@ -100,17 +145,19 @@ pub trait Input {
     ///
     /// This function assumes that the next character in the input has already been fetched through
     /// [`Input::lookahead`].
-    #[must_use]
-    fn peek_opt(&self) -> Option<char>;
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn peek_opt(&mut self) -> InputResult<Option<char>, Self::Error>;
 
     /// Look for the next character and return it.
     ///
     /// The character is not consumed.
     /// Equivalent to calling [`Input::lookahead`] and [`Input::peek`].
     #[inline]
-    #[must_use]
-    fn look_ch(&mut self) -> char {
-        self.lookahead(1);
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn look_ch(&mut self) -> InputResult<char, Self::Error> {
+        self.lookahead(1)?;
         self.peek()
     }
 
@@ -119,9 +166,10 @@ pub trait Input {
     /// This function assumes that the next character in the input has already been fetched through
     /// [`Input::lookahead`].
     #[inline]
-    #[must_use]
-    fn next_char_is(&self, c: char) -> bool {
-        self.peek() == c
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_char_is(&mut self, c: char) -> InputResult<bool, Self::Error> {
+        Ok(self.peek()? == c)
     }
 
     /// Return whether the `n`-th character in the input source is equal to `c`.
@@ -129,9 +177,10 @@ pub trait Input {
     /// This function assumes that the n-th character in the input has already been fetched through
     /// [`Input::lookahead`].
     #[inline]
-    #[must_use]
-    fn nth_char_is(&self, n: usize, c: char) -> bool {
-        self.peek_nth(n) == c
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn nth_char_is(&mut self, n: usize, c: char) -> InputResult<bool, Self::Error> {
+        Ok(self.peek_nth(n)? == c)
     }
 
     /// Return whether the next 2 characters in the input source match the given characters.
@@ -139,10 +188,11 @@ pub trait Input {
     /// This function assumes that the next 2 characters in the input have already been fetched
     /// through [`Input::lookahead`].
     #[inline]
-    #[must_use]
-    fn next_2_are(&self, c1: char, c2: char) -> bool {
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_2_are(&mut self, c1: char, c2: char) -> InputResult<bool, Self::Error> {
         assert!(self.buflen() >= 2);
-        self.peek() == c1 && self.peek_nth(1) == c2
+        Ok(self.peek()? == c1 && self.peek_nth(1)? == c2)
     }
 
     /// Return whether the next 3 characters in the input source match the given characters.
@@ -150,10 +200,11 @@ pub trait Input {
     /// This function assumes that the next 3 characters in the input have already been fetched
     /// through [`Input::lookahead`].
     #[inline]
-    #[must_use]
-    fn next_3_are(&self, c1: char, c2: char, c3: char) -> bool {
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_3_are(&mut self, c1: char, c2: char, c3: char) -> InputResult<bool, Self::Error> {
         assert!(self.buflen() >= 3);
-        self.peek() == c1 && self.peek_nth(1) == c2 && self.peek_nth(2) == c3
+        Ok(self.peek()? == c1 && self.peek_nth(1)? == c2 && self.peek_nth(2)? == c3)
     }
 
     /// Check whether the next characters correspond to a document indicator.
@@ -161,11 +212,12 @@ pub trait Input {
     /// This function assumes that the next 4 characters in the input has already been fetched
     /// through [`Input::lookahead`].
     #[inline]
-    #[must_use]
-    fn next_is_document_indicator(&self) -> bool {
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_is_document_indicator(&mut self) -> InputResult<bool, Self::Error> {
         assert!(self.buflen() >= 4);
-        is_blank_or_breakz(self.peek_nth(3))
-            && (self.next_3_are('.', '.', '.') || self.next_3_are('-', '-', '-'))
+        Ok(is_blank_or_breakz(self.peek_nth(3)?)
+            && (self.next_3_are('.', '.', '.')? || self.next_3_are('-', '-', '-')?))
     }
 
     /// Check whether the next characters correspond to a start of document.
@@ -173,10 +225,11 @@ pub trait Input {
     /// This function assumes that the next 4 characters in the input has already been fetched
     /// through [`Input::lookahead`].
     #[inline]
-    #[must_use]
-    fn next_is_document_start(&self) -> bool {
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_is_document_start(&mut self) -> InputResult<bool, Self::Error> {
         assert!(self.buflen() >= 4);
-        self.next_3_are('-', '-', '-') && is_blank_or_breakz(self.peek_nth(3))
+        Ok(self.next_3_are('-', '-', '-')? && is_blank_or_breakz(self.peek_nth(3)?))
     }
 
     /// Check whether the next characters correspond to an end of document.
@@ -184,10 +237,11 @@ pub trait Input {
     /// This function assumes that the next 4 characters in the input has already been fetched
     /// through [`Input::lookahead`].
     #[inline]
-    #[must_use]
-    fn next_is_document_end(&self) -> bool {
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_is_document_end(&mut self) -> InputResult<bool, Self::Error> {
         assert!(self.buflen() >= 4);
-        self.next_3_are('.', '.', '.') && is_blank_or_breakz(self.peek_nth(3))
+        Ok(self.next_3_are('.', '.', '.')? && is_blank_or_breakz(self.peek_nth(3)?))
     }
 
     /// Skip yaml whitespace at most up to eol. Also skips comments. Advances the input.
@@ -202,31 +256,36 @@ pub trait Input {
     /// Errors if a comment is encountered but it was not preceded by a whitespace. In that event,
     /// the first tuple element will contain the number of characters consumed prior to reaching
     /// the `#`.
-    fn skip_ws_to_eol(&mut self, skip_tabs: SkipTabs) -> (usize, Result<SkipTabs, &'static str>) {
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn skip_ws_to_eol(
+        &mut self,
+        skip_tabs: SkipTabs,
+    ) -> InputResult<(usize, Result<SkipTabs, &'static str>), Self::Error> {
         let mut encountered_tab = false;
         let mut has_yaml_ws = false;
         let mut chars_consumed = 0;
         loop {
-            match self.look_ch() {
+            match self.look_ch()? {
                 ' ' => {
                     has_yaml_ws = true;
-                    self.skip();
+                    self.skip()?;
                 }
                 '\t' if skip_tabs != SkipTabs::No => {
                     encountered_tab = true;
-                    self.skip();
+                    self.skip()?;
                 }
                 // YAML comments must be preceded by whitespace.
                 '#' if !encountered_tab && !has_yaml_ws => {
-                    return (
+                    return Ok((
                         chars_consumed,
                         Err("comments must be separated from other tokens by whitespace"),
-                    );
+                    ));
                 }
                 '#' => {
-                    self.skip(); // Skip over '#'
-                    while !is_breakz(self.look_ch()) {
-                        self.skip();
+                    self.skip()?; // Skip over '#'
+                    while !is_breakz(self.look_ch()?) {
+                        self.skip()?;
                         chars_consumed += 1;
                     }
                 }
@@ -235,10 +294,10 @@ pub trait Input {
             chars_consumed += 1;
         }
 
-        (
+        Ok((
             chars_consumed,
             Ok(SkipTabs::Result(encountered_tab, has_yaml_ws)),
-        )
+        ))
     }
 
     /// Check whether the next characters may be part of a plain scalar.
@@ -246,14 +305,16 @@ pub trait Input {
     /// This function assumes we are not given a blankz character.
     #[allow(clippy::inline_always)]
     #[inline(always)]
-    fn next_can_be_plain_scalar(&self, in_flow: bool) -> bool {
-        let nc = self.peek_nth(1);
-        match self.peek() {
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_can_be_plain_scalar(&mut self, in_flow: bool) -> InputResult<bool, Self::Error> {
+        let nc = self.peek_nth(1)?;
+        Ok(match self.peek()? {
             // indicators can end a plain scalar, see 7.3.3. Plain Style
             ':' if is_blank_or_breakz(nc) || (in_flow && is_flow(nc)) => false,
             c if in_flow && is_flow(c) => false,
             _ => true,
-        }
+        })
     }
 
     /// Check whether the next character is [a blank] or [a break].
@@ -267,8 +328,10 @@ pub trait Input {
     /// [a blank]: is_blank
     /// [a break]: is_break
     #[inline]
-    fn next_is_blank_or_break(&self) -> bool {
-        is_blank(self.peek()) || is_break(self.peek())
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_is_blank_or_break(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(is_blank(self.peek()?) || is_break(self.peek()?))
     }
 
     /// Check whether the next character is [a blank] or [a breakz].
@@ -282,8 +345,10 @@ pub trait Input {
     /// [a blank]: is_blank
     /// [a breakz]: is_breakz
     #[inline]
-    fn next_is_blank_or_breakz(&self) -> bool {
-        is_blank(self.peek()) || is_breakz(self.peek())
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_is_blank_or_breakz(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(is_blank(self.peek()?) || is_breakz(self.peek()?))
     }
 
     /// Check whether the next character is [a blank].
@@ -296,8 +361,10 @@ pub trait Input {
     /// [`lookahead`]: Input::lookahead
     /// [a blank]: is_blank
     #[inline]
-    fn next_is_blank(&self) -> bool {
-        is_blank(self.peek())
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_is_blank(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(is_blank(self.peek()?))
     }
 
     /// Check whether the next character is [a break].
@@ -310,8 +377,10 @@ pub trait Input {
     /// [`lookahead`]: Input::lookahead
     /// [a break]: is_break
     #[inline]
-    fn next_is_break(&self) -> bool {
-        is_break(self.peek())
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_is_break(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(is_break(self.peek()?))
     }
 
     /// Check whether the next character is [a breakz].
@@ -324,8 +393,10 @@ pub trait Input {
     /// [`lookahead`]: Input::lookahead
     /// [a breakz]: is_breakz
     #[inline]
-    fn next_is_breakz(&self) -> bool {
-        is_breakz(self.peek())
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_is_breakz(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(is_breakz(self.peek()?))
     }
 
     /// Check whether the next character is [a z].
@@ -338,8 +409,10 @@ pub trait Input {
     /// [`lookahead`]: Input::lookahead
     /// [a z]: is_z
     #[inline]
-    fn next_is_z(&self) -> bool {
-        is_z(self.peek())
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_is_z(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(is_z(self.peek()?))
     }
 
     /// Check whether the next character is [a flow].
@@ -352,8 +425,10 @@ pub trait Input {
     /// [`lookahead`]: Input::lookahead
     /// [a flow]: is_flow
     #[inline]
-    fn next_is_flow(&self) -> bool {
-        is_flow(self.peek())
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_is_flow(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(is_flow(self.peek()?))
     }
 
     /// Check whether the next character is [a digit].
@@ -366,8 +441,10 @@ pub trait Input {
     /// [`lookahead`]: Input::lookahead
     /// [a digit]: is_digit
     #[inline]
-    fn next_is_digit(&self) -> bool {
-        is_digit(self.peek())
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_is_digit(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(is_digit(self.peek()?))
     }
 
     /// Check whether the next character is [a letter].
@@ -380,8 +457,10 @@ pub trait Input {
     /// [`lookahead`]: Input::lookahead
     /// [a letter]: is_alpha
     #[inline]
-    fn next_is_alpha(&self) -> bool {
-        is_alpha(self.peek())
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn next_is_alpha(&mut self) -> InputResult<bool, Self::Error> {
+        Ok(is_alpha(self.peek()?))
     }
 
     /// Skip characters from the input until a [breakz] is found.
@@ -394,13 +473,15 @@ pub trait Input {
     ///
     /// [breakz]: is_breakz
     #[inline]
-    fn skip_while_non_breakz(&mut self) -> usize {
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn skip_while_non_breakz(&mut self) -> InputResult<usize, Self::Error> {
         let mut count = 0;
-        while !is_breakz(self.look_ch()) {
+        while !is_breakz(self.look_ch()?) {
             count += 1;
-            self.skip();
+            self.skip()?;
         }
-        count
+        Ok(count)
     }
 
     /// Skip characters from the input while [blanks] are found.
@@ -412,13 +493,15 @@ pub trait Input {
     /// be used to advance the index and column, since no end-of-line character will be consumed.
     ///
     /// [blanks]: is_blank
-    fn skip_while_blank(&mut self) -> usize {
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn skip_while_blank(&mut self) -> InputResult<usize, Self::Error> {
         let mut n_chars = 0;
-        while is_blank(self.look_ch()) {
+        while is_blank(self.look_ch()?) {
             n_chars += 1;
-            self.skip();
+            self.skip()?;
         }
-        n_chars
+        Ok(n_chars)
     }
 
     /// Fetch characters from the input while we encounter letters and store them in `out`.
@@ -428,14 +511,16 @@ pub trait Input {
     /// # Return
     /// Return the number of characters that were consumed. The number of characters returned can
     /// be used to advance the index and column, since no end-of-line character will be consumed.
-    fn fetch_while_is_alpha(&mut self, out: &mut String) -> usize {
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn fetch_while_is_alpha(&mut self, out: &mut String) -> InputResult<usize, Self::Error> {
         let mut n_chars = 0;
-        while is_alpha(self.look_ch()) {
+        while is_alpha(self.look_ch()?) {
             n_chars += 1;
-            out.push(self.peek());
-            self.skip();
+            out.push(self.peek()?);
+            self.skip()?;
         }
-        n_chars
+        Ok(n_chars)
     }
 
     /// Fetch characters as long as they satisfy `is_yaml_non_space(c)`.
@@ -445,14 +530,19 @@ pub trait Input {
     /// # Return
     /// Return the number of characters that were consumed. The number of characters returned can
     /// be used to advance the index and column, since no end-of-line character will be consumed.
-    fn fetch_while_is_yaml_non_space(&mut self, out: &mut String) -> usize {
+    /// # Errors
+    /// Returns an input error when the source fails or has already failed.
+    fn fetch_while_is_yaml_non_space(
+        &mut self,
+        out: &mut String,
+    ) -> InputResult<usize, Self::Error> {
         let mut n_chars = 0;
-        while crate::char_traits::is_yaml_non_space(self.look_ch()) {
+        while crate::char_traits::is_yaml_non_space(self.look_ch()?) {
             n_chars += 1;
-            out.push(self.peek());
-            self.skip();
+            out.push(self.peek()?);
+            self.skip()?;
         }
-        n_chars
+        Ok(n_chars)
     }
 }
 

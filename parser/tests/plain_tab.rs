@@ -1,6 +1,11 @@
-use saphyr_parser::{Event, Parser, ScanError};
+mod common;
+#[path = "common/syntax.rs"]
+mod syntax;
+use common::ParserError;
+use saphyr_parser::{Event, Parser};
+use syntax::syntax_error;
 
-fn collect_scalars(input: &str) -> Result<Vec<String>, ScanError> {
+fn collect_scalars(input: &str) -> Result<Vec<String>, ParserError> {
     let mut out = Vec::new();
     for item in Parser::new_from_str(input) {
         let ev = item?;
@@ -36,7 +41,7 @@ fn tab_at_start_of_block_scalar_is_rejected() {
     // This means the content line starts with a tab instead of spaces for indentation.
     let yaml = "key: |\n\tvalue";
 
-    let mut got_err: Option<ScanError> = None;
+    let mut got_err: Option<ParserError> = None;
     for item in Parser::new_from_str(yaml) {
         match item {
             Ok(_) => continue,
@@ -47,8 +52,9 @@ fn tab_at_start_of_block_scalar_is_rejected() {
         }
     }
 
-    let err =
+    let error =
         got_err.expect("expected a ScanError due to leading tab at start of block scalar content");
+    let err = syntax_error(&error);
     // The scanner has a specific error for this case.
     assert!(
         err.info()

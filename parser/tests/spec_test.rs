@@ -82,8 +82,8 @@ fn str_to_test_events(docs: &str) -> Vec<TestEvent> {
     // }
 
     assert_eq!(str_events, iter_events);
-    assert_eq!(str_error, None);
-    assert_eq!(iter_error, None);
+    assert!(str_error.is_none());
+    assert!(iter_error.is_none());
 
     let mut p = YamlChecker { evs: Vec::new() };
     for event in str_events.into_iter().map(|x| x.0) {

@@ -29,6 +29,13 @@ fuzz_target!(|data: &[u8]| {
         }
 
         assert_eq!(str_events, iter_events);
-        assert_eq!(str_error, iter_error);
+        match (&str_error, &iter_error) {
+            (None, None) => {}
+            (
+                Some(saphyr_parser::ParseError::Syntax(str_error)),
+                Some(saphyr_parser::ParseError::Syntax(iter_error)),
+            ) => assert_eq!(str_error, iter_error),
+            _ => panic!("string and iterator parser errors differ"),
+        }
     }
 });

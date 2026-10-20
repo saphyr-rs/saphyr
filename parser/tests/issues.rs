@@ -1,5 +1,13 @@
+mod common;
+#[path = "common/error_assertions.rs"]
+mod error_assertions;
+#[path = "common/syntax.rs"]
+mod syntax;
+use common::ParserError;
+use error_assertions::assert_errors_equal;
 use saphyr::Marker;
-use saphyr_parser::{Event, Parser, ScalarStyle, ScanError, Span};
+use saphyr_parser::{Event, Parser, ScalarStyle, Span};
+use syntax::syntax_error;
 
 /// Run the parser through the string.
 ///
@@ -12,7 +20,7 @@ use saphyr_parser::{Event, Parser, ScalarStyle, ScanError, Span};
 /// # Panics
 /// This function panics if there is a mismatch between the 2 parser invocations with the different
 /// input traits.
-fn run_parser_with_span(input: &str) -> Result<Vec<(Event<'_>, Span)>, ScanError> {
+fn run_parser_with_span(input: &str) -> Result<Vec<(Event<'_>, Span)>, ParserError> {
     let mut str_events = vec![];
     let mut str_error = None;
     let mut iter_events = vec![];
@@ -47,7 +55,7 @@ fn run_parser_with_span(input: &str) -> Result<Vec<(Event<'_>, Span)>, ScanError
     // }
 
     assert_eq!(str_events, iter_events);
-    assert_eq!(str_error, iter_error);
+    assert_errors_equal(str_error.as_ref(), iter_error.as_ref());
 
     if let Some(err) = str_error {
         Err(err)
@@ -67,7 +75,7 @@ fn run_parser_with_span(input: &str) -> Result<Vec<(Event<'_>, Span)>, ScanError
 /// # Panics
 /// This function panics if there is a mismatch between the 2 parser invocations with the different
 /// input traits.
-fn run_parser(input: &str) -> Result<Vec<Event<'_>>, ScanError> {
+fn run_parser(input: &str) -> Result<Vec<Event<'_>>, ParserError> {
     Ok(run_parser_with_span(input)?
         .into_iter()
         .map(|x| x.0)
@@ -252,7 +260,7 @@ fn test_issue14() {
     let s = "{---";
     let Err(error) = run_parser(s) else { panic!() };
     assert_eq!(
-        error.info(),
+        syntax_error(&error).info(),
         "while parsing a flow mapping, did not find expected ',' or '}'"
     );
     assert_eq!(
@@ -266,7 +274,7 @@ fn test_issue14_v2() {
     let s = "{...";
     let Err(error) = run_parser(s) else { panic!() };
     assert_eq!(
-        error.info(),
+        syntax_error(&error).info(),
         "while parsing a flow mapping, did not find expected ',' or '}'"
     );
     assert!(error.to_string().ends_with("at byte 4 line 2 column 1"));

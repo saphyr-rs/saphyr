@@ -1,3 +1,9 @@
+mod common;
+#[path = "common/error_assertions.rs"]
+mod error_assertions;
+use common::ParserError;
+use error_assertions::assert_errors_equal;
+
 use std::{
     borrow::Cow,
     fs::{self, DirEntry},
@@ -8,7 +14,7 @@ use libtest_mimic::{Arguments, Failed, Trial, run};
 
 use saphyr::{LoadableYamlNode, Mapping, Scalar, Yaml};
 use saphyr_parser::{
-    Event, Marker, Parser, ScalarStyle, ScanError, Span, SpannedEventReceiver, Tag,
+    Event, Marker, ParseError, Parser, ScalarStyle, Span, SpannedEventReceiver, Tag,
 };
 
 type Result<T, E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
@@ -62,7 +68,11 @@ fn run_yaml_test(data: YamlTest) -> Result<(), Failed> {
         add_error_context(
             &mut txt,
             &data,
-            events_diff.err().map(saphyr::ScanError::marker),
+            events_diff.err().map(|error| match error {
+                ParseError::Syntax(error) => error.marker(),
+                ParseError::Source(error) => match *error {},
+                ParseError::Failed => panic!("infallible parser input cannot fail"),
+            }),
         );
         Err(txt.into())
     } else if let Some((mut msg, span)) = reporter
@@ -147,7 +157,7 @@ fn load_tests_from_file(entry: &DirEntry) -> Result<Vec<Trial>> {
     Ok(result)
 }
 
-fn parse_to_events(source: &str) -> Result<EventReporter<'_>, ScanError> {
+fn parse_to_events(source: &str) -> Result<EventReporter<'_>, ParserError> {
     let mut str_events = vec![];
     let mut str_error = None;
     let mut iter_events = vec![];
@@ -177,7 +187,7 @@ fn parse_to_events(source: &str) -> Result<EventReporter<'_>, ScanError> {
     // No matter the input, we should parse into the same events.
     assert_eq!(str_events, iter_events);
     // Or the same error.
-    assert_eq!(str_error, iter_error);
+    assert_errors_equal(str_error.as_ref(), iter_error.as_ref());
     // If we had an error, return it so the test fails.
     if let Some(err) = str_error {
         return Err(err);
