@@ -1,4 +1,6 @@
-use saphyr::{LoadableYamlNode, Yaml, YamlEmitter};
+use std::borrow::Cow;
+
+use saphyr::{LoadableYamlNode, ScalarStyle, Yaml, YamlEmitter};
 
 #[allow(clippy::similar_names)]
 #[test]
@@ -311,4 +313,140 @@ a:
     println!("emitted:\n{writer}");
 
     assert_eq!(s, writer);
+}
+
+#[test]
+fn test_string_values_default_to_existing_output() {
+    let mapping = Yaml::load_from_str("---\nanswer: \"value\"").unwrap();
+    let mut mapping_output = String::new();
+    YamlEmitter::new(&mut mapping_output)
+        .dump(&mapping[0])
+        .unwrap();
+    println!("quoted mapping value baseline: {mapping_output:?}");
+    assert_eq!(mapping_output, "---\nanswer: value");
+    assert_eq!(Yaml::load_from_str(&mapping_output).unwrap()[0], mapping[0]);
+
+    let sequence = Yaml::load_from_str("---\n- \"first\"\n- \"second\"").unwrap();
+    let mut sequence_output = String::new();
+    YamlEmitter::new(&mut sequence_output)
+        .dump(&sequence[0])
+        .unwrap();
+    println!("quoted sequence values baseline: {sequence_output:?}");
+    assert_eq!(sequence_output, "---\n- first\n- second");
+    assert_eq!(
+        Yaml::load_from_str(&sequence_output).unwrap()[0],
+        sequence[0]
+    );
+}
+
+fn emit_with_options(doc: &Yaml, quote_string_values: bool, multiline_strings: bool) -> String {
+    let mut output = String::new();
+    let mut emitter = YamlEmitter::new(&mut output);
+    emitter.quote_string_values(quote_string_values);
+    emitter.multiline_strings(multiline_strings);
+    emitter.dump(doc).unwrap();
+    output
+}
+
+#[test]
+fn quote_string_values_applies_to_values_but_not_mapping_keys() {
+    let source = r#"---
+root: "plain value"
+items:
+  - "first"
+  - "second"
+nested:
+  child: "inner"
+? ["complex", {inside: "key value"}]
+: "complex value""#;
+    let docs = Yaml::load_from_str(source).unwrap();
+    let output = emit_with_options(&docs[0], true, false);
+    println!("quoted semantic values: {output:?}");
+
+    let reparsed = Yaml::load_from_str(&output).unwrap();
+    assert_eq!(reparsed[0], docs[0]);
+    assert!(output.contains("root: \"plain value\""));
+    assert!(output.contains("\"first\""));
+    assert!(output.contains("\"inner\""));
+    assert!(output.contains("inside: key value"));
+    assert!(output.contains("\"complex value\""));
+}
+
+#[test]
+fn quote_string_values_handles_roots_tags_and_explicit_representations() {
+    let root = Yaml::value_from_str("root string");
+    assert_eq!(
+        emit_with_options(&root, true, false),
+        "---\n\"root string\""
+    );
+
+    let owned = Yaml::value_from_cow(Cow::Owned(String::from("owned string")));
+    assert_eq!(
+        emit_with_options(&owned, true, false),
+        "---\n\"owned string\""
+    );
+
+    let tagged = Yaml::load_from_str("---\n!example tagged string").unwrap();
+    let tagged_output = emit_with_options(&tagged[0], true, false);
+    println!("quoted tagged string: {tagged_output:?}");
+    assert!(tagged_output.contains("\"tagged string\""));
+    assert_eq!(Yaml::load_from_str(&tagged_output).unwrap()[0], tagged[0]);
+
+    let representation = Yaml::Representation(
+        Cow::Borrowed("explicit style"),
+        ScalarStyle::SingleQuoted,
+        None,
+    );
+    assert_eq!(
+        emit_with_options(&representation, true, false),
+        "---\n'explicit style'"
+    );
+}
+
+#[test]
+fn quote_string_values_overrides_multiline_style_and_preserves_other_scalars() {
+    let multiline = Yaml::load_from_str("---\ntext: \"first\\nsecond\"").unwrap();
+    let output = emit_with_options(&multiline[0], true, true);
+    assert_eq!(output, "---\ntext: \"first\\nsecond\"");
+    assert_eq!(Yaml::load_from_str(&output).unwrap()[0], multiline[0]);
+
+    let scalars =
+        Yaml::load_from_str("---\nboolean: true\nfloat: 2.5\ninteger: 7\nnull: ~").unwrap();
+    assert_eq!(
+        emit_with_options(&scalars[0], true, false),
+        emit_with_options(&scalars[0], false, false)
+    );
+    let alias = Yaml::Alias(1);
+    assert_eq!(
+        emit_with_options(&alias, true, false),
+        emit_with_options(&alias, false, false)
+    );
+}
+
+#[test]
+fn quote_string_values_can_be_toggled_and_reports_its_state() {
+    let document = Yaml::value_from_str("plain value");
+    let mut output = String::new();
+    let default_end;
+    let quoted_end;
+    {
+        let mut emitter = YamlEmitter::new(&mut output);
+
+        assert!(!emitter.is_quote_string_values());
+        emitter.dump(&document).unwrap();
+        default_end = "---\nplain value".len();
+
+        emitter.quote_string_values(true);
+        assert!(emitter.is_quote_string_values());
+        emitter.dump(&document).unwrap();
+        quoted_end = default_end + "---\n\"plain value\"".len();
+
+        emitter.quote_string_values(false);
+        assert!(!emitter.is_quote_string_values());
+        emitter.dump(&document).unwrap();
+    }
+
+    assert_eq!(&output[..default_end], "---\nplain value");
+    assert_eq!(&output[default_end..quoted_end], "---\n\"plain value\"");
+    assert_eq!(&output[quoted_end..], "---\nplain value");
 }
