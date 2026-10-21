@@ -40,7 +40,7 @@ pub struct YamlEmitter<'a> {
     compact: bool,
     level: isize,
     multiline_strings: bool,
-    quote_string_values: bool,
+    quoted_value: bool,
 }
 
 /// A convenience alias for emitter functions that may fail without returning a value.
@@ -124,7 +124,7 @@ impl<'a> YamlEmitter<'a> {
             compact: true,
             level: -1,
             multiline_strings: false,
-            quote_string_values: false,
+            quoted_value: false,
         }
     }
 
@@ -187,14 +187,14 @@ impl<'a> YamlEmitter<'a> {
     /// This option applies to root strings, sequence items, tagged strings, and mapping values.
     /// It does not apply to mapping keys or explicit [`Yaml::Representation`] nodes. It takes
     /// precedence over [`Self::multiline_strings`].
-    pub fn quote_string_values(&mut self, quote_string_values: bool) {
-        self.quote_string_values = quote_string_values;
+    pub fn quoted_value(&mut self, quoted_value: bool) {
+        self.quoted_value = quoted_value;
     }
 
     /// Determine if this emitter quotes semantic string values.
     #[must_use]
-    pub fn is_quote_string_values(&self) -> bool {
-        self.quote_string_values
+    pub fn is_quoted_value(&self) -> bool {
+        self.quoted_value
     }
 
     /// Dump Yaml to an output stream.
@@ -220,20 +220,20 @@ impl<'a> YamlEmitter<'a> {
     }
 
     fn emit_node(&mut self, node: &Yaml) -> EmitResult {
-        self.emit_node_with_options(node, self.multiline_strings, self.quote_string_values)
+        self.emit_node_with_options(node, self.multiline_strings, self.quoted_value)
     }
 
     fn emit_node_with_options(
         &mut self,
         node: &Yaml,
         allow_multiline_strings: bool,
-        quote_string_values: bool,
+        quoted_value: bool,
     ) -> EmitResult {
         match *node {
-            Yaml::Sequence(ref v) => self.emit_sequence(v, quote_string_values),
-            Yaml::Mapping(ref h) => self.emit_mapping(h, quote_string_values),
+            Yaml::Sequence(ref v) => self.emit_sequence(v, quoted_value),
+            Yaml::Mapping(ref h) => self.emit_mapping(h, quoted_value),
             Yaml::Value(Scalar::String(ref v)) => {
-                if quote_string_values {
+                if quoted_value {
                     escape_str(self.writer, v)?;
                 } else if allow_multiline_strings && self.should_emit_string_as_block(v) {
                     self.emit_literal_block(v)?;
@@ -300,11 +300,7 @@ impl<'a> YamlEmitter<'a> {
                     self.write_indent()?;
                     self.level -= 1;
                 }
-                self.emit_node_with_options(
-                    node.as_ref(),
-                    allow_multiline_strings,
-                    quote_string_values,
-                )
+                self.emit_node_with_options(node.as_ref(), allow_multiline_strings, quoted_value)
             }
             // XXX(chenyh) Alias
             Yaml::Alias(_) => Ok(()),
@@ -344,7 +340,7 @@ impl<'a> YamlEmitter<'a> {
         Ok(())
     }
 
-    fn emit_sequence(&mut self, v: &[Yaml], quote_string_values: bool) -> EmitResult {
+    fn emit_sequence(&mut self, v: &[Yaml], quoted_value: bool) -> EmitResult {
         if v.is_empty() {
             write!(self.writer, "[]")?;
         } else {
@@ -355,14 +351,14 @@ impl<'a> YamlEmitter<'a> {
                     self.write_indent()?;
                 }
                 write!(self.writer, "-")?;
-                self.emit_val(true, x, quote_string_values)?;
+                self.emit_val(true, x, quoted_value)?;
             }
             self.level -= 1;
         }
         Ok(())
     }
 
-    fn emit_mapping(&mut self, h: &Mapping, quote_string_values: bool) -> EmitResult {
+    fn emit_mapping(&mut self, h: &Mapping, quoted_value: bool) -> EmitResult {
         if h.is_empty() {
             self.writer.write_str("{}")?;
         } else {
@@ -379,13 +375,13 @@ impl<'a> YamlEmitter<'a> {
                     writeln!(self.writer)?;
                     self.write_indent()?;
                     write!(self.writer, ":")?;
-                    self.emit_val(true, v, quote_string_values)?;
+                    self.emit_val(true, v, quoted_value)?;
                 } else {
                     // A literal block cannot be used as an implicit key, so multiline keys are
                     // always written as quoted strings.
                     self.emit_node_with_options(k, false, false)?;
                     write!(self.writer, ":")?;
-                    self.emit_val(false, v, quote_string_values)?;
+                    self.emit_val(false, v, quoted_value)?;
                 }
             }
             self.level -= 1;
@@ -397,7 +393,7 @@ impl<'a> YamlEmitter<'a> {
     /// following a ":" or "-", either after a space, or on a new line.
     /// If `inline` is true, then the preceding characters are distinct
     /// and short enough to respect the compact flag.
-    fn emit_val(&mut self, inline: bool, val: &Yaml, quote_string_values: bool) -> EmitResult {
+    fn emit_val(&mut self, inline: bool, val: &Yaml, quoted_value: bool) -> EmitResult {
         match *val {
             Yaml::Sequence(ref v) => {
                 if (inline && self.compact) || v.is_empty() {
@@ -408,7 +404,7 @@ impl<'a> YamlEmitter<'a> {
                     self.write_indent()?;
                     self.level -= 1;
                 }
-                self.emit_sequence(v, quote_string_values)
+                self.emit_sequence(v, quoted_value)
             }
             Yaml::Mapping(ref h) => {
                 if (inline && self.compact) || h.is_empty() {
@@ -419,11 +415,11 @@ impl<'a> YamlEmitter<'a> {
                     self.write_indent()?;
                     self.level -= 1;
                 }
-                self.emit_mapping(h, quote_string_values)
+                self.emit_mapping(h, quoted_value)
             }
             _ => {
                 write!(self.writer, " ")?;
-                self.emit_node_with_options(val, self.multiline_strings, quote_string_values)
+                self.emit_node_with_options(val, self.multiline_strings, quoted_value)
             }
         }
     }

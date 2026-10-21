@@ -339,17 +339,17 @@ fn test_string_values_default_to_existing_output() {
     );
 }
 
-fn emit_with_options(doc: &Yaml, quote_string_values: bool, multiline_strings: bool) -> String {
+fn emit_with_options(doc: &Yaml, quoted_value: bool, multiline_strings: bool) -> String {
     let mut output = String::new();
     let mut emitter = YamlEmitter::new(&mut output);
-    emitter.quote_string_values(quote_string_values);
+    emitter.quoted_value(quoted_value);
     emitter.multiline_strings(multiline_strings);
     emitter.dump(doc).unwrap();
     output
 }
 
 #[test]
-fn quote_string_values_applies_to_values_but_not_mapping_keys() {
+fn quoted_value_applies_to_values_but_not_mapping_keys() {
     let source = r#"---
 root: "plain value"
 items:
@@ -373,7 +373,7 @@ nested:
 }
 
 #[test]
-fn quote_string_values_handles_roots_tags_and_explicit_representations() {
+fn quoted_value_handles_roots_tags_and_explicit_representations() {
     let root = Yaml::value_from_str("root string");
     assert_eq!(
         emit_with_options(&root, true, false),
@@ -404,7 +404,7 @@ fn quote_string_values_handles_roots_tags_and_explicit_representations() {
 }
 
 #[test]
-fn quote_string_values_overrides_multiline_style_and_preserves_other_scalars() {
+fn quoted_value_overrides_multiline_style_and_preserves_other_scalars() {
     let multiline = Yaml::load_from_str("---\ntext: \"first\\nsecond\"").unwrap();
     let output = emit_with_options(&multiline[0], true, true);
     assert_eq!(output, "---\ntext: \"first\\nsecond\"");
@@ -424,7 +424,7 @@ fn quote_string_values_overrides_multiline_style_and_preserves_other_scalars() {
 }
 
 #[test]
-fn quote_string_values_can_be_toggled_and_reports_its_state() {
+fn quoted_value_can_be_toggled_and_reports_its_state() {
     let document = Yaml::value_from_str("plain value");
     let mut output = String::new();
     let default_end;
@@ -432,17 +432,17 @@ fn quote_string_values_can_be_toggled_and_reports_its_state() {
     {
         let mut emitter = YamlEmitter::new(&mut output);
 
-        assert!(!emitter.is_quote_string_values());
+        assert!(!emitter.is_quoted_value());
         emitter.dump(&document).unwrap();
         default_end = "---\nplain value".len();
 
-        emitter.quote_string_values(true);
-        assert!(emitter.is_quote_string_values());
+        emitter.quoted_value(true);
+        assert!(emitter.is_quoted_value());
         emitter.dump(&document).unwrap();
         quoted_end = default_end + "---\n\"plain value\"".len();
 
-        emitter.quote_string_values(false);
-        assert!(!emitter.is_quote_string_values());
+        emitter.quoted_value(false);
+        assert!(!emitter.is_quoted_value());
         emitter.dump(&document).unwrap();
     }
 
