@@ -1555,7 +1555,7 @@ impl<'input, T: Input> Scanner<'input, T> {
     fn decrease_flow_level(&mut self) {
         if self.flow_level > 0 {
             self.flow_level -= 1;
-            self.simple_keys.pop().unwrap();
+            self.simple_keys.pop();
         }
     }
 
@@ -2432,9 +2432,9 @@ impl<'input, T: Input> Scanner<'input, T> {
                 TokenType::BlockMappingStart,
                 start_mark,
             );
-        } else {
+        } else if let Some(mapping_started) = self.flow_mapping_started.last_mut() {
             // The scanner, upon emitting a `Key`, will prepend a `MappingStart` event.
-            *self.flow_mapping_started.last_mut().expect("flow level") = true;
+            *mapping_started = true;
         }
 
         self.remove_simple_key()?;
@@ -2491,15 +2491,21 @@ impl<'input, T: Input> Scanner<'input, T> {
 
     /// Fetch a value from a mapping (after a `:`).
     fn fetch_value(&mut self) -> ScanResult {
-        let sk = self.simple_keys.last().unwrap().clone();
+        let sk = self
+            .simple_keys
+            .last()
+            .cloned()
+            .ok_or_else(|| ScanError::new_str(self.mark, "simple key expected"))?;
         let start_mark = self.mark;
-        let is_implicit_flow_mapping =
-            matches!(self.implicit_flow_mapping_states.last(), Some(Some(_)))
-                && self.flow_mapping_started.last() == Some(&false);
-        if is_implicit_flow_mapping {
-            *self.implicit_flow_mapping_states.last_mut().unwrap() =
-                Some(ImplicitMappingState::Inside);
-        }
+        let is_implicit_flow_mapping = if let (Some(Some(implicit_mapping)), Some(false)) = (
+            self.implicit_flow_mapping_states.last_mut(),
+            self.flow_mapping_started.last(),
+        ) {
+            *implicit_mapping = ImplicitMappingState::Inside;
+            true
+        } else {
+            false
+        };
 
         // Skip over ':'.
         self.skip_non_blank();
@@ -2539,7 +2545,10 @@ impl<'input, T: Input> Scanner<'input, T> {
             );
             self.roll_one_col_indent();
 
-            self.simple_keys.last_mut().unwrap().possible = false;
+            self.simple_keys
+                .last_mut()
+                .ok_or_else(|| ScanError::new_str(self.mark, "simple key expected"))?
+                .possible = false;
             self.disallow_simple_key();
         } else {
             if is_implicit_flow_mapping {
@@ -2680,7 +2689,10 @@ impl<'input, T: Input> Scanner<'input, T> {
     }
 
     fn remove_simple_key(&mut self) -> ScanResult {
-        let last = self.simple_keys.last_mut().unwrap();
+        let last = self
+            .simple_keys
+            .last_mut()
+            .ok_or_else(|| ScanError::new_str(self.mark, "simple key expected"))?;
         if last.possible && last.required {
             return Err(ScanError::new_str(self.mark, "simple key expected"));
         }
@@ -2700,9 +2712,12 @@ impl<'input, T: Input> Scanner<'input, T> {
     ///
     /// [`implicit_flow_mapping_states`]: Self::implicit_flow_mapping_states
     fn end_implicit_mapping(&mut self, mark: Marker) {
-        if let Some(Some(implicit_mapping)) = self.implicit_flow_mapping_states.last_mut() {
+        if let (Some(Some(implicit_mapping)), Some(mapping_started)) = (
+            self.implicit_flow_mapping_states.last_mut(),
+            self.flow_mapping_started.last_mut(),
+        ) {
             if *implicit_mapping == ImplicitMappingState::Inside {
-                *self.flow_mapping_started.last_mut().expect("flow level") = false;
+                *mapping_started = false;
                 *implicit_mapping = ImplicitMappingState::Possible;
                 self.tokens
                     .push_back(Token(Span::empty(mark), TokenType::FlowMappingEnd));
