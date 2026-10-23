@@ -5,6 +5,14 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
+## Unreleased
+
+**Changes**:
+
+- An empty block scalar at the end of the input is now `""` instead of `"\n"`.
+  ([+143](https://github.com/saphyr-rs/saphyr/issues/143))
+
+
 
 ## v0.2.2
 

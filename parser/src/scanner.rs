@@ -1693,7 +1693,6 @@ impl<'input, T: Input> Scanner<'input, T> {
         let mut string = String::new();
         let mut leading_break = String::new();
         let mut trailing_breaks = String::new();
-        let mut chomping_break = String::new();
 
         // skip '|' or '>'
         self.skip_non_blank();
@@ -1751,7 +1750,7 @@ impl<'input, T: Input> Scanner<'input, T> {
 
         if self.input.next_is_break() {
             self.input.lookahead(2);
-            self.read_break(&mut chomping_break);
+            self.skip_break();
         }
 
         if self.input.look_ch() == '\t' {
@@ -1782,17 +1781,18 @@ impl<'input, T: Input> Scanner<'input, T> {
         // ```
         if self.input.next_is_z() {
             let contents = match chomping {
-                // We strip trailing linebreaks. Nothing remain.
-                Chomping::Strip => String::new(),
-                // There was no newline after the chomping indicator.
-                _ if self.mark.line == start_mark.line() => String::new(),
-                // We clip lines, and there was a newline after the chomping indicator.
-                // All other breaks are ignored.
-                Chomping::Clip => chomping_break,
-                // We keep lines. There was a newline after the chomping indicator but nothing
-                // else.
-                Chomping::Keep if trailing_breaks.is_empty() => chomping_break,
-                // Otherwise, the newline after chomping is ignored.
+                // The line break ending the header line is not content, so with no content lines
+                // there is nothing to strip or clip.
+                Chomping::Strip | Chomping::Clip => String::new(),
+                // We keep lines: only the breaks following the header line remain. An unterminated
+                // whitespace-only line still counts as a line.
+                Chomping::Keep
+                    if trailing_breaks.is_empty()
+                        && self.mark.line > start_mark.line()
+                        && self.mark.col > 0 =>
+                {
+                    "\n".into()
+                }
                 Chomping::Keep => trailing_breaks,
             };
             return Ok(Token(

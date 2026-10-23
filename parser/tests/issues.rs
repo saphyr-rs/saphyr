@@ -457,3 +457,23 @@ fn test_escaped_nul_is_preserved() {
         None
     )));
 }
+
+#[test]
+fn test_empty_block_scalar_at_eof_is_empty() {
+    // YAML 1.2.2, 8.1.1.2: the line break ending the header is not content.
+    for (s, style) in [
+        ("a: |\n", ScalarStyle::Literal),
+        ("a: >\n", ScalarStyle::Folded),
+        ("a: |+\n", ScalarStyle::Literal),
+        ("a: |-\n", ScalarStyle::Literal),
+        ("a: |", ScalarStyle::Literal),
+        ("- |\n", ScalarStyle::Literal),
+        ("a: |\nb: 1\n", ScalarStyle::Literal),
+    ] {
+        let events = run_parser(s).unwrap();
+        assert!(
+            events.contains(&Event::Scalar("".into(), style, 0, None)),
+            "expected an empty scalar for {s:?}, got {events:?}"
+        );
+    }
+}
