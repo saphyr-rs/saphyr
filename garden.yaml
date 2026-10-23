@@ -60,6 +60,7 @@ trees:
     variables:
       workspace: "--workspace"
     remotes:
+      akashchamp: "https://github.com/akashchamp/saphyr.git"
       bourumir-wyngs: "https://github.com/bourumir-wyngs/saphyr.git"
       chrisjr404: "https://github.com/ChrisJr404/saphyr.git"
       duckduckwhale: "https://github.com/DuckDuckWhale/saphyr.git"
