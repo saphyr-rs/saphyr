@@ -450,3 +450,28 @@ fn quoted_value_can_be_toggled_and_reports_its_state() {
     assert_eq!(&output[default_end..quoted_end], "---\n\"plain value\"");
     assert_eq!(&output[quoted_end..], "---\nplain value");
 }
+
+#[test]
+fn test_emit_non_finite_floats() {
+    for (value, expected) in [
+        (f64::INFINITY, ".inf"),
+        (f64::NEG_INFINITY, "-.inf"),
+        (f64::NAN, ".nan"),
+        (f64::from_bits(0xfff8_0000_0000_0001), ".nan"),
+    ] {
+        let yaml = Yaml::Value(saphyr::Scalar::FloatingPoint(value.into()));
+        let mut output = String::new();
+        YamlEmitter::new(&mut output).dump(&yaml).unwrap();
+        assert_eq!(output, format!("---\n{expected}"));
+        assert_eq!(Yaml::load_from_str(&output).unwrap()[0], yaml);
+    }
+}
+
+#[test]
+fn test_emit_nested_non_finite_floats() {
+    let input = "values: [.inf, -.inf, .nan, 0.0, -0.0, 1.5, 100.0]\n.inf: infinity\n.nan: nan";
+    let docs = Yaml::load_from_str(input).unwrap();
+    let mut output = String::new();
+    YamlEmitter::new(&mut output).dump(&docs[0]).unwrap();
+    assert_eq!(Yaml::load_from_str(&output).unwrap(), docs);
+}

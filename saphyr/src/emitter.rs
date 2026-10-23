@@ -253,6 +253,14 @@ impl<'a> YamlEmitter<'a> {
                 Ok(())
             }
             Yaml::Value(Scalar::Integer(v)) => Ok(write!(self.writer, "{v}")?),
+            Yaml::Value(Scalar::FloatingPoint(ref v)) if v.is_nan() => {
+                Ok(write!(self.writer, ".nan")?)
+            }
+            Yaml::Value(Scalar::FloatingPoint(ref v)) if v.is_infinite() => Ok(write!(
+                self.writer,
+                "{}.inf",
+                if v.is_sign_negative() { "-" } else { "" }
+            )?),
             Yaml::Value(Scalar::FloatingPoint(ref v)) => Ok(write!(
                 self.writer,
                 "{v}{}",
