@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.0
+
+**Breaking Changes**:
+
+- `multiline_strings` was renamed to `multiline` in the APIs.
+
+**Changes**:
+
+- An emitter-wide ``quoted_value`` option forces all strings values to be quoted.
+  ([#142](https://github.com/saphyr-rs/saphyr/pull/142))
+
+- DEL and C0 control characters now cause strings to be quoted when emitting YAML.
+  ([#138](https://github.com/saphyr-rs/saphyr/pull/138))
+
+- BOM is now properly supported.
+  ([#137](https://github.com/saphyr-rs/saphyr/pull/137))
+
+- Canonical YAML spellings are now emitting for infinity and NaN.
+  ([#140](https://github.com/saphyr-rs/saphyr/pull/140))
+
 ## v0.2.2
 
 **Changes**:
