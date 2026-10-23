@@ -1,4 +1,4 @@
-use crate::char_traits::is_breakz;
+use crate::char_traits::is_yaml_non_break;
 use crate::input::Input;
 
 use arraydeque::ArrayDeque;
@@ -78,11 +78,11 @@ impl<T: Iterator<Item = char>> Input for BufferedInput<T> {
     #[inline]
     fn raw_read_non_breakz_ch(&mut self) -> Option<char> {
         if let Some(c) = self.input.next() {
-            if is_breakz(c) {
+            if is_yaml_non_break(c) {
+                Some(c)
+            } else {
                 self.buffer.push_back(c).unwrap();
                 None
-            } else {
-                Some(c)
             }
         } else {
             None

@@ -22,7 +22,7 @@ use thiserror::Error;
 use crate::{
     char_traits::{
         as_hex, is_anchor_char, is_blank_or_breakz, is_break, is_breakz, is_flow, is_hex,
-        is_tag_char, is_uri_char,
+        is_tag_char, is_uri_char, is_yaml_non_break,
     },
     input::{Input, SkipTabs},
 };
@@ -62,11 +62,11 @@ pub enum ScalarStyle {
 /// A location in a yaml document.
 #[derive(Clone, Copy, PartialEq, Debug, Eq, Default)]
 pub struct Marker {
-    /// The index (in bytes) in the input string.
+    /// The index (in characters) in the input string.
     index: usize,
     /// The line (1-indexed).
     line: usize,
-    /// The column (1-indexed).
+    /// The column (0-indexed, in characters).
     col: usize,
 }
 
@@ -77,19 +77,19 @@ impl Marker {
         Marker { index, line, col }
     }
 
-    /// Return the index (in bytes) of the marker in the source.
+    /// Return the index (in characters) of the marker in the source.
     #[must_use]
     pub fn index(&self) -> usize {
         self.index
     }
 
-    /// Return the line of the marker in the source.
+    /// Return the line (1-indexed) of the marker in the source.
     #[must_use]
     pub fn line(&self) -> usize {
         self.line
     }
 
-    /// Return the column of the marker in the source.
+    /// Return the column (0-indexed, in characters) of the marker in the source.
     #[must_use]
     pub fn col(&self) -> usize {
         self.col
@@ -203,6 +203,8 @@ pub enum TokenType<'input> {
     DocumentStart,
     /// The end of a YAML document (`...`).
     DocumentEnd,
+    /// A BOM at the start of a line.
+    ByteOrderMark,
     /// The start of a sequence block.
     ///
     /// Sequence blocks are arrays starting with a `-`.
@@ -721,6 +723,19 @@ impl<'input, T: Input> Scanner<'input, T> {
             return Ok(());
         }
 
+        // Only the parser knows whether a byte order mark at the start of a line is between
+        // documents. Anywhere else, it's inside one.
+        if self.input.next_char_is('\u{FEFF}') {
+            if self.mark.col == 0 && self.flow_level == 0 {
+                return self.fetch_byte_order_mark();
+            }
+
+            return Err(ScanError::new_str(
+                self.mark,
+                "a byte order mark must not appear inside a document",
+            ));
+        }
+
         if self.mark.col == 0 {
             if self.input.next_char_is('%') {
                 return self.fetch_directive();
@@ -870,7 +885,6 @@ impl<'input, T: Input> Scanner<'input, T> {
     /// one.
     fn skip_to_next_token(&mut self) -> ScanResult {
         loop {
-            // TODO(chenyh) BOM
             match self.input.look_ch() {
                 // Tabs may not be used as indentation.
                 // "Indentation" only exists as long as a block is started, but does not exist
@@ -974,6 +988,14 @@ impl<'input, T: Input> Scanner<'input, T> {
         let (n_bytes, result) = self.input.skip_ws_to_eol(skip_tabs);
         self.mark.col += n_bytes;
         self.mark.index += n_bytes;
+        // Skipping stops at a byte order mark. Unless it starts the line, it's inside a document.
+        if self.mark.col > 0 && self.input.look_ch() == '\u{FEFF}' {
+            return Err(ScanError::new_str(
+                self.mark,
+                "a byte order mark must not appear inside a document",
+            ));
+        }
+
         result.map_err(|msg| ScanError::new_str(self.mark, msg))
     }
 
@@ -1617,6 +1639,21 @@ impl<'input, T: Input> Scanner<'input, T> {
         Ok(())
     }
 
+    fn fetch_byte_order_mark(&mut self) -> ScanResult {
+        self.unroll_indent(-1);
+        self.remove_simple_key()?;
+
+        // Don't count BOMs as content.
+        let mark = self.mark;
+        self.input.skip();
+        self.mark.index += 1;
+        self.allow_simple_key();
+
+        self.tokens
+            .push_back(Token(Span::new(mark, self.mark), TokenType::ByteOrderMark));
+        Ok(())
+    }
+
     fn fetch_document_indicator(&mut self, t: TokenType<'input>) -> ScanResult {
         self.unroll_indent(-1);
         self.remove_simple_key()?;
@@ -1773,7 +1810,7 @@ impl<'input, T: Input> Scanner<'input, T> {
 
         let mut line_buffer = String::with_capacity(100);
         let start_mark = self.mark;
-        while self.mark.col == indent && !self.input.next_is_z() {
+        while self.mark.col == indent && is_yaml_non_break(self.input.peek()) {
             if indent == 0 {
                 self.input.lookahead(4);
                 if self.input.next_is_document_end() {
@@ -1800,9 +1837,9 @@ impl<'input, T: Input> Scanner<'input, T> {
 
             self.scan_block_scalar_content_line(&mut string, &mut line_buffer);
 
-            // break on EOF
+            // break unless the line ends with a line break, e.g., on EOF
             self.input.lookahead(2);
-            if self.input.next_is_z() {
+            if !self.input.next_is_break() {
                 break;
             }
 
@@ -1844,7 +1881,7 @@ impl<'input, T: Input> Scanner<'input, T> {
     /// line. This function does not consume the line break character(s) after the line.
     fn scan_block_scalar_content_line(&mut self, string: &mut String, line_buffer: &mut String) {
         // Start by evaluating characters in the buffer.
-        while !self.input.buf_is_empty() && !self.input.next_is_breakz() {
+        while !self.input.buf_is_empty() && is_yaml_non_break(self.input.peek()) {
             string.push(self.input.peek());
             // We may technically skip non-blank characters. However, the only distinction is
             // to determine what is leading whitespace and what is not. Here, we read the

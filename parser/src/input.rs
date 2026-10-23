@@ -5,6 +5,8 @@
 
 use alloc::string::String;
 
+use crate::char_traits::is_yaml_non_break;
+
 pub(crate) mod buffered;
 pub(crate) mod str;
 
@@ -56,12 +58,15 @@ pub trait Input {
     #[must_use]
     fn raw_read_ch(&mut self) -> char;
 
-    /// Read a non-breakz a character from the input stream and return it directly.
+    /// Read a non-break character from the input stream and return it directly. A non-break
+    /// character is neither a [breakz] nor a byte order mark, see 5.4. Line Break Characters.
     ///
     /// The internal buffer (if any) is bypassed.
     ///
-    /// If the next character is a breakz, it is either not consumed or placed into the buffer (if
-    /// any).
+    /// If the next character is a breakz or a byte order mark, it is either not consumed or placed
+    /// into the buffer (if any).
+    ///
+    /// [breakz]: is_breakz
     #[must_use]
     fn raw_read_non_breakz_ch(&mut self) -> Option<char>;
 
@@ -225,7 +230,7 @@ pub trait Input {
                 }
                 '#' => {
                     self.skip(); // Skip over '#'
-                    while !is_breakz(self.look_ch()) {
+                    while is_yaml_non_break(self.look_ch()) {
                         self.skip();
                         chars_consumed += 1;
                     }
@@ -251,6 +256,8 @@ pub trait Input {
         match self.peek() {
             // indicators can end a plain scalar, see 7.3.3. Plain Style
             ':' if is_blank_or_breakz(nc) || (in_flow && is_flow(nc)) => false,
+            // A byte order mark isn't a plain scalar character, see 5.2. Character Encodings
+            '\u{FEFF}' => false,
             c if in_flow && is_flow(c) => false,
             _ => true,
         }
@@ -384,7 +391,7 @@ pub trait Input {
         is_alpha(self.peek())
     }
 
-    /// Skip characters from the input until a [breakz] is found.
+    /// Skip characters from the input until a [breakz] or a byte order mark is found.
     ///
     /// The characters are consumed from the input.
     ///
@@ -396,7 +403,7 @@ pub trait Input {
     #[inline]
     fn skip_while_non_breakz(&mut self) -> usize {
         let mut count = 0;
-        while !is_breakz(self.look_ch()) {
+        while is_yaml_non_break(self.look_ch()) {
             count += 1;
             self.skip();
         }

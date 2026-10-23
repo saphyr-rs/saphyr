@@ -1,6 +1,7 @@
 use crate::{
     char_traits::{
-        is_alpha, is_blank, is_blank_or_breakz, is_break, is_breakz, is_digit, is_flow, is_z,
+        is_alpha, is_blank, is_blank_or_breakz, is_break, is_breakz, is_digit, is_flow,
+        is_yaml_non_break, is_z,
     },
     input::{Input, SkipTabs},
 };
@@ -67,11 +68,11 @@ impl Input for StrInput<'_> {
     #[inline]
     fn raw_read_non_breakz_ch(&mut self) -> Option<char> {
         if let Some((c, sub_str)) = split_first_char(self.buffer) {
-            if is_breakz(c) {
-                None
-            } else {
+            if is_yaml_non_break(c) {
                 self.buffer = sub_str;
                 Some(c)
+            } else {
+                None
             }
         } else {
             None
@@ -228,9 +229,9 @@ impl Input for StrInput<'_> {
                 );
             }
 
-            // Skip remaining characters until we hit a breakz.
+            // Skip remaining non-break characters.
             while let Some((c, sub_str)) = split_first_char(new_str) {
-                if is_breakz(c) {
+                if !is_yaml_non_break(c) {
                     break;
                 }
                 new_str = sub_str;
@@ -253,6 +254,8 @@ impl Input for StrInput<'_> {
         match self.peek() {
             // indicators can end a plain scalar, see 7.3.3. Plain Style
             ':' if is_blank_or_breakz(nc) || (in_flow && is_flow(nc)) => false,
+            // A byte order mark isn't a plain scalar character, see 5.2. Character Encodings
+            '\u{FEFF}' => false,
             c if in_flow && is_flow(c) => false,
             _ => true,
         }
@@ -313,7 +316,7 @@ impl Input for StrInput<'_> {
 
         // Skip over all non-breaks.
         while let Some((c, sub_str)) = split_first_char(new_str) {
-            if is_breakz(c) {
+            if !is_yaml_non_break(c) {
                 break;
             }
             new_str = sub_str;

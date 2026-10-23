@@ -68,3 +68,14 @@ fn yaml_reserved_directive_with_params() {
     }
     assert!(got_err.is_none(), "Error: {}", got_err.unwrap().info());
 }
+
+#[test]
+fn yaml_reserved_directive_at_end_of_input() {
+    // Scanning a directive from an iterator used to loop forever at the end of the input.
+    let yaml = "%FOO";
+    let got_err = Parser::new_from_iter(yaml.chars()).find_map(Result::err);
+    assert_eq!(
+        got_err.unwrap().info(),
+        "did not find expected <document start>"
+    );
+}

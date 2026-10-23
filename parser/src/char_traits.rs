@@ -84,12 +84,13 @@ pub fn is_bom(c: char) -> bool {
     c == '\u{FEFF}'
 }
 
-/// Check whether the character is a YAML non-breaking character.
+/// Check whether the character is a YAML non-breaking character, that is, not nil, a line break,
+/// or the BOM character.
 #[inline]
 #[must_use]
 pub fn is_yaml_non_break(c: char) -> bool {
     // TODO(ethiraric, 28/12/2023): is_printable
-    !is_break(c) && !is_bom(c)
+    !is_breakz(c) && !is_bom(c)
 }
 
 /// Check whether the character is NOT a YAML whitespace (` ` / `\t`).
@@ -103,7 +104,7 @@ pub fn is_yaml_non_space(c: char) -> bool {
 #[inline]
 #[must_use]
 pub fn is_anchor_char(c: char) -> bool {
-    is_yaml_non_space(c) && !is_flow(c) && !is_z(c)
+    is_yaml_non_space(c) && !is_flow(c)
 }
 
 /// Check whether the character is a valid word character.
