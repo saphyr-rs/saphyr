@@ -52,7 +52,7 @@ where
 /// limit, a handful of nested anchors can be crafted to expand into an exponential number
 /// of nodes (a "billion laughs" attack), exhausting memory. See
 /// <https://github.com/saphyr-rs/saphyr/issues/109>.
-pub const DEFAULT_ALIAS_NODE_BUDGET: usize = 100_000;
+pub const DEFAULT_ALIAS_LIMIT: usize = 100_000;
 
 /// A trait providing methods used by the [`YamlLoader`].
 ///
@@ -304,7 +304,7 @@ where
     /// <https://github.com/saphyr-rs/saphyr/issues/109>. This budget bounds the total
     /// number of nodes that may be produced via alias resolution across the whole load,
     /// beyond which loading fails with a [`ScanError`]. Defaults to
-    /// [`DEFAULT_ALIAS_NODE_BUDGET`].
+    /// [`DEFAULT_ALIAS_LIMIT`].
     pub fn alias_limit(&mut self, alias_limit: usize) {
         self.alias_limit = alias_limit;
     }
@@ -482,7 +482,7 @@ where
             anchor_map: BTreeMap::new(),
             marker: PhantomData,
             early_parse: true,
-            alias_limit: DEFAULT_ALIAS_NODE_BUDGET,
+            alias_limit: DEFAULT_ALIAS_LIMIT,
             allow_duplicate_keys: false,
             error: None,
         }
