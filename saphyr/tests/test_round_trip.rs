@@ -15,7 +15,7 @@ fn roundtrip(original: &Yaml) {
 fn roundtrip_multiline(original: &Yaml) {
     let mut emitted = String::new();
     let mut emitter = YamlEmitter::new(&mut emitted);
-    emitter.multiline_strings(true);
+    emitter.multiline(true);
     emitter.dump(original).unwrap();
 
     println!("emitted {emitted}");
@@ -31,7 +31,7 @@ fn assert_emits_yaml(input: &str, expected: &str) {
 
     let mut emitted = String::new();
     let mut emitter = YamlEmitter::new(&mut emitted);
-    emitter.multiline_strings(true);
+    emitter.multiline(true);
     emitter.dump(&original[0]).unwrap();
 
     assert_eq!(emitted, expected);

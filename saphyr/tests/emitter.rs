@@ -339,11 +339,11 @@ fn test_string_values_default_to_existing_output() {
     );
 }
 
-fn emit_with_options(doc: &Yaml, quoted_value: bool, multiline_strings: bool) -> String {
+fn emit_with_options(doc: &Yaml, quoted_value: bool, multiline: bool) -> String {
     let mut output = String::new();
     let mut emitter = YamlEmitter::new(&mut output);
     emitter.quoted_value(quoted_value);
-    emitter.multiline_strings(multiline_strings);
+    emitter.multiline(multiline);
     emitter.dump(doc).unwrap();
     output
 }

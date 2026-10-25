@@ -39,7 +39,7 @@ pub struct YamlEmitter<'a> {
     best_indent: usize,
     compact: bool,
     level: isize,
-    multiline_strings: bool,
+    multiline: bool,
     quoted_value: bool,
 }
 
@@ -123,7 +123,7 @@ impl<'a> YamlEmitter<'a> {
             best_indent: 2,
             compact: true,
             level: -1,
-            multiline_strings: false,
+            multiline: false,
             quoted_value: false,
         }
     }
@@ -161,7 +161,7 @@ impl<'a> YamlEmitter<'a> {
     ///
     /// let mut output = String::new();
     /// let mut emitter = YamlEmitter::new(&mut output);
-    /// emitter.multiline_strings(true);
+    /// emitter.multiline(true);
     /// emitter.dump(&parsed[0]).unwrap();
     /// assert_eq!(output.as_str(), "\
     /// ---
@@ -172,21 +172,21 @@ impl<'a> YamlEmitter<'a> {
     /// ```
     ///
     /// [literal style]: https://yaml.org/spec/1.2/spec.html#id2795688
-    pub fn multiline_strings(&mut self, multiline_strings: bool) {
-        self.multiline_strings = multiline_strings;
+    pub fn multiline(&mut self, multiline: bool) {
+        self.multiline = multiline;
     }
 
     /// Determine if this emitter will emit multiline strings when appropriate.
     #[must_use]
-    pub fn is_multiline_strings(&self) -> bool {
-        self.multiline_strings
+    pub fn is_multiline(&self) -> bool {
+        self.multiline
     }
 
     /// Quote semantic string values with double quotes.
     ///
     /// This option applies to root strings, sequence items, tagged strings, and mapping values.
     /// It does not apply to mapping keys or explicit [`Yaml::Representation`] nodes. It takes
-    /// precedence over [`Self::multiline_strings`].
+    /// precedence over [`Self::multiline`].
     pub fn quoted_value(&mut self, quoted_value: bool) {
         self.quoted_value = quoted_value;
     }
@@ -220,13 +220,13 @@ impl<'a> YamlEmitter<'a> {
     }
 
     fn emit_node(&mut self, node: &Yaml) -> EmitResult {
-        self.emit_node_with_options(node, self.multiline_strings, self.quoted_value)
+        self.emit_node_with_options(node, self.multiline, self.quoted_value)
     }
 
     fn emit_node_with_options(
         &mut self,
         node: &Yaml,
-        allow_multiline_strings: bool,
+        allow_multiline: bool,
         quoted_value: bool,
     ) -> EmitResult {
         match *node {
@@ -235,7 +235,7 @@ impl<'a> YamlEmitter<'a> {
             Yaml::Value(Scalar::String(ref v)) => {
                 if quoted_value {
                     escape_str(self.writer, v)?;
-                } else if allow_multiline_strings && self.should_emit_string_as_block(v) {
+                } else if allow_multiline && self.should_emit_string_as_block(v) {
                     self.emit_literal_block(v)?;
                 } else if need_quotes(v) {
                     escape_str(self.writer, v)?;
@@ -308,7 +308,7 @@ impl<'a> YamlEmitter<'a> {
                     self.write_indent()?;
                     self.level -= 1;
                 }
-                self.emit_node_with_options(node.as_ref(), allow_multiline_strings, quoted_value)
+                self.emit_node_with_options(node.as_ref(), allow_multiline, quoted_value)
             }
             // XXX(chenyh) Alias
             Yaml::Alias(_) => Ok(()),
@@ -427,20 +427,20 @@ impl<'a> YamlEmitter<'a> {
             }
             _ => {
                 write!(self.writer, " ")?;
-                self.emit_node_with_options(val, self.multiline_strings, quoted_value)
+                self.emit_node_with_options(val, self.multiline, quoted_value)
             }
         }
     }
 
     /// Check whether the string should be emitted as a literal block.
     ///
-    /// This takes into account the [`multiline_strings`] option and whether the string contains
+    /// This takes into account the [`multiline`] option and whether the string contains
     /// newlines.
     ///
-    /// [`multiline_strings`]: Self::multiline_strings.
+    /// [`multiline`]: Self::multiline.
     #[must_use]
     fn should_emit_string_as_block(&self, s: &str) -> bool {
-        self.multiline_strings && s.contains('\n') && char_traits::is_valid_literal_block_scalar(s)
+        self.multiline && s.contains('\n') && char_traits::is_valid_literal_block_scalar(s)
     }
 }
 
@@ -567,12 +567,12 @@ mod test {
     }
 
     #[test]
-    fn test_multiline_string() {
+    fn test_multiline() {
         let input = r#"{foo: "bar!\nbar!", baz: 42}"#;
         let parsed = Yaml::load_from_str(input).unwrap();
         let mut output = String::new();
         let mut emitter = YamlEmitter::new(&mut output);
-        emitter.multiline_strings(true);
+        emitter.multiline(true);
         emitter.dump(&parsed[0]).unwrap();
     }
 }
