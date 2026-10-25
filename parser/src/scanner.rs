@@ -459,20 +459,21 @@ pub struct Scanner<'input, T> {
     /// ```yaml
     /// [ : foo ] # { null: "foo" }
     /// ```
-    flow_mapping_started: bool,
-    /// An array of states, representing whether flow sequences have implicit mappings.
+    flow_mapping_started: Vec<bool>,
+    /// A state for each flow level; mappings use `None`, sequences track implicit pairs.
     ///
     /// When a flow mapping is possible (when encountering the first `[` or a `,` in a sequence),
     /// the state is set to [`Possible`].
     /// When we encounter the `:`, we know we are in an implicit mapping and can set the state to
     /// [`Inside`].
     ///
-    /// There is one entry in this [`Vec`] for each nested flow sequence that we are in.
-    /// The entries are created with the opening `]` and popped with the closing `]`.
+    /// Every nested flow collection occupies one entry, so delimiters inside a mapping
+    /// cannot terminate an outer sequence pair. Entries are pushed at `[` or `{`
+    /// and popped at their closing delimiter.
     ///
     /// [`Possible`]: ImplicitMappingState::Possible
     /// [`Inside`]: ImplicitMappingState::Inside
-    implicit_flow_mapping_states: Vec<ImplicitMappingState>,
+    implicit_flow_mapping_states: Vec<Option<ImplicitMappingState>>,
     /// If a plain scalar was terminated by a `#` comment on its line, we set this
     /// to detect an illegal multiline continuation on the following line.
     interrupted_plain_by_comment: Option<Marker>,
@@ -499,7 +500,7 @@ impl<T: Input + Clone> Clone for Scanner<'_, T> {
             tokens_parsed: self.tokens_parsed,
             token_available: self.token_available,
             leading_whitespace: self.leading_whitespace,
-            flow_mapping_started: self.flow_mapping_started,
+            flow_mapping_started: self.flow_mapping_started.clone(),
             implicit_flow_mapping_states: self.implicit_flow_mapping_states.clone(),
             interrupted_plain_by_comment: self.interrupted_plain_by_comment,
             buf_leading_break: self.buf_leading_break.clone(),
@@ -557,7 +558,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             tokens_parsed: 0,
             token_available: false,
             leading_whitespace: true,
-            flow_mapping_started: false,
+            flow_mapping_started: vec![],
             implicit_flow_mapping_states: vec![],
             interrupted_plain_by_comment: None,
 
@@ -1494,12 +1495,13 @@ impl<'input, T: Input> Scanner<'input, T> {
         let start_mark = self.mark;
         self.skip_non_blank();
 
-        if tok == TokenType::FlowMappingStart {
-            self.flow_mapping_started = true;
+        let mapping = tok == TokenType::FlowMappingStart;
+        self.flow_mapping_started.push(mapping);
+        self.implicit_flow_mapping_states.push(if mapping {
+            None
         } else {
-            self.implicit_flow_mapping_states
-                .push(ImplicitMappingState::Possible);
-        }
+            Some(ImplicitMappingState::Possible)
+        });
 
         self.skip_ws_to_eol(SkipTabs::Yes)?;
 
@@ -1521,9 +1523,11 @@ impl<'input, T: Input> Scanner<'input, T> {
 
         if matches!(tok, TokenType::FlowSequenceEnd) {
             self.end_implicit_mapping(self.mark);
-            // We are out exiting the flow sequence, nesting goes down 1 level.
-            self.implicit_flow_mapping_states.pop();
         }
+        // Both collection kinds occupy a flow level. A nested mapping must not
+        // expose an outer sequence's implicit pair to its comma or colon.
+        self.implicit_flow_mapping_states.pop();
+        self.flow_mapping_started.pop();
 
         let start_mark = self.mark;
         self.skip_non_blank();
@@ -1573,7 +1577,7 @@ impl<'input, T: Input> Scanner<'input, T> {
     fn decrease_flow_level(&mut self) {
         if self.flow_level > 0 {
             self.flow_level -= 1;
-            self.simple_keys.pop().unwrap();
+            self.simple_keys.pop();
         }
     }
 
@@ -2465,9 +2469,9 @@ impl<'input, T: Input> Scanner<'input, T> {
                 TokenType::BlockMappingStart,
                 start_mark,
             );
-        } else {
+        } else if let Some(mapping_started) = self.flow_mapping_started.last_mut() {
             // The scanner, upon emitting a `Key`, will prepend a `MappingStart` event.
-            self.flow_mapping_started = true;
+            *mapping_started = true;
         }
 
         self.remove_simple_key()?;
@@ -2524,13 +2528,21 @@ impl<'input, T: Input> Scanner<'input, T> {
 
     /// Fetch a value from a mapping (after a `:`).
     fn fetch_value(&mut self) -> ScanResult {
-        let sk = self.simple_keys.last().unwrap().clone();
+        let sk = self
+            .simple_keys
+            .last()
+            .cloned()
+            .ok_or_else(|| ScanError::new_str(self.mark, "simple key expected"))?;
         let start_mark = self.mark;
-        let is_implicit_flow_mapping =
-            !self.implicit_flow_mapping_states.is_empty() && !self.flow_mapping_started;
-        if is_implicit_flow_mapping {
-            *self.implicit_flow_mapping_states.last_mut().unwrap() = ImplicitMappingState::Inside;
-        }
+        let is_implicit_flow_mapping = if let (Some(Some(implicit_mapping)), Some(false)) = (
+            self.implicit_flow_mapping_states.last_mut(),
+            self.flow_mapping_started.last(),
+        ) {
+            *implicit_mapping = ImplicitMappingState::Inside;
+            true
+        } else {
+            false
+        };
 
         // Skip over ':'.
         self.skip_non_blank();
@@ -2570,7 +2582,10 @@ impl<'input, T: Input> Scanner<'input, T> {
             );
             self.roll_one_col_indent();
 
-            self.simple_keys.last_mut().unwrap().possible = false;
+            self.simple_keys
+                .last_mut()
+                .ok_or_else(|| ScanError::new_str(self.mark, "simple key expected"))?
+                .possible = false;
             self.disallow_simple_key();
         } else {
             if is_implicit_flow_mapping {
@@ -2711,7 +2726,10 @@ impl<'input, T: Input> Scanner<'input, T> {
     }
 
     fn remove_simple_key(&mut self) -> ScanResult {
-        let last = self.simple_keys.last_mut().unwrap();
+        let last = self
+            .simple_keys
+            .last_mut()
+            .ok_or_else(|| ScanError::new_str(self.mark, "simple key expected"))?;
         if last.possible && last.required {
             return Err(ScanError::new_str(self.mark, "simple key expected"));
         }
@@ -2731,9 +2749,12 @@ impl<'input, T: Input> Scanner<'input, T> {
     ///
     /// [`implicit_flow_mapping_states`]: Self::implicit_flow_mapping_states
     fn end_implicit_mapping(&mut self, mark: Marker) {
-        if let Some(implicit_mapping) = self.implicit_flow_mapping_states.last_mut() {
+        if let (Some(Some(implicit_mapping)), Some(mapping_started)) = (
+            self.implicit_flow_mapping_states.last_mut(),
+            self.flow_mapping_started.last_mut(),
+        ) {
             if *implicit_mapping == ImplicitMappingState::Inside {
-                self.flow_mapping_started = false;
+                *mapping_started = false;
                 *implicit_mapping = ImplicitMappingState::Possible;
                 self.tokens
                     .push_back(Token(Span::empty(mark), TokenType::FlowMappingEnd));
