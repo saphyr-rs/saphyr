@@ -5,6 +5,16 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
+## v0.3.1
+
+**Fixes**:
+
+- Compat pairs whose value is a flow mapping were incorrectly losing their structure
+  upon encountering the first comma inside a mapping. The flow mapping state is now
+  tracked per flow level by the parser.
+  ([+139](https://github.com/saphyr-rs/saphyr/issues/139))
+
+
 ## v0.3.0
 
 **Changes**:
