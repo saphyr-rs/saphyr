@@ -6,6 +6,15 @@
 
 - Update to [saphyr-parser v0.3.1](https://crates.io/crates/saphyr-parser/0.3.0).
 
+- The parser now guards against recursive alias expansions ("billion-laughs") that could exhaust memory.
+  ([#109](https://github.com/saphyr-rs/saphyr/issues/109))
+  ([+120](https://github.com/saphyr-rs/saphyr/pull/120))
+
+- Compat pairs whose value is a flow mapping were incorrectly losing their structure
+  upon encountering the first comma inside a mapping. The flow mapping state is now
+  tracked per flow level by the parser.
+  ([#139](https://github.com/saphyr-rs/saphyr/issues/139))
+
 
 ## v0.3.0
 
@@ -371,7 +380,7 @@ This feature is extensible and should allow (later) to add comments.
 - Tags can now be retained across documents by calling `keep_tags(true)` on a
   `Parser` before loading documents.
   ([#10](https://github.com/Ethiraric/yaml-rust2/issues/10)
-  ([#12](https://github.com/Ethiraric/yaml-rust2/pull/12))
+  ([+12](https://github.com/Ethiraric/yaml-rust2/pull/12))
 
 - `YamlLoader` structs now have a `documents()` method that returns the parsed
   documents associated with a loader.

@@ -9,10 +9,15 @@
 
 **Fixes**:
 
+- The parser now guards against recursive alias expansions ("billion-laughs") that could exhaust memory.
+  ([#109](https://github.com/saphyr-rs/saphyr/issues/109))
+  ([+120](https://github.com/saphyr-rs/saphyr/pull/120))
+
+
 - Compat pairs whose value is a flow mapping were incorrectly losing their structure
   upon encountering the first comma inside a mapping. The flow mapping state is now
   tracked per flow level by the parser.
-  ([+139](https://github.com/saphyr-rs/saphyr/issues/139))
+  ([#139](https://github.com/saphyr-rs/saphyr/issues/139))
 
 
 ## v0.3.0
@@ -20,7 +25,7 @@
 **Changes**:
 
 - An empty block scalar at the end of the input is now `""` instead of `"\n"`.
-  ([+143](https://github.com/saphyr-rs/saphyr/issues/143))
+  ([#143](https://github.com/saphyr-rs/saphyr/issues/143))
 
 
 
