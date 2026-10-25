@@ -20,6 +20,9 @@
 - Canonical YAML spellings are now emitted for infinity and NaN.
   ([#140](https://github.com/saphyr-rs/saphyr/pull/140))
 
+- Update to [saphyr-parser v0.3.0](https://crates.io/crates/saphyr-parser/0.3.0).
+
+
 ## v0.2.2
 
 **Changes**:

@@ -5,7 +5,7 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
-## Unreleased
+## v0.3.0
 
 **Changes**:
 
