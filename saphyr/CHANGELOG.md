@@ -17,7 +17,7 @@
 - BOM is now properly supported.
   ([#137](https://github.com/saphyr-rs/saphyr/pull/137))
 
-- Canonical YAML spellings are now emitting for infinity and NaN.
+- Canonical YAML spellings are now emitted for infinity and NaN.
   ([#140](https://github.com/saphyr-rs/saphyr/pull/140))
 
 ## v0.2.2
