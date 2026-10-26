@@ -7,8 +7,20 @@
 ///   | #x85 | [#xA0-#xD7FF] | [#xE000-#xFFFD] /* 16 bit */
 ///   | [#x10000-#x10FFFF]                     /* 32 bit */
 /// ```
+/// `#xD` is excluded as well: a carriage return in a block scalar is a line break, which is read
+/// back as `#xA`.
 #[inline]
 pub(crate) fn is_valid_literal_block_scalar(string: &str) -> bool {
-    string.chars().all(|character: char|
-        matches!(character, '\t' | '\n' | '\r' | '\x20'..='\x7e' | '\u{0085}' | '\u{00a0}'..='\u{d7fff}'))
+    string.chars().all(|character: char| {
+        matches!(
+            character,
+            '\t' | '\n'
+                | '\x20'..='\x7e'
+                | '\u{0085}'
+                | '\u{00a0}'..='\u{d7ff}'
+                | '\u{e000}'..='\u{fefe}'
+                | '\u{ff00}'..='\u{fffd}'
+                | '\u{10000}'..='\u{10ffff}'
+        )
+    })
 }

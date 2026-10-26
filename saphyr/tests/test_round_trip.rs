@@ -131,6 +131,50 @@ fn test_multiline_leading_newline() {
 }
 
 #[test]
+fn test_multiline_carriage_return() {
+    // A carriage return in a literal block would be read back as a line feed.
+    for value in ["a\r\nb", "a\rb\n", "a\nb\r"] {
+        let scalar = Yaml::Value(Scalar::String(value.into()));
+        roundtrip_multiline(&scalar);
+        roundtrip_multiline(&Yaml::Sequence(vec![scalar.clone()]));
+        let mut mapping = Mapping::new();
+        mapping.insert(Yaml::Value(Scalar::String("k".into())), scalar);
+        roundtrip_multiline(&Yaml::Mapping(mapping));
+    }
+}
+
+#[test]
+fn test_multiline_byte_order_mark() {
+    // A byte order mark may only appear at the start of a document.
+    for value in ["\u{feff}a\nb", "a\n\u{feff}b"] {
+        let scalar = Yaml::Value(Scalar::String(value.into()));
+        roundtrip_multiline(&scalar);
+        roundtrip_multiline(&Yaml::Sequence(vec![scalar]));
+    }
+}
+
+#[test]
+fn test_multiline_printable_characters() {
+    // Printable characters up to U+10FFFF can be written in a literal block.
+    let scalar = Yaml::Value(Scalar::String("\u{1f600}\n\u{f0000}".into()));
+    let mut emitted = String::new();
+    let mut emitter = YamlEmitter::new(&mut emitted);
+    emitter.multiline(true);
+    emitter.dump(&scalar).unwrap();
+    assert_eq!(emitted, "---\n|-\n\u{1f600}\n\u{f0000}");
+    roundtrip_multiline(&scalar);
+
+    // U+FFFF is not printable, so it is not written in a literal block.
+    let scalar = Yaml::Value(Scalar::String("a\u{ffff}\nb".into()));
+    let mut emitted = String::new();
+    let mut emitter = YamlEmitter::new(&mut emitted);
+    emitter.multiline(true);
+    emitter.dump(&scalar).unwrap();
+    assert!(!emitted.contains('|'), "{emitted}");
+    roundtrip_multiline(&scalar);
+}
+
+#[test]
 fn test_multiline_key() {
     let mut mapping = Mapping::new();
     mapping.insert(
