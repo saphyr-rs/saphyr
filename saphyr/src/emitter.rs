@@ -476,7 +476,6 @@ fn need_quotes(string: &str) -> bool {
             matches!(
                 character,
                 '\0'..='\x1f'
-                    | '\x7f'
                     | ':'
                     | '{'
                     | '}'
@@ -488,6 +487,8 @@ fn need_quotes(string: &str) -> bool {
                     | '\"'
                     | '\''
                     | '\\'
+                    | '\x7f'
+                    | '\u{feff}'
             )
         })
         || [
@@ -558,11 +559,18 @@ mod test {
             ("a\x0cb", "\"a\\fb\""),
             ("a\x1bb", "\"a\\u001bb\""),
             ("a\x7fb", "\"a\\u007fb\""),
+            // BOMs inside documents may only appear within quoted scalars (YAML 1.2.2, 5.2)
+            ("a\u{feff}b", "\"a\u{feff}b\""),
         ] {
             let yaml = Yaml::Value(crate::Scalar::String(input.into()));
             let mut output = String::new();
             YamlEmitter::new(&mut output).dump(&yaml).unwrap();
             assert_eq!(output, alloc::format!("---\n{expected}"), "input {input:?}");
+            assert_eq!(
+                Yaml::load_from_str(&output).unwrap()[0],
+                yaml,
+                "input {input:?}"
+            );
         }
     }
 
