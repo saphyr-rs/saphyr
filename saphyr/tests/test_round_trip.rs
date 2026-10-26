@@ -125,6 +125,15 @@ fn test_multiline_trailing_newline() {
 }
 
 #[test]
+fn test_multiline_trailing_newlines() {
+    for value in ["\n", "\n\n", "a\n\n", "a\nb\n\n\n"] {
+        let scalar = Yaml::Value(Scalar::String(value.into()));
+        roundtrip_multiline(&scalar);
+        roundtrip_multiline(&Yaml::Sequence(vec![scalar.clone(), scalar]));
+    }
+}
+
+#[test]
 fn test_multiline_leading_newline() {
     let y = Yaml::Sequence(vec![Yaml::Value(Scalar::String("\na".into()))]);
     roundtrip_multiline(&y);

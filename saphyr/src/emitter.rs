@@ -440,8 +440,21 @@ impl<'a> YamlEmitter<'a> {
     /// [`multiline`]: Self::multiline.
     #[must_use]
     fn should_emit_string_as_block(&self, s: &str) -> bool {
-        self.multiline && s.contains('\n') && char_traits::is_valid_literal_block_scalar(s)
+        self.multiline
+            && s.contains('\n')
+            && !has_trailing_empty_lines(s)
+            && char_traits::is_valid_literal_block_scalar(s)
     }
+}
+
+/// Check whether the string ends with empty lines, i.e. it is made only of line feeds or it ends
+/// with more than one of them.
+///
+/// The `|` and `|-` headers we emit drop such trailing lines on load, so these strings are
+/// quoted instead.
+fn has_trailing_empty_lines(s: &str) -> bool {
+    let content = s.trim_end_matches('\n');
+    content.is_empty() || s.len() - content.len() > 1
 }
 
 /// Check if the string requires quoting.
