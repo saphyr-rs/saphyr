@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.2
+
+**Changes**:
+
+- Strings that contain BOMs are now emitted as quoted scalars.
+  ([+145](https://github.com/saphyr-rs/saphyr/pull/145))
+
+
 ## v0.3.1
 
 **Changes**:
