@@ -50,8 +50,7 @@ where
 ///
 /// Resolving an [`Event::Alias`] clones the anchor's already-built subtree. Without a
 /// limit, a handful of nested anchors can be crafted to expand into an exponential number
-/// of nodes (a "billion laughs" attack), exhausting memory. See
-/// <https://github.com/saphyr-rs/saphyr/issues/109>.
+/// of nodes (a "billion laughs" attack), exhausting memory.
 pub const DEFAULT_ALIAS_LIMIT: usize = 100_000;
 
 /// A trait providing methods used by the [`YamlLoader`].
