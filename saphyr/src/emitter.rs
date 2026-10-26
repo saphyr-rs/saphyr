@@ -332,9 +332,10 @@ impl<'a> YamlEmitter<'a> {
 
         let previous_level = self.level;
         self.level += 1;
-        if needs_indent_indicator && self.level == 0 {
+        if self.level == 0 && (needs_indent_indicator || v.lines().any(is_document_marker)) {
             // At root, write_indent() emits none; |2 needs two spaces to preserve
-            // leading scalar whitespace.
+            // leading scalar whitespace, and a line starting with `---` or `...` would end
+            // the document.
             self.level = 1;
         }
         // lines() will omit the last line if it is empty.
@@ -442,6 +443,12 @@ impl<'a> YamlEmitter<'a> {
     fn should_emit_string_as_block(&self, s: &str) -> bool {
         self.multiline && s.contains('\n') && char_traits::is_valid_literal_block_scalar(s)
     }
+}
+
+/// Check whether a line written without indentation would be a document marker (`---` or `...`).
+fn is_document_marker(line: &str) -> bool {
+    (line.starts_with("---") || line.starts_with("..."))
+        && matches!(line.as_bytes().get(3), None | Some(b' ' | b'\t'))
 }
 
 /// Check if the string requires quoting.

@@ -131,6 +131,27 @@ fn test_multiline_leading_newline() {
 }
 
 #[test]
+fn test_multiline_document_markers_root() {
+    // At the root, lines starting with `---` or `...` must be indented, or they would be read as
+    // document markers.
+    for (value, expected) in [
+        ("a\n...\nb", "---\n|-\n  a\n  ...\n  b"),
+        ("a\n---\nb\n", "---\n|\n  a\n  ---\n  b"),
+        ("a\n--- x\nb", "---\n|-\n  a\n  --- x\n  b"),
+        ("a\n...\tx", "---\n|-\n  a\n  ...\tx"),
+        ("a\n---x\n....", "---\n|-\na\n---x\n...."),
+    ] {
+        let scalar = Yaml::Value(Scalar::String(value.into()));
+        let mut emitted = String::new();
+        let mut emitter = YamlEmitter::new(&mut emitted);
+        emitter.multiline(true);
+        emitter.dump(&scalar).unwrap();
+        assert_eq!(emitted, expected);
+        roundtrip_multiline(&scalar);
+    }
+}
+
+#[test]
 fn test_multiline_key() {
     let mut mapping = Mapping::new();
     mapping.insert(
