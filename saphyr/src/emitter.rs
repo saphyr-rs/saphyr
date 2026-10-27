@@ -41,6 +41,18 @@ pub struct YamlEmitter<'a> {
     level: isize,
     multiline: bool,
     quoted_value: bool,
+    /// Set when a literal block has just written the line break after its last line, which the
+    /// next node must not write again.
+    final_line_break: Option<Chomping>,
+}
+
+/// The chomping of a literal block that ends with a line break.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Chomping {
+    /// Only the final line break is part of the value.
+    Clip,
+    /// All the trailing line breaks are part of the value, and so would be text after them.
+    Keep,
 }
 
 /// A convenience alias for emitter functions that may fail without returning a value.
@@ -125,6 +137,7 @@ impl<'a> YamlEmitter<'a> {
             level: -1,
             multiline: false,
             quoted_value: false,
+            final_line_break: None,
         }
     }
 
@@ -204,7 +217,21 @@ impl<'a> YamlEmitter<'a> {
         // write DocumentStart
         writeln!(self.writer, "---")?;
         self.level = -1;
-        self.emit_node(doc)
+        self.final_line_break = None;
+        self.emit_node(doc)?;
+        if self.final_line_break == Some(Chomping::Keep) {
+            // Text after the block would be part of it, so end the document.
+            self.writer.write_str("...")?;
+        }
+        Ok(())
+    }
+
+    /// Start a new line, unless a literal block has just written its final line break.
+    fn write_line_break(&mut self) -> EmitResult {
+        if self.final_line_break.take().is_none() {
+            writeln!(self.writer)?;
+        }
+        Ok(())
     }
 
     fn write_indent(&mut self) -> EmitResult {
@@ -317,17 +344,21 @@ impl<'a> YamlEmitter<'a> {
 
     fn emit_literal_block(&mut self, v: &str) -> EmitResult {
         let needs_indent_indicator = v.trim_start_matches('\n').starts_with([' ', '\t']);
-        let ends_with_newline = v.ends_with('\n');
-        if ends_with_newline && !needs_indent_indicator {
-            self.writer.write_str("|")?;
-        } else if !ends_with_newline && !needs_indent_indicator {
-            self.writer.write_str("|-")?;
+        let trailing_line_breaks = v.len() - v.trim_end_matches('\n').len();
+        // Clip chomping keeps one final line break, keep chomping keeps all of them.
+        let keep = trailing_line_breaks > 1;
+        let header = if keep {
+            "|+"
+        } else if trailing_line_breaks == 1 {
+            "|"
         } else {
-            self.writer.write_str(&format!(
-                "|{}{}",
-                self.best_indent,
-                if ends_with_newline { "" } else { "-" }
-            ))?;
+            "|-"
+        };
+        if needs_indent_indicator {
+            self.writer
+                .write_str(&format!("|{}{}", self.best_indent, &header[1..]))?;
+        } else {
+            self.writer.write_str(header)?;
         }
 
         let previous_level = self.level;
@@ -344,6 +375,12 @@ impl<'a> YamlEmitter<'a> {
             // It's literal text, so don't escape special chars.
             self.writer.write_str(line)?;
         }
+        if trailing_line_breaks > 0 {
+            // The final line break is part of the value. Write it here, since no node follows
+            // the block at the end of the document.
+            writeln!(self.writer)?;
+            self.final_line_break = Some(if keep { Chomping::Keep } else { Chomping::Clip });
+        }
         self.level = previous_level;
         Ok(())
     }
@@ -355,7 +392,7 @@ impl<'a> YamlEmitter<'a> {
             self.level += 1;
             for (cnt, x) in v.iter().enumerate() {
                 if cnt > 0 {
-                    writeln!(self.writer)?;
+                    self.write_line_break()?;
                     self.write_indent()?;
                 }
                 write!(self.writer, "-")?;
@@ -374,13 +411,13 @@ impl<'a> YamlEmitter<'a> {
             for (cnt, (k, v)) in h.iter().enumerate() {
                 let complex_key = matches!(k, Yaml::Mapping(_) | Yaml::Sequence(_));
                 if cnt > 0 {
-                    writeln!(self.writer)?;
+                    self.write_line_break()?;
                     self.write_indent()?;
                 }
                 if complex_key {
                     write!(self.writer, "?")?;
                     self.emit_val(true, k, false)?;
-                    writeln!(self.writer)?;
+                    self.write_line_break()?;
                     self.write_indent()?;
                     write!(self.writer, ":")?;
                     self.emit_val(true, v, quoted_value)?;
@@ -435,12 +472,15 @@ impl<'a> YamlEmitter<'a> {
     /// Check whether the string should be emitted as a literal block.
     ///
     /// This takes into account the [`multiline`] option and whether the string contains
-    /// newlines.
+    /// newlines. A string made only of newlines has no line of text, so it is quoted.
     ///
     /// [`multiline`]: Self::multiline.
     #[must_use]
     fn should_emit_string_as_block(&self, s: &str) -> bool {
-        self.multiline && s.contains('\n') && char_traits::is_valid_literal_block_scalar(s)
+        self.multiline
+            && s.contains('\n')
+            && !s.trim_start_matches('\n').is_empty()
+            && char_traits::is_valid_literal_block_scalar(s)
     }
 }
 
@@ -538,6 +578,8 @@ mod test {
             (" first\nsecond", "|2-"),
             ("\n first\nsecond", "|2-"),
             ("\tfirst\nsecond\n", "|2"),
+            ("first\n\n", "|+"),
+            ("\n first\n\n", "|2+"),
         ] {
             let mut writer = RecordingWriter::default();
             YamlEmitter::new(&mut writer)

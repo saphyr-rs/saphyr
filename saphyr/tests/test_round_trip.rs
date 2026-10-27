@@ -125,6 +125,70 @@ fn test_multiline_trailing_newline() {
 }
 
 #[test]
+fn test_multiline_trailing_newlines() {
+    for value in ["\n", "\n\n", "a\n\n", "a\nb\n\n\n"] {
+        let scalar = Yaml::Value(Scalar::String(value.into()));
+        roundtrip_multiline(&scalar);
+        roundtrip_multiline(&Yaml::Sequence(vec![scalar.clone(), scalar]));
+    }
+}
+
+#[test]
+fn test_multiline_trailing_newlines_nested() {
+    let string = |value: &str| Yaml::Value(Scalar::String(value.to_owned().into()));
+    let mapping = |entries: [(&str, Yaml<'static>); 2]| {
+        Yaml::Mapping(entries.into_iter().map(|(k, v)| (string(k), v)).collect())
+    };
+    for value in ["\n", "a\n", "a\n\n", "a\nb\n\n\n", "  a\n\n"] {
+        let scalar = string(value);
+        let nested = mapping([("k", scalar.clone()), ("z", string("x"))]);
+        for yaml in [
+            Yaml::Sequence(vec![scalar.clone(), string("x")]),
+            Yaml::Sequence(vec![string("x"), scalar.clone()]),
+            nested.clone(),
+            mapping([("z", string("x")), ("k", scalar.clone())]),
+            Yaml::Sequence(vec![nested.clone(), Yaml::Sequence(vec![scalar.clone()])]),
+            mapping([("o", nested), ("p", Yaml::Sequence(vec![scalar.clone()]))]),
+            Yaml::Mapping(
+                [(Yaml::Sequence(vec![scalar.clone()]), scalar.clone())]
+                    .into_iter()
+                    .collect(),
+            ),
+        ] {
+            roundtrip_multiline(&yaml);
+        }
+    }
+}
+
+#[test]
+fn test_multiline_trailing_newlines_output() {
+    // A literal block ending with line breaks writes the last one itself, since no node follows
+    // it at the end of the document. Keep chomping then needs the document end marker.
+    for (value, expected) in [
+        (vec!["a\n\n", "x"], "---\n- |+\n  a\n  \n- x"),
+        (vec!["x", "a\n\n"], "---\n- x\n- |+\n  a\n  \n..."),
+        (vec!["x", "  a\n\n"], "---\n- x\n- |2+\n    a\n  \n..."),
+        (vec!["x", "\n\n"], "---\n- x\n- \"\\n\\n\""),
+        (vec!["x", "a\n"], "---\n- x\n- |\n  a\n"),
+    ] {
+        let yaml = Yaml::Sequence(
+            value
+                .into_iter()
+                .map(|v| Yaml::Value(Scalar::String(v.into())))
+                .collect(),
+        );
+        let mut emitted = String::new();
+        let mut emitter = YamlEmitter::new(&mut emitted);
+        emitter.multiline(true);
+        emitter.dump(&yaml).unwrap();
+        assert_eq!(emitted, expected);
+        // A line break after the document does not change the value.
+        emitted.push('\n');
+        assert_eq!(Yaml::load_from_str(&emitted).unwrap(), [yaml]);
+    }
+}
+
+#[test]
 fn test_multiline_leading_newline() {
     let y = Yaml::Sequence(vec![Yaml::Value(Scalar::String("\na".into()))]);
     roundtrip_multiline(&y);
