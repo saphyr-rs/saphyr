@@ -363,9 +363,10 @@ impl<'a> YamlEmitter<'a> {
 
         let previous_level = self.level;
         self.level += 1;
-        if needs_indent_indicator && self.level == 0 {
+        if self.level == 0 && (needs_indent_indicator || has_document_marker_line(v)) {
             // At root, write_indent() emits none; |2 needs two spaces to preserve
-            // leading scalar whitespace.
+            // leading scalar whitespace, and a line starting with `---` or `...` would end
+            // the document.
             self.level = 1;
         }
         // lines() will omit the last line if it is empty.
@@ -482,6 +483,21 @@ impl<'a> YamlEmitter<'a> {
             && !s.trim_start_matches('\n').is_empty()
             && char_traits::is_valid_literal_block_scalar(s)
     }
+}
+
+/// Check whether a line of the string would be a document marker (`---` or `...` followed by a
+/// space, a tab or the end of the line) if it were written without indentation.
+fn has_document_marker_line(s: &str) -> bool {
+    let is_marker = |start: usize| {
+        let line = &s.as_bytes()[start..];
+        (line.starts_with(b"---") || line.starts_with(b"..."))
+            && matches!(line.get(3), None | Some(b' ' | b'\t' | b'\n'))
+    };
+    // Most strings contain neither "\n---" nor "\n...", which `contains` finds out quickly.
+    is_marker(0)
+        || ["\n---", "\n..."].into_iter().any(|marker| {
+            s.contains(marker) && s.match_indices(marker).any(|(i, _)| is_marker(i + 1))
+        })
 }
 
 /// Check if the string requires quoting.
