@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.3
+
+- Literal multiline string blocks are now emitted correctly when the string
+  contains trailing slashes, carriage returns, BOMs, and document markers.
+  ([+147](https://github.com/saphyr-rs/saphyr/pull/147))
+
+
 ## v0.3.2
 
 **Changes**:

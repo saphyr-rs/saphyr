@@ -5,6 +5,10 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
+## v0.3.3
+
+- Version bump.
+
 
 ## v0.3.2
 
