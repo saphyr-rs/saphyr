@@ -2,6 +2,13 @@
 
 ## v0.3.4
 
+**Additions**:
+
+- `YamlEventEmitter` writes YAML from a stream of `EmitEvent`s as it receives them, without
+  building a `Yaml` first. Its output is the same as `YamlEmitter`'s. It checks the order of the
+  events and the depth of the containers, and returns an `EventEmitError` instead of writing
+  invalid YAML.
+
 **Fixes**:
 
 - Invalid trailing content is now reported before the document end.
