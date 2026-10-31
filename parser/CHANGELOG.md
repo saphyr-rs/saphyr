@@ -5,6 +5,14 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
+## Unreleased
+
+**Fixes**:
+
+- A block scalar that is not indented (at the root of a document) now ends at a `---` line,
+  as it does at a `...` line. The `---` was part of the scalar.
+
+
 ## v0.3.4
 
 **Changes**:
