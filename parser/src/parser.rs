@@ -830,17 +830,27 @@ impl<'input, T: Input> Parser<'input, T> {
         if explicit_end {
             self.state = State::ImplicitDocumentStart;
         } else {
-            if let Token(
-                span,
-                TokenType::VersionDirective(..)
-                | TokenType::TagDirective(..)
-                | TokenType::ReservedDirective(..),
-            ) = *self.peek_token()?
-            {
-                return Err(ScanError::new_str(
-                    span.start,
-                    "missing explicit document end marker before directive",
-                ));
+            match *self.peek_token()? {
+                Token(
+                    span,
+                    TokenType::VersionDirective(..)
+                    | TokenType::TagDirective(..)
+                    | TokenType::ReservedDirective(..),
+                ) => {
+                    return Err(ScanError::new_str(
+                        span.start,
+                        "missing explicit document end marker before directive",
+                    ));
+                }
+                Token(_, TokenType::DocumentStart | TokenType::StreamEnd) => {}
+                // Report this now rather than from the next document: a caller reading a single
+                // document stops at `DocumentEnd` and would never see the error.
+                Token(span, _) => {
+                    return Err(ScanError::new_str(
+                        span.start,
+                        "did not find expected <document start>",
+                    ));
+                }
             }
             self.state = State::DocumentStart;
         }
