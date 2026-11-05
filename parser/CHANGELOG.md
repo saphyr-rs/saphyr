@@ -5,6 +5,17 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
+## v0.3.4
+
+**Changes**:
+
+- `encoding_rs` was updated to `v0.8.45`.
+
+- `hashlink` was updated to `v0.12.2`.
+
+- `thiserror` was updated to `v2.0.21`.
+
+
 ## v0.3.3
 
 - Version bump.
