@@ -1,7 +1,10 @@
 #![allow(clippy::bool_assert_comparison)]
 #![allow(clippy::float_cmp)]
 
-use saphyr::{LoadableYamlNode, Scalar, Yaml, YamlEmitter};
+use std::fmt::Write;
+
+use saphyr::{LoadableYamlNode, Scalar, Yaml, YamlEmitter, YamlLoader};
+use saphyr_parser::Parser;
 
 #[test]
 fn test_api() {
@@ -301,8 +304,6 @@ fn test_integer_key() {
 
 #[test]
 fn test_nominal_float_parse() {
-    use std::fmt::Write;
-
     // back test for
     // https://github.com/Ethiraric/yaml-rust2/issues/50
 
@@ -409,9 +410,6 @@ fn test_mapping_distinct_keys() {
 
 #[test]
 fn test_mapping_duplicate_keys_allowed() {
-    use saphyr::YamlLoader;
-    use saphyr_parser::Parser;
-
     let s = "
 a: 1
 b: 2
