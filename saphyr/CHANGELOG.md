@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.4
+
+**Fixes**:
+
+- Invalid trailing content is now reported before the document end.
+  ([+154](https://github.com/saphyr-rs/saphyr/pull/154))
+
+- A block scalar that is not indented (at the root of a document) now ends at a `---` line,
+  as it does at a `...` line. The `---` was part of the scalar.
+  ([+155](https://github.com/saphyr-rs/saphyr/pull/155))
+
+- `+-5`, `0x-1`, `0x+1`, `0o-1` and `0o+1` were loaded as integers. They are strings.
+  ([+156](https://github.com/saphyr-rs/saphyr/pull/156))
+
+
 ## v0.3.3
 
 - Literal multiline string blocks are now emitted correctly when the string
