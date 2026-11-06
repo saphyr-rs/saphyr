@@ -1816,8 +1816,9 @@ impl<'input, T: Input> Scanner<'input, T> {
         let start_mark = self.mark;
         while self.mark.col == indent && is_yaml_non_break(self.input.peek()) {
             if indent == 0 {
+                // A document marker ends the scalar, whether it starts another document or not.
                 self.input.lookahead(4);
-                if self.input.next_is_document_end() {
+                if self.input.next_is_document_indicator() {
                     break;
                 }
             }
