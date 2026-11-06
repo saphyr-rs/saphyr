@@ -184,17 +184,19 @@ impl<'input> Scalar<'input> {
 
         if bytes.len() >= 2 {
             match (bytes[0], bytes[1]) {
-                (b'0', b'x') => {
+                // `from_str_radix` and `parse` accept a sign of their own, which the core schema does
+                // not allow after a prefix (`0x-1`, `+-1`).
+                (b'0', b'x') if !s[2..].starts_with(['+', '-']) => {
                     if let Ok(i) = i64::from_str_radix(&s[2..], 16) {
                         return Self::Integer(i);
                     }
                 }
-                (b'0', b'o') => {
+                (b'0', b'o') if !s[2..].starts_with(['+', '-']) => {
                     if let Ok(i) = i64::from_str_radix(&s[2..], 8) {
                         return Self::Integer(i);
                     }
                 }
-                (b'+', _) => {
+                (b'+', b'0'..=b'9') => {
                     if let Ok(i) = s[1..].parse::<i64>() {
                         return Self::Integer(i);
                     }

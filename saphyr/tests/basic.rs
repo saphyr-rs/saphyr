@@ -426,3 +426,34 @@ a: 3
     assert_eq!(docs[0]["a"].as_integer(), Some(3));
     assert_eq!(docs[0]["b"].as_integer(), Some(2));
 }
+
+#[test]
+fn test_signs_after_a_prefix_are_not_integers() {
+    // The sign of an integer comes first, and only once.
+    let docs = Yaml::load_from_str(
+        "- +5\n- -5\n- +-5\n- -+5\n- 0x-1\n- 0x+1\n- 0o-1\n- 0o+1\n- 0x1f\n- 0o17\n- + 5\n- +",
+    )
+    .unwrap();
+    let items = docs[0].as_vec().unwrap();
+    let ints: Vec<_> = items.iter().map(|i| i.as_integer()).collect();
+    assert_eq!(
+        ints,
+        [
+            Some(5),
+            Some(-5),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(31),
+            Some(15),
+            None,
+            None
+        ]
+    );
+    for item in &items[2..8] {
+        assert!(item.is_string(), "{item:?}");
+    }
+}
