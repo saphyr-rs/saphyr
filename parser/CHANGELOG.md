@@ -5,6 +5,7 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
+
 ## v0.3.4
 
 **Changes**:
@@ -14,6 +15,11 @@
 - `hashlink` was updated to `v0.12.2`.
 
 - `thiserror` was updated to `v2.0.21`.
+
+**Fixes**:
+
+- `+-5`, `0x-1`, `0x+1`, `0o-1` and `0o+1` were loaded as integers. They are strings.
+  ([+156](https://github.com/saphyr-rs/saphyr/pull/156))
 
 
 ## v0.3.3

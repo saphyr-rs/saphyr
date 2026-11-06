@@ -1,11 +1,5 @@
 # Changelog
 
-## Unreleased
-
-**Fixes**:
-
-- `+-5`, `0x-1`, `0x+1`, `0o-1` and `0o+1` were loaded as integers. They are strings.
-
 ## v0.3.3
 
 - Literal multiline string blocks are now emitted correctly when the string
