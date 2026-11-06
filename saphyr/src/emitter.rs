@@ -48,7 +48,7 @@ pub struct YamlEmitter<'a> {
 
 /// The chomping of a literal block that ends with a line break.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Chomping {
+pub(crate) enum Chomping {
     /// Only the final line break is part of the value.
     Clip,
     /// All the trailing line breaks are part of the value, and so would be text after them.
@@ -59,7 +59,7 @@ enum Chomping {
 pub type EmitResult = Result<(), EmitError>;
 
 // from serialize::json
-fn escape_str(wr: &mut dyn fmt::Write, v: &str) -> Result<(), fmt::Error> {
+pub(crate) fn escape_str(wr: &mut dyn fmt::Write, v: &str) -> Result<(), fmt::Error> {
     wr.write_str("\"")?;
 
     let bytes = v.as_bytes();
@@ -235,15 +235,7 @@ impl<'a> YamlEmitter<'a> {
     }
 
     fn write_indent(&mut self) -> EmitResult {
-        if self.level <= 0 {
-            return Ok(());
-        }
-        for _ in 0..self.level {
-            for _ in 0..self.best_indent {
-                write!(self.writer, " ")?;
-            }
-        }
-        Ok(())
+        Ok(write_indent(self.writer, self.level, self.best_indent)?)
     }
 
     fn emit_node(&mut self, node: &Yaml) -> EmitResult {
@@ -280,19 +272,7 @@ impl<'a> YamlEmitter<'a> {
                 Ok(())
             }
             Yaml::Value(Scalar::Integer(v)) => Ok(write!(self.writer, "{v}")?),
-            Yaml::Value(Scalar::FloatingPoint(ref v)) if v.is_nan() => {
-                Ok(write!(self.writer, ".nan")?)
-            }
-            Yaml::Value(Scalar::FloatingPoint(ref v)) if v.is_infinite() => Ok(write!(
-                self.writer,
-                "{}.inf",
-                if v.is_sign_negative() { "-" } else { "" }
-            )?),
-            Yaml::Value(Scalar::FloatingPoint(ref v)) => Ok(write!(
-                self.writer,
-                "{v}{}",
-                if v.fract() == 0.0 { ".0" } else { "" }
-            )?),
+            Yaml::Value(Scalar::FloatingPoint(ref v)) => Ok(write_f64(self.writer, v.0)?),
             Yaml::Value(Scalar::Null) | Yaml::BadValue => Ok(write!(self.writer, "~")?),
             Yaml::Representation(ref v, style, ref tag) => {
                 if let Some(tag) = tag {
@@ -343,46 +323,7 @@ impl<'a> YamlEmitter<'a> {
     }
 
     fn emit_literal_block(&mut self, v: &str) -> EmitResult {
-        let needs_indent_indicator = v.trim_start_matches('\n').starts_with([' ', '\t']);
-        let trailing_line_breaks = v.len() - v.trim_end_matches('\n').len();
-        // Clip chomping keeps one final line break, keep chomping keeps all of them.
-        let keep = trailing_line_breaks > 1;
-        let header = if keep {
-            "|+"
-        } else if trailing_line_breaks == 1 {
-            "|"
-        } else {
-            "|-"
-        };
-        if needs_indent_indicator {
-            self.writer
-                .write_str(&format!("|{}{}", self.best_indent, &header[1..]))?;
-        } else {
-            self.writer.write_str(header)?;
-        }
-
-        let previous_level = self.level;
-        self.level += 1;
-        if self.level == 0 && (needs_indent_indicator || has_document_marker_line(v)) {
-            // At root, write_indent() emits none; |2 needs two spaces to preserve
-            // leading scalar whitespace, and a line starting with `---` or `...` would end
-            // the document.
-            self.level = 1;
-        }
-        // lines() will omit the last line if it is empty.
-        for line in v.lines() {
-            writeln!(self.writer)?;
-            self.write_indent()?;
-            // It's literal text, so don't escape special chars.
-            self.writer.write_str(line)?;
-        }
-        if trailing_line_breaks > 0 {
-            // The final line break is part of the value. Write it here, since no node follows
-            // the block at the end of the document.
-            writeln!(self.writer)?;
-            self.final_line_break = Some(if keep { Chomping::Keep } else { Chomping::Clip });
-        }
-        self.level = previous_level;
+        self.final_line_break = write_literal_block(self.writer, v, self.best_indent, self.level)?;
         Ok(())
     }
 
@@ -478,12 +419,113 @@ impl<'a> YamlEmitter<'a> {
     /// [`multiline`]: Self::multiline.
     #[must_use]
     fn should_emit_string_as_block(&self, s: &str) -> bool {
-        self.multiline
-            && s.contains('\n')
-            && !s.trim_start_matches('\n').is_empty()
-            && char_traits::is_valid_literal_block_scalar(s)
+        self.multiline && can_be_literal_block(s)
     }
 }
+
+/// Write `string` as a literal block scalar, one line break per line.
+///
+/// The header is written first, and the block is indented one level deeper than `level`.
+/// Returns the chomping of the block if its final line break was written, in which case nothing
+/// else needs to write it.
+pub(crate) fn write_literal_block(
+    writer: &mut dyn fmt::Write,
+    v: &str,
+    best_indent: usize,
+    level: isize,
+) -> Result<Option<Chomping>, fmt::Error> {
+    let needs_indent_indicator = v.trim_start_matches('\n').starts_with([' ', '\t']);
+    let trailing_line_breaks = v.len() - v.trim_end_matches('\n').len();
+    // Clip chomping keeps one final line break, keep chomping keeps all of them.
+    let keep = trailing_line_breaks > 1;
+    let header = if keep {
+        "|+"
+    } else if trailing_line_breaks == 1 {
+        "|"
+    } else {
+        "|-"
+    };
+    if needs_indent_indicator {
+        writer.write_str(&format!("|{best_indent}{}", &header[1..]))?;
+    } else {
+        writer.write_str(header)?;
+    }
+
+    let mut block_level = level + 1;
+    if block_level == 0 && (needs_indent_indicator || has_document_marker_line(v)) {
+        // At root, write_indent() emits none; |2 needs two spaces to preserve
+        // leading scalar whitespace, and a line starting with `---` or `...` would end
+        // the document.
+        block_level = 1;
+    }
+    // lines() will omit the last line if it is empty.
+    for line in v.lines() {
+        writeln!(writer)?;
+        write_indent(writer, block_level, best_indent)?;
+        // It's literal text, so don't escape special chars.
+        writer.write_str(line)?;
+    }
+    if trailing_line_breaks > 0 {
+        // The final line break is part of the value. Write it here, since no node follows
+        // the block at the end of the document.
+        writeln!(writer)?;
+        Ok(Some(if keep { Chomping::Keep } else { Chomping::Clip }))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Write the indentation of `level`, which is none for the root and below.
+pub(crate) fn write_indent(
+    writer: &mut dyn fmt::Write,
+    level: isize,
+    best_indent: usize,
+) -> fmt::Result {
+    const SPACES: &str = "                                                                ";
+    let mut remaining = best_indent * usize::try_from(level).unwrap_or(0);
+    while remaining > 0 {
+        let n = remaining.min(SPACES.len());
+        writer.write_str(&SPACES[..n])?;
+        remaining -= n;
+    }
+    Ok(())
+}
+
+/// Check whether the string can, and should, be written as a literal block.
+///
+/// It must contain a line break, and a line of text (a string made only of line breaks is
+/// quoted), and only characters that a literal block can hold.
+pub(crate) fn can_be_literal_block(s: &str) -> bool {
+    s.contains('\n')
+        && !s.trim_start_matches('\n').is_empty()
+        && char_traits::is_valid_literal_block_scalar(s)
+}
+
+macro_rules! write_float {
+    ($name:ident, $type:ty) => {
+        /// Write a float the way the Core Schema reads it back.
+        pub(crate) fn $name(writer: &mut dyn fmt::Write, v: $type) -> fmt::Result {
+            if v.is_nan() {
+                writer.write_str(".nan")
+            } else if v.is_infinite() {
+                writer.write_str(if v.is_sign_negative() {
+                    "-.inf"
+                } else {
+                    ".inf"
+                })
+            } else {
+                // Without a fractional part, it would be read back as an integer.
+                write!(
+                    writer,
+                    "{v}{}",
+                    if FloatCore::fract(v) == 0.0 { ".0" } else { "" }
+                )
+            }
+        }
+    };
+}
+write_float!(write_f64, f64);
+write_float!(write_f32, f32);
 
 /// Check whether a line of the string would be a document marker (`---` or `...` followed by a
 /// space, a tab or the end of the line) if it were written without indentation.
@@ -515,7 +557,7 @@ fn has_document_marker_line(s: &str) -> bool {
 /// * When the string looks like a number, such as integers (e.g. 2, 14, etc.), floats (e.g. 2.6, 14.9) and exponential numbers (e.g. 12e7, etc.) (otherwise, it would be treated as a numeric value);
 /// * When the string looks like a date (e.g. 2014-12-31) (otherwise it would be automatically converted into a Unix timestamp).
 #[allow(clippy::doc_markdown)]
-fn need_quotes(string: &str) -> bool {
+pub(crate) fn need_quotes(string: &str) -> bool {
     fn need_quotes_spaces(string: &str) -> bool {
         string.starts_with(' ') || string.ends_with(' ')
     }
