@@ -843,8 +843,8 @@ impl<'input, T: Input> Parser<'input, T> {
                     ));
                 }
                 Token(_, TokenType::DocumentStart | TokenType::StreamEnd) => {}
-                // Report this now rather than from the next document: a caller reading a single
-                // document stops at `DocumentEnd` and would never see the error.
+                // Detect invalid trailing content immediately rather than deferring the error into
+                // the next document.
                 Token(span, _) => {
                     return Err(ScanError::new_str(
                         span.start,
