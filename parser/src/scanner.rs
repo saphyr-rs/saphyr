@@ -19,6 +19,11 @@ use core::char;
 
 use thiserror::Error;
 
+/// Maximum depth of nested block collections before the scanner gives up.
+///
+/// The loader recurses once per nesting level, so this bounds its stack use.
+const MAX_BLOCK_DEPTH: usize = 256;
+
 use crate::{
     char_traits::{
         as_hex, is_anchor_char, is_blank_or_breakz, is_break, is_breakz, is_flow, is_hex,
@@ -1617,7 +1622,7 @@ impl<'input, T: Input> Scanner<'input, T> {
         self.skip_non_blank();
 
         // generate BLOCK-SEQUENCE-START if indented
-        self.roll_indent(mark.col, None, TokenType::BlockSequenceStart, mark);
+        self.roll_indent(mark.col, None, TokenType::BlockSequenceStart, mark)?;
         let found_tabs = self.skip_ws_to_eol(SkipTabs::Yes)?.found_tabs();
         self.input.lookahead(2);
         if found_tabs && self.input.next_char_is('-') && is_blank_or_breakz(self.input.peek_nth(1))
@@ -2469,7 +2474,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 None,
                 TokenType::BlockMappingStart,
                 start_mark,
-            );
+            )?;
         } else if let Some(mapping_started) = self.flow_mapping_started.last_mut() {
             // The scanner, upon emitting a `Key`, will prepend a `MappingStart` event.
             *mapping_started = true;
@@ -2580,7 +2585,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 Some(sk.token_number),
                 TokenType::BlockMappingStart,
                 sk.mark,
-            );
+            )?;
             self.roll_one_col_indent();
 
             self.simple_keys
@@ -2607,7 +2612,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                     None,
                     TokenType::BlockMappingStart,
                     start_mark,
-                );
+                )?;
             }
             self.roll_one_col_indent();
 
@@ -2634,9 +2639,9 @@ impl<'input, T: Input> Scanner<'input, T> {
         number: Option<usize>,
         tok: TokenType<'input>,
         mark: Marker,
-    ) {
+    ) -> ScanResult {
         if self.flow_level > 0 {
-            return;
+            return Ok(());
         }
 
         // If the last indent was a non-block indent, remove it.
@@ -2652,6 +2657,10 @@ impl<'input, T: Input> Scanner<'input, T> {
         }
 
         if self.indent < col as isize {
+            // Block nesting is consumed recursively by the loader; bound it like flow nesting.
+            if self.indents.len() >= MAX_BLOCK_DEPTH {
+                return Err(ScanError::new_str(mark, "recursion limit exceeded"));
+            }
             self.indents.push(Indent {
                 indent: self.indent,
                 needs_block_end: true,
@@ -2663,6 +2672,7 @@ impl<'input, T: Input> Scanner<'input, T> {
                 None => self.tokens.push_back(Token(Span::empty(mark), tok)),
             }
         }
+        Ok(())
     }
 
     /// Pop indentation levels from the stack as much as needed.
