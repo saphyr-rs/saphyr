@@ -1,0 +1,25 @@
+[package]
+name = "saphyr-serde"
+authors = { workspace = true }
+categories = [ "encoding", "parser-implementations" ]
+description = "Serde support for saphyr, a YAML 1.2 library"
+documentation = "https://docs.rs/saphyr-serde"
+edition = { workspace = true }
+keywords = [ "yaml", "serde", "serialization" ]
+license = { workspace = true }
+readme = "README.md"
+repository = { workspace = true }
+rust-version = { workspace = true }
+version = { workspace = true }
+
+[dependencies]
+# Without the `encoding` feature of `saphyr`. (A workspace dependency cannot opt out of its default features.)
+saphyr = { path = "../saphyr", version = "0.3.3", default-features = false }
+saphyr-parser = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+serde = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true
