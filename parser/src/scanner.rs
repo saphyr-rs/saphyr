@@ -1813,7 +1813,6 @@ impl<'input, T: Input> Scanner<'input, T> {
         }
 
         let mut line_buffer = String::with_capacity(100);
-        let start_mark = self.mark;
         while self.mark.col == indent && is_yaml_non_break(self.input.peek()) {
             if indent == 0 {
                 // A document marker ends the scalar, whether it starts another document or not.

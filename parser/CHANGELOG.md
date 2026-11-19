@@ -5,6 +5,15 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
+## Unreleased
+
+**Breaking Changes**:
+
+- The span of a block scalar now starts at its `|` or `>` indicator, as libyaml reports it.
+  A block scalar with content started at its first content character.
+  ([+159](https://github.com/saphyr-rs/saphyr/pull/159))
+
+
 ## v0.3.4
 
 **Changes**:
