@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+**Breaking Changes**:
+
+- The span of a block scalar node now starts at its `|` or `>` indicator, as libyaml reports it.
+  A block scalar with content started at its first content character.
+  ([+159](https://github.com/saphyr-rs/saphyr/pull/159))
+
+
 ## v0.3.4
 
 **Fixes**:
