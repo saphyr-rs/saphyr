@@ -8,6 +8,8 @@
   A block scalar with content started at its first content character.
   ([+159](https://github.com/saphyr-rs/saphyr/pull/159))
 
+**Changes**:
+- `encoding_rs` was updated to `v0.8.45`.
 
 ## v0.3.4
 
