@@ -5,12 +5,12 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
-## Unreleased
+## v0.4.0
 
 **Breaking Changes**:
 
 - The span of a block scalar now starts at its `|` or `>` indicator, as libyaml reports it.
-  A block scalar with content started at its first content character.
+  A block scalar with content previously started at its first content character.
   ([+159](https://github.com/saphyr-rs/saphyr/pull/159))
 
 **Changes**:
@@ -21,8 +21,6 @@
 ## v0.3.4
 
 **Changes**:
-
-- `encoding_rs` was updated to `v0.8.45`.
 
 - `hashlink` was updated to `v0.12.2`.
 

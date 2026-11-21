@@ -1,15 +1,17 @@
 # Changelog
 
-## Unreleased
+
+## v0.4.0
 
 **Breaking Changes**:
 
 - The span of a block scalar node now starts at its `|` or `>` indicator, as libyaml reports it.
-  A block scalar with content started at its first content character.
+  A block scalar with content previously started at its first content character.
   ([+159](https://github.com/saphyr-rs/saphyr/pull/159))
 
 **Changes**:
-- `encoding_rs` was updated to `v0.8.45`.
+- `encoding_rs` is no longer pinned to a non-major upper version bound.
+
 
 ## v0.3.4
 
