@@ -13,6 +13,10 @@
   A block scalar with content started at its first content character.
   ([+159](https://github.com/saphyr-rs/saphyr/pull/159))
 
+**Changes**:
+
+- The `gen_large_yaml` tool no longer depends on `lipsum`.
+
 
 ## v0.3.4
 

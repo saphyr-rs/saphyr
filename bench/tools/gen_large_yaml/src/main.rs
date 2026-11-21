@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 mod r#gen;
+mod lipsum; // Vendored from lipsum-0.9.1
 mod nested;
 
 use std::fs::File;
@@ -195,7 +196,7 @@ impl Generator {
         mut obj_creator: F,
     ) -> std::io::Result<()> {
         let mut first = true;
-        for _ in 0..self.rng.gen_range(len_lo..len_hi) {
+        for _ in 0..self.rng.random_range(len_lo..len_hi) {
             if first {
                 first = false;
             } else {
