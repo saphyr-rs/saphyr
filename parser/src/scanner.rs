@@ -2483,12 +2483,18 @@ impl<'input, T: Input> Scanner<'input, T> {
         }
 
         self.skip_non_blank();
-        self.skip_yaml_whitespace()?;
-        if self.input.peek() == '\t' {
-            return Err(ScanError::new_str(
-                self.mark(),
-                "tabs disallowed in this context",
-            ));
+        if self.flow_level == 0 {
+            self.skip_yaml_whitespace()?;
+            if self.input.peek() == '\t' {
+                return Err(ScanError::new_str(
+                    self.mark(),
+                    "tabs disallowed in this context",
+                ));
+            }
+        } else {
+            // In a flow collection, `?` is separated from its key like any other flow token,
+            // tabs included.
+            self.skip_to_next_token()?;
         }
         self.tokens
             .push_back(Token(Span::new(start_mark, self.mark), TokenType::Key));
