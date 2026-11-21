@@ -951,7 +951,7 @@ impl<'input, T: Input> Scanner<'input, T> {
     /// Skip over YAML whitespace (` `, `\n`, `\r`).
     ///
     /// # Errors
-    /// This function returns an error if no whitespace was found.
+    /// This function returns an error if no whitespace was found and the input is not exhausted.
     fn skip_yaml_whitespace(&mut self) -> ScanResult {
         let mut need_whitespace = true;
         loop {
@@ -978,7 +978,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             }
         }
 
-        if need_whitespace {
+        if need_whitespace && self.input.peek_opt().is_some() {
             Err(ScanError::new_str(self.mark(), "expected whitespace"))
         } else {
             Ok(())

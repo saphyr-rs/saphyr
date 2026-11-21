@@ -477,3 +477,12 @@ fn test_empty_block_scalar_at_eof_is_empty() {
         );
     }
 }
+
+#[test]
+fn test_explicit_key_at_eof() {
+    // `b-comment` may be the end of the input (YAML 1.2.2, 6.6), so nothing needs to follow `?`.
+    for (s, with_break) in [("?", "?\n"), ("- ?", "- ?\n")] {
+        assert_eq!(run_parser(s).unwrap(), run_parser(with_break).unwrap());
+    }
+    assert!(run_parser("?\0").is_err());
+}
