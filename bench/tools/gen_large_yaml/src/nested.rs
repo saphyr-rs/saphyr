@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 /// Create a deep object with the given amount of nodes.
 pub fn create_deep_object<W: std::io::Write>(

@@ -1,6 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 
-use rand::{Rng, distr::Alphanumeric, rngs::SmallRng};
+use rand::{RngExt, distr::Alphanumeric, rngs::SmallRng};
 
 /// Generate a string with hexadecimal digits of the specified length.
 pub fn hex_string(rng: &mut SmallRng, len: usize) -> String {

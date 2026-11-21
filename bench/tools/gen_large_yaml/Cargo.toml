@@ -11,5 +11,5 @@ edition = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-rand = { version = "0.9", features = ["small_rng"] }
-rand_chacha = "0.9"
+rand = { version = "0.10" }
+rand_chacha = "0.10"

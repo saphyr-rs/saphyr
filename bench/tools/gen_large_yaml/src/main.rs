@@ -8,7 +8,7 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
 
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 /// The path into which the generated YAML files will be written.
 const OUTPUT_DIR: &str = "bench_yaml";

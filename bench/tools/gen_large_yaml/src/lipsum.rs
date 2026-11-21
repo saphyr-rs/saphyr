@@ -29,7 +29,7 @@
 #![deny(missing_docs)]
 
 use rand::prelude::IndexedRandom;
-use rand::{Rng, RngCore, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::collections::HashMap;
 
@@ -496,7 +496,7 @@ pub fn lipsum_words(n: usize) -> String {
 /// ```
 ///
 /// [`thread_rng`]: https://docs.rs/rand/latest/rand/fn.thread_rng.html
-pub fn lipsum_words_with_rng(rng: impl RngCore, n: usize) -> String {
+pub fn lipsum_words_with_rng(rng: impl Rng, n: usize) -> String {
     LOREM_IPSUM_CHAIN.with(|chain| chain.generate_with_rng(rng, n))
 }
 
