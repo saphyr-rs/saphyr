@@ -5,6 +5,14 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
+## Unreleased
+
+**Fixes**:
+
+- A block scalar with clip chomping (`|` or `>`) whose input ends with a line holding only
+  indentation and no line break no longer gains an extra line break. `|\n a\n ` gave `"a\n\n"`.
+
+
 ## v0.4.0
 
 **Breaking Changes**:

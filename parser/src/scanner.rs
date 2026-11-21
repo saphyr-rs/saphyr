@@ -1844,6 +1844,8 @@ impl<'input, T: Input> Scanner<'input, T> {
             // break unless the line ends with a line break, e.g., on EOF
             self.input.lookahead(2);
             if !self.input.next_is_break() {
+                // The end of the input ends the content line as a line break would.
+                leading_break.push('\n');
                 break;
             }
 
@@ -1851,17 +1853,17 @@ impl<'input, T: Input> Scanner<'input, T> {
 
             // Eat the following indentation spaces and line breaks.
             self.skip_block_scalar_indent(indent, &mut trailing_breaks);
+
+            // A last line holding the full indentation and ended by the end of the input is an
+            // empty line.
+            if self.input.next_is_z() && self.mark.col >= indent.max(1) {
+                trailing_breaks.push('\n');
+            }
         }
 
         // Chomp the tail.
         if chomping != Chomping::Strip {
             string.push_str(&leading_break);
-            // If we had reached an eof but the last character wasn't an end-of-line, check if the
-            // last line was indented at least as the rest of the scalar, then we need to consider
-            // there is a newline.
-            if self.input.next_is_z() && self.mark.col >= indent.max(1) {
-                string.push('\n');
-            }
         }
 
         if chomping == Chomping::Keep {
