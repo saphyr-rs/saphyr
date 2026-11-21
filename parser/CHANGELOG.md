@@ -5,6 +5,14 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
+## Unreleased
+
+**Fixes**:
+
+- A plain scalar in a flow collection may end in a `-` before `,`, `]` or `}`, as in `[a -]`.
+  Only a `-` that starts the scalar is rejected there.
+
+
 ## v0.4.0
 
 **Breaking Changes**:
