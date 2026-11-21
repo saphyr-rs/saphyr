@@ -6,6 +6,7 @@ members = [
     "parser",
     "parser/tools/walk",
     "saphyr",
+    "serde",
     "bench",
     "bench/tools/gen_large_yaml",
     "bench/tools/bench_compare",
@@ -47,6 +48,7 @@ quickcheck = "1.1"
 rustyline = "17.0.2"
 saphyr = { path = "saphyr" }
 saphyr-bench = { path = "bench" }
+serde = { version = "1.0", default-features = false, features = ["std"] }
 thiserror = { version = "2.0.20", default-features = false }
 
 [workspace.lints.rust]
