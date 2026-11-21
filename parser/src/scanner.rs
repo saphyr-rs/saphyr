@@ -2546,9 +2546,14 @@ impl<'input, T: Input> Scanner<'input, T> {
 
         // Skip over ':'.
         self.skip_non_blank();
-        if self.input.look_ch() == '\t'
-            && !self.skip_ws_to_eol(SkipTabs::Yes)?.has_valid_yaml_ws()
-            && (self.input.peek() == '-' || self.input.next_is_alpha())
+        // Only a flow node may follow tabs (YAML 1.2.2, 8.2.3), so reject a block sequence here
+        // and keep a block mapping from starting on this line below.
+        let tab_separated = self.input.look_ch() == '\t'
+            && !self.skip_ws_to_eol(SkipTabs::Yes)?.has_valid_yaml_ws();
+        self.input.lookahead(2);
+        if tab_separated
+            && self.input.next_char_is('-')
+            && is_blank_or_breakz(self.input.peek_nth(1))
         {
             return Err(ScanError::new_str(
                 self.mark,
@@ -2610,7 +2615,7 @@ impl<'input, T: Input> Scanner<'input, T> {
             }
             self.roll_one_col_indent();
 
-            if self.flow_level == 0 {
+            if self.flow_level == 0 && !tab_separated {
                 self.allow_simple_key();
             } else {
                 self.disallow_simple_key();
