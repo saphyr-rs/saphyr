@@ -5,6 +5,15 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
+## Unreleased
+
+**Fixes**:
+
+- Inside a flow collection, a tab may separate the `?` of an explicit key from the key, as in
+  `{?\tkey: value}`. It was rejected with `expected whitespace` or
+  `tabs disallowed in this context`.
+
+
 ## v0.4.0
 
 **Breaking Changes**:
