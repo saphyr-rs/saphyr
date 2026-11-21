@@ -2327,7 +2327,11 @@ impl<'input, T: Input> Scanner<'input, T> {
                 break;
             }
 
-            if self.flow_level > 0 && self.input.peek() == '-' && is_flow(self.input.peek_nth(1)) {
+            if self.flow_level > 0
+                && string.is_empty()
+                && self.input.peek() == '-'
+                && is_flow(self.input.peek_nth(1))
+            {
                 return Err(ScanError::new_str(
                     self.mark,
                     "plain scalar cannot start with '-' followed by ,[]{}",
