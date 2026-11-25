@@ -5,12 +5,14 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
+
 ## Unreleased
 
 **Fixes**:
 
 - An explicit key indicator `?` at the end of the input parses as an empty key with an empty
   value, as it does when a line break follows it.
+  ([+160](https://github.com/saphyr-rs/saphyr/pull/160))
 
 
 ## v0.4.0
