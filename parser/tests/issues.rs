@@ -486,3 +486,21 @@ fn test_explicit_key_at_eof() {
     }
     assert!(run_parser("?\0").is_err());
 }
+
+#[test]
+fn test_tab_after_value_indicator() {
+    // A tab may separate `:` from a flow node (YAML 1.2.2, 8.2.3), but not from a block collection.
+    for (tab, space) in [
+        ("a:\tb", "a: b"),
+        ("a:\t-1", "a: -1"),
+        ("- a:\tb", "- a: b"),
+        ("{a:\tb}", "{a: b}"),
+        ("[a:\tb]", "[a: b]"),
+        ("? a\n:\tb", "? a\n: b"),
+    ] {
+        assert_eq!(run_parser(tab).unwrap(), run_parser(space).unwrap());
+    }
+    for s in ["a:\t- b", "? a\n:\t- b", "? a\n:\tb: c", "? a\n:\t&x b: c"] {
+        assert!(run_parser(s).is_err(), "expected an error for {s:?}");
+    }
+}

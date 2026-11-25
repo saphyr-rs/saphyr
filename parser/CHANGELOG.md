@@ -5,7 +5,6 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
-
 ## Unreleased
 
 **Fixes**:
@@ -17,6 +16,10 @@
 - A block scalar with clip chomping (`|` or `>`) whose input ends with a line holding only
   indentation and no line break no longer gains an extra line break. `|\n a\n ` gave `"a\n\n"`.
   ([+161](https://github.com/saphyr-rs/saphyr/pull/161))
+
+- A tab may separate the `:` of a mapping value from a plain scalar, as in `a:\tb` or `a:\t-1`.
+  A block sequence or an implicit key after that tab is an error.
+  ([+162](https://github.com/saphyr-rs/saphyr/pull/162))
 
 
 ## v0.4.0
