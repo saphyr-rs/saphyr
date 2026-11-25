@@ -14,6 +14,10 @@
   value, as it does when a line break follows it.
   ([+160](https://github.com/saphyr-rs/saphyr/pull/160))
 
+- A block scalar with clip chomping (`|` or `>`) whose input ends with a line holding only
+  indentation and no line break no longer gains an extra line break. `|\n a\n ` gave `"a\n\n"`.
+  ([+161](https://github.com/saphyr-rs/saphyr/pull/161))
+
 
 ## v0.4.0
 
