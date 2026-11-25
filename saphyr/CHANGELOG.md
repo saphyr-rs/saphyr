@@ -1,6 +1,14 @@
 # Changelog
 
 
+## v0.4.1
+
+**Fixes**:
+
+- Update to [saphyr-parser v0.4.1](https://crates.io/crates/saphyr-parser/0.4.1).
+  See the [saphyr-parser changelog](../parser/CHANGELOG.md) for more details.
+
+
 ## v0.4.0
 
 **Breaking Changes**:
