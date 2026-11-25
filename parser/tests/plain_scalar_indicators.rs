@@ -43,3 +43,41 @@ fn colon_without_space_is_part_of_scalar_value() {
         ]
     );
 }
+
+/// Collects the values of the scalar events, or the first error.
+fn scalars(input: &str) -> Result<Vec<String>, ScanError> {
+    let mut values = Vec::new();
+    for event in Parser::new_from_str(input) {
+        if let Event::Scalar(value, ..) = event?.0 {
+            values.push(value.into_owned());
+        }
+    }
+    Ok(values)
+}
+
+#[test]
+fn dash_continuing_plain_scalar_may_precede_flow_indicator() {
+    // Only the first character of a plain scalar restricts what may follow a `-`.
+    for (input, expected) in [
+        ("[a -]", &["a -"][..]),
+        ("[a\n-]", &["a -"]),
+        ("[a -, b]", &["a -", "b"]),
+        ("[a  -  ]", &["a  -"]),
+        ("{a -}", &["a -", ""]),
+        ("{a -: b -}", &["a -", "b -"]),
+    ] {
+        assert_eq!(scalars(input).unwrap(), expected, "{input:?}");
+    }
+}
+
+#[test]
+fn plain_scalar_cannot_start_with_dash_followed_by_flow_indicator() {
+    for input in ["[-]", "[a, -]", "{-}", "[a,\n-]"] {
+        let err = scalars(input).unwrap_err();
+        assert_eq!(
+            err.info(),
+            "plain scalar cannot start with '-' followed by ,[]{}",
+            "{input:?}"
+        );
+    }
+}

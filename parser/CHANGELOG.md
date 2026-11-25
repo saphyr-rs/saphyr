@@ -5,6 +5,7 @@
 - "Version bump" releases increment their version to match the crate workspace and
   contain no functional changes.
 
+
 ## Unreleased
 
 **Fixes**:
@@ -20,6 +21,10 @@
 - A tab may separate the `:` of a mapping value from a plain scalar, as in `a:\tb` or `a:\t-1`.
   A block sequence or an implicit key after that tab is an error.
   ([+162](https://github.com/saphyr-rs/saphyr/pull/162))
+
+- A plain scalar in a flow collection may end in a `-` before `,`, `]` or `}`, as in `[a -]`.
+  Only a `-` that starts the scalar is rejected there.
+  ([+163](https://github.com/saphyr-rs/saphyr/pull/163))
 
 
 ## v0.4.0
