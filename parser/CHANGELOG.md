@@ -26,6 +26,11 @@
   Only a `-` that starts the scalar is rejected there.
   ([+163](https://github.com/saphyr-rs/saphyr/pull/163))
 
+- Inside a flow collection, a tab may separate the `?` of an explicit key from the key, as in
+  `{?\tkey: value}`. It was rejected with `expected whitespace` or
+  `tabs disallowed in this context`.
+  ([+164](https://github.com/saphyr-rs/saphyr/pull/164))
+
 
 ## v0.4.0
 
