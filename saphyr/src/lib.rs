@@ -140,6 +140,7 @@ mod macros;
 mod annotated;
 mod char_traits;
 mod emitter;
+mod event_emitter;
 mod index;
 mod loader;
 mod scalar;
@@ -153,6 +154,7 @@ pub use crate::annotated::{
     marked_yaml_owned::MarkedYamlOwned,
 };
 pub use crate::emitter::{EmitError, YamlEmitter};
+pub use crate::event_emitter::{EmitEvent, EventEmitError, EventEmitResult, YamlEventEmitter};
 pub use crate::index::{Accessor, SafelyIndex, SafelyIndexMut};
 pub use crate::loader::{LoadError, LoadableYamlNode, YamlLoader};
 pub use crate::scalar::{Scalar, ScalarOwned, parse_core_schema_fp};
